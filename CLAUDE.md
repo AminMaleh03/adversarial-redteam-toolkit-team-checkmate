@@ -87,12 +87,27 @@ These are decided. Implement them as written; do not reopen the discussion.
 **Truncation**
 - The model is never truncated. V1 lets over-length input reach the model. V2 rejects it before
   inference. Silently truncating would hide the exact failure we are trying to measure.
+- Leaving truncation unset on the Hugging Face pipeline is not enough. Every point where text
+  reaches the tokenizer or the model must be checked, including any direct tokenizer call,
+  because silent truncation anywhere in that path neutralises two of our attack categories.
+- This is easy to reintroduce by accident while fixing an unrelated error, so it must be
+  verified once V1 is running rather than assumed.
 
 **V2 defenses — exactly four, no more**
 1. A length limit tied to the model's max sequence length.
 2. Strict type checking on the request body.
 3. A scoped exception handler. It must **not** convert 422 validation responses into 500s.
 4. Unicode normalization with whitespace cleanup.
+
+**What counts as a crash finding**
+- An unhandled 5xx, or a request failing at the connection level, is a sufficient and expected
+  finding on its own.
+- The uvicorn process itself will probably never die, because FastAPI catches exceptions per
+  request and returns a 500. That is fine and expected.
+- Do not attempt to make the process die, do not treat a surviving process as a failure, and
+  never introduce an artificial crash to produce a demo.
+- We still ping health after every request, and still report HTTP errors and service death as two
+  separate numbers. The measurement does not change, only the expectation of what we will find.
 
 ## Scaffold State
 

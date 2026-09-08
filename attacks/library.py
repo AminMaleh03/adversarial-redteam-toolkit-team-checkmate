@@ -19,16 +19,26 @@ and for analysis to join against. It is generated output -- do not commit it.
 
 from __future__ import annotations
 
+from typing import Callable, Optional
+
 from contract import AttackCase, BaselineCase
 from attacks import boundary, encoding, malformed, perturbation, truncation, whitespace
 from attacks import metadata as md
 
 
-def standalone_cases() -> list[AttackCase]:
-    """Every payload that needs no baseline sentence. Called once by the runner."""
+def standalone_cases(*, token_counter: Optional[Callable[[str], int]] = None,
+                     max_tokens: Optional[int] = None) -> list[AttackCase]:
+    """
+    Every payload that needs no baseline sentence. Called once by the runner.
+
+    Amin's plain ``standalone_cases()`` call still works and uses approximate length
+    boundaries. Passing a real ``token_counter`` (+ ``max_tokens``) makes boundary.py emit
+    exact N-1 / N / N+1 length cases -- this is how the integration step injects the real
+    tokenizer without changing the public signature.
+    """
     cases: list[AttackCase] = []
     cases.extend(malformed.standalone())
-    cases.extend(boundary.standalone())
+    cases.extend(boundary.standalone(token_counter=token_counter, max_tokens=max_tokens))
     cases.extend(encoding.standalone())
     return cases
 
@@ -43,9 +53,11 @@ def build_derived(baseline: BaselineCase) -> list[AttackCase]:
     return cases
 
 
-def build_suite(baselines: list[BaselineCase]) -> list[AttackCase]:
+def build_suite(baselines: list[BaselineCase], *,
+                token_counter: Optional[Callable[[str], int]] = None,
+                max_tokens: Optional[int] = None) -> list[AttackCase]:
     """Convenience: the whole suite (standalone + derived for every baseline)."""
-    cases = list(standalone_cases())
+    cases = list(standalone_cases(token_counter=token_counter, max_tokens=max_tokens))
     for baseline in baselines:
         cases.extend(build_derived(baseline))
     return cases

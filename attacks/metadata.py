@@ -3,31 +3,33 @@ Provenance and oracle metadata for every attack the library produces.
 
 Why this exists
 ---------------
-`contract.AttackCase` is frozen and deliberately minimal: it carries only what the
-runner needs to fire a request. But a serious robustness scanner has to record more
-than "here is a weird string" — it has to record, for each case:
-
-  * where the payload came from (which research / standard / dataset),
-  * what *relation* the transformation declares (should the label stay the same,
-    should the request be rejected, should the service stay up), and
-  * what *oracle* decides whether the observed behaviour is actually a defect.
-
-We do NOT touch the frozen contract to store this. Instead every `AttackCase` we build
-is registered here in a sidecar manifest keyed by `attack_id`. Analysis and the report
-can read the manifest to know, per case, what "failure" even means — they never have to
-guess. This is the difference between a behavioural-testing framework and a bag of
-exploits.
+``contract.AttackCase`` is frozen and deliberately minimal: it carries only what the
+runner needs to fire a request. A serious robustness scanner has to record more than
+"here is a weird string" -- for each case it records where the payload came from, what
+*relation* the transformation declares, and what *oracle* decides whether the observed
+behaviour is actually a defect. We keep all of that here, in a sidecar manifest keyed by
+``attack_id``, so the frozen contract is never touched.
 
 Division of responsibility (do not blur it)
 -------------------------------------------
-This layer only *declares* the expected relation and oracle. It never decides that an
-attack "succeeded". The runner supplies the observed response; the analysis evaluates
-the observed response against the declared oracle. So a case says
-"label_should_match_baseline", and only Khalid's analysis rules on whether it did.
+This layer only *declares* expectations. It never decides that an attack "succeeded". The
+runner supplies the observed response; the analysis evaluates it against the declared
+oracle.
+
+Generic facts vs target-profile expectations
+--------------------------------------------
+Most fields (relation, oracle, source, dose, position) are generic: they hold no matter
+what endpoint you point the scanner at. A few (``expected_sanitizer_behavior``,
+``expected_http_behavior``) are expectations about *this competition's* hardened endpoint,
+so they are grouped under ``target_profile`` (default ``"rayyan-v2"``). A future user
+pointing the scanner at a different system would supply a different profile rather than
+inherit Rayyan-specific assumptions as universal truth. This keeps today's integration
+working while leaving a clean migration path.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import asdict, dataclass, field
 from typing import Optional
@@ -35,19 +37,18 @@ from typing import Optional
 from contract import AttackCase
 
 # --------------------------------------------------------------------------------------
-# Controlled vocabularies. Kept as module constants so a typo becomes an ImportError
-# instead of a silent string mismatch that analysis can't join on later.
+# Controlled vocabularies (module constants so a typo is an ImportError, not a silent join
+# failure downstream).
 # --------------------------------------------------------------------------------------
 
-# What the transformation promises about the model's decision / the service's behaviour.
+# Relation the transformation declares about model decision / service behaviour.
 REL_INVARIANT = "invariant"        # meaning preserved -> label must not change
-REL_SCHEMA = "schema"              # request is malformed/invalid -> must be rejected cleanly
+REL_SCHEMA = "schema"              # request malformed/invalid -> rejected cleanly
 REL_BOUNDARY = "boundary"          # around a defined limit -> defined, graceful behaviour
 REL_AVAILABILITY = "availability"  # unusual but bounded -> service must stay up
-REL_DIRECTIONAL = "directional"    # RESERVED for Phase 2 (negation/contrast/intensity).
-#                                    Changes the oracle, so it is a team decision, not a
-#                                    silent addition to this branch. Defined here only so
-#                                    the vocabulary is complete when the team enables it.
+REL_DIRECTIONAL = "directional"    # RESERVED for Phase 2 (negation/contrast/intensity);
+#                                    changes the oracle, so it is a team decision, defined
+#                                    here only to complete the vocabulary.
 
 RELATIONS = frozenset(
     {REL_INVARIANT, REL_SCHEMA, REL_BOUNDARY, REL_AVAILABILITY, REL_DIRECTIONAL}
@@ -59,6 +60,7 @@ ORACLE_REQUEST_REJECTED = "request_should_be_rejected_cleanly"
 ORACLE_GRACEFUL_OR_TRUNCATE = "endpoint_should_fail_gracefully_or_apply_documented_truncation"
 ORACLE_STAY_AVAILABLE = "endpoint_should_stay_available"
 ORACLE_NO_INFO_LEAK = "error_response_must_not_leak_internals"
+ORACLE_DIAGNOSTIC = "diagnostic_no_fixed_oracle"  # inspect only; never auto-scored
 
 ORACLES = frozenset(
     {
@@ -67,15 +69,14 @@ ORACLES = frozenset(
         ORACLE_GRACEFUL_OR_TRUNCATE,
         ORACLE_STAY_AVAILABLE,
         ORACLE_NO_INFO_LEAK,
+        ORACLE_DIAGNOSTIC,
     }
 )
 
-# Confidence that the declared relation actually holds for this case. Drives whether a
-# result can be counted automatically or must be human-reviewed before it is a finding.
-# Rationale: Morris et al. (2020) showed many "successful" NLP attacks silently break
-# semantics, so a flip on a REVIEW/DIAGNOSTIC case is not automatically a vulnerability.
-TIER_GOLD = "GOLD"            # deterministic relation (schema/boundary) or human-labelled seed
-TIER_SILVER = "SILVER"        # mechanically justified, low semantic risk (e.g. 1 typo)
+# Confidence that the declared relation holds. Morris et al. (2020) showed many "successful"
+# NLP attacks silently break semantics, so REVIEW/DIAGNOSTIC cases are never auto-scored.
+TIER_GOLD = "GOLD"            # deterministic relation, or human-labelled seed
+TIER_SILVER = "SILVER"        # mechanically justified, low semantic risk
 TIER_REVIEW = "REVIEW"        # meaning could have shifted; do not count automatically
 TIER_DIAGNOSTIC = "DIAGNOSTIC"  # intentionally ambiguous; inspect, never score as a vuln
 
@@ -83,19 +84,28 @@ VALIDITY_TIERS = frozenset({TIER_GOLD, TIER_SILVER, TIER_REVIEW, TIER_DIAGNOSTIC
 
 SEMANTIC_RISK = frozenset({"low", "medium", "high", "none"})
 
-# What we EXPECT the hardened V2 to do with this payload. This is a hypothesis to be
-# measured, never an assertion. It is what powers the automated before/after column.
-SAN_V2_STRIPS = "v2_strips"                    # control/format char removed (zero-width, RTL, null)
-SAN_V2_NORMALIZES = "v2_normalizes"            # NFKC folds it (compatibility forms, full-width)
+# Where a payload's characters/positions sit.
+POSITIONS = frozenset(
+    {"leading", "middle", "trailing", "whole", "content_word", "start", "end", "none"}
+)
+
+# How a boundary length was derived.
+BOUNDARY_SOURCES = frozenset(
+    {"tokenizer", "approximate_word_estimate", "code", "empirical"}
+)
+
+# --- target-profile expectations (profile: rayyan-v2) ---------------------------------
+# What we EXPECT this competition's hardened V2 to do. Hypotheses, measured by the runner,
+# never assertions.
+SAN_V2_STRIPS = "v2_strips"                    # control/format char removed
+SAN_V2_NORMALIZES = "v2_normalizes"            # NFKC folds it (compatibility forms)
 SAN_V2_COLLAPSES_WS = "v2_collapses_whitespace"
-SAN_V2_PASSES_THROUGH = "v2_passes_through"    # NFKC does NOT touch it (mixed-script homoglyphs!)
+SAN_V2_PASSES_THROUGH = "v2_passes_through"    # NFKC does NOT touch it (mixed-script homoglyphs)
 SAN_V2_REJECTS_LENGTH = "v2_rejects_on_length_limit"
 SAN_V2_REJECTS_TYPE = "v2_rejects_on_strict_type"
 SAN_V2_REJECTS_EXTRA = "v2_rejects_on_extra_forbid"
 SAN_NOT_APPLICABLE = "not_applicable"
 
-# What we EXPECT over HTTP. "measure_empirically" is the honest default whenever we are
-# not certain from reading the endpoint code. Measure first, narrate second.
 HTTP_EXPECT_200 = "expect_200_ok"
 HTTP_EXPECT_4XX = "expect_4xx_rejected"
 HTTP_EXPECT_5XX_OR_CONN = "expect_5xx_or_connection_error"
@@ -107,26 +117,32 @@ class AttackMetadata:
     """Everything about an attack that does not fit in the frozen AttackCase contract."""
 
     attack_id: str
-    family: str                       # matches AttackCase.category, e.g. "encoding"
-    subfamily: str                    # e.g. "homoglyph_mixed_script"
+    family: str                       # matches AttackCase.category
+    subfamily: str
     relation: str                     # one of RELATIONS
     oracle: str                       # one of ORACLES
-    source: str                       # e.g. "Unicode UTS #39", "Bad Characters (Boucher 2022)"
+    source: str
     validity_tier: str                # one of VALIDITY_TIERS
     semantic_risk: str = "none"       # one of SEMANTIC_RISK
-    requires_baseline: bool = False   # True for derived (invariance) cases
-    source_version: Optional[str] = None       # e.g. Unicode "15.1"
-    dose: Optional[int] = None                  # number of injections / perturbations
-    position: Optional[str] = None              # start | middle | end | keyword | n/a
-    script_change: Optional[str] = None         # e.g. "Latin->Cyrillic" for confusables
-    boundary_source: Optional[str] = None       # tokenizer | approximate | code | empirical
+    requires_baseline: bool = False
+    # provenance
+    source_version: Optional[str] = None
+    source_url: Optional[str] = None
+    transform_version: str = "v1"
+    # generic attack facts
+    dose: Optional[int] = None
+    position: Optional[str] = None
+    script_change: Optional[str] = None
+    boundary_source: Optional[str] = None
+    boundary_target: Optional[int] = None    # requested token count for a boundary case
+    boundary_measured: Optional[int] = None  # what the counter actually reported
+    # target-profile expectations (profile below)
+    target_profile: str = "rayyan-v2"
     expected_sanitizer_behavior: str = SAN_NOT_APPLICABLE
     expected_http_behavior: str = HTTP_MEASURE
     notes: str = ""
 
     def __post_init__(self) -> None:
-        # Fail loudly at construction if a controlled field is off-vocabulary. A silent
-        # bad value here would only surface as a broken join in analysis, far away.
         if self.relation not in RELATIONS:
             raise ValueError(f"unknown relation {self.relation!r} for {self.attack_id}")
         if self.oracle not in ORACLES:
@@ -135,28 +151,49 @@ class AttackMetadata:
             raise ValueError(f"unknown validity_tier {self.validity_tier!r} for {self.attack_id}")
         if self.semantic_risk not in SEMANTIC_RISK:
             raise ValueError(f"unknown semantic_risk {self.semantic_risk!r} for {self.attack_id}")
+        if self.position is not None and self.position not in POSITIONS:
+            raise ValueError(f"unknown position {self.position!r} for {self.attack_id}")
+        if self.boundary_source is not None and self.boundary_source not in BOUNDARY_SOURCES:
+            raise ValueError(
+                f"unknown boundary_source {self.boundary_source!r} for {self.attack_id}"
+            )
 
 
 # --------------------------------------------------------------------------------------
-# The sidecar manifest. Keyed by attack_id, populated as cases are registered.
+# The sidecar manifest + a payload fingerprint registry.
 # --------------------------------------------------------------------------------------
 
 _MANIFEST: dict[str, AttackMetadata] = {}
+_FINGERPRINTS: dict[str, str] = {}
+
+
+def _fingerprint(case: AttackCase) -> str:
+    """Deterministic digest of a case's payload, so a reused id with a different payload is caught."""
+    parts = [
+        case.attack_id,
+        case.category,
+        str(case.is_raw),
+        case.attacked_text or "",
+        (case.raw_body.decode("utf-8", "surrogatepass")
+         if isinstance(case.raw_body, bytes) else (case.raw_body or "")),
+        json.dumps(case.raw_headers, sort_keys=True) if case.raw_headers else "",
+    ]
+    blob = "\x1f".join(parts).encode("utf-8", "surrogatepass")
+    return hashlib.sha256(blob).hexdigest()
 
 
 def register(case: AttackCase, meta: AttackMetadata) -> AttackCase:
     """
-    Record `meta` for `case` and return the case unchanged.
+    Record ``meta`` for ``case`` and return the case unchanged.
 
-    Every builder in this package funnels through here, which is also the one place we
-    enforce two contract invariants that the tests assert:
-      * attack_id on the case and the metadata agree,
-      * the derived/standalone rule holds: a case with a baseline_id is derived and its
-        metadata must say requires_baseline=True, and vice-versa.
+    Enforced invariants (the tests assert these):
+      * attack_id on case and metadata agree; category == family;
+      * derived cases carry a baseline_id and set requires_baseline=True, and vice-versa;
+      * an attack_id is never reused for a *different* payload (checked by fingerprint) or
+        for different metadata.
 
     Registration is idempotent per attack_id: the runner calls build_derived() once per
-    baseline sentence, so re-registering the same id (same content) just overwrites. A
-    *different* payload reusing an existing id is a bug and raises.
+    baseline, so re-registering the identical case just overwrites.
     """
     if case.attack_id != meta.attack_id:
         raise ValueError(
@@ -164,12 +201,8 @@ def register(case: AttackCase, meta: AttackMetadata) -> AttackCase:
         )
     if case.category != meta.family:
         raise ValueError(
-            f"category/family mismatch on {case.attack_id!r}: "
-            f"{case.category!r} vs {meta.family!r}"
+            f"category/family mismatch on {case.attack_id!r}: {case.category!r} vs {meta.family!r}"
         )
-    # Derived cases carry a baseline_id; standalone cases leave it None. Keep metadata
-    # honest about which it is, because analysis uses baseline_id emptiness to decide
-    # what it can diff.
     has_baseline = case.baseline_id is not None
     if has_baseline != meta.requires_baseline:
         raise ValueError(
@@ -177,10 +210,16 @@ def register(case: AttackCase, meta: AttackMetadata) -> AttackCase:
             f"requires_baseline={meta.requires_baseline}"
         )
 
-    existing = _MANIFEST.get(case.attack_id)
-    if existing is not None and existing != meta:
-        raise ValueError(f"duplicate attack_id with differing metadata: {case.attack_id!r}")
+    fp = _fingerprint(case)
+    existing_fp = _FINGERPRINTS.get(case.attack_id)
+    if existing_fp is not None and existing_fp != fp:
+        raise ValueError(f"attack_id {case.attack_id!r} reused for a DIFFERENT payload")
+    existing_meta = _MANIFEST.get(case.attack_id)
+    if existing_meta is not None and existing_meta != meta:
+        raise ValueError(f"attack_id {case.attack_id!r} reused with DIFFERENT metadata")
+
     _MANIFEST[case.attack_id] = meta
+    _FINGERPRINTS[case.attack_id] = fp
     return case
 
 
@@ -195,17 +234,13 @@ def metadata_for(attack_id: str) -> Optional[AttackMetadata]:
 
 
 def reset() -> None:
-    """Clear the manifest. Used by tests so each run starts from a clean registry."""
+    """Clear the manifest and fingerprint registry. Used by tests for a clean start."""
     _MANIFEST.clear()
+    _FINGERPRINTS.clear()
 
 
 def write_manifest(path: str) -> None:
-    """
-    Dump the manifest to JSON for the report and for analysis to join against.
-
-    Written on demand by library.py, not committed: it is generated output, like
-    anything under results/.
-    """
+    """Dump the manifest to JSON for the report and for analysis to join against."""
     payload = {aid: asdict(meta) for aid, meta in sorted(_MANIFEST.items())}
     with open(path, "w", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2, ensure_ascii=False)

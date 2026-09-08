@@ -49,8 +49,8 @@ Use the `oracle` field to decide what "failure" means per case; **never auto-sco
 `expected_http_behavior` are hypotheses for the before/after column — measured, not asserted.
 
 ## 6. Runtime  (Amin)
-~25 standalone + ~38 derived per baseline. At ~40 baselines that is ~1,545 cases, ~3,100
-requests across V1+V2. Fine, but if a run drags, the cheapest trim is the homoglyph
+~33 standalone + up to ~44 derived per baseline. At ~40 baselines that is ~1,793 cases,
+≈3,586 requests across V1+V2. Fine, but if a run drags, the cheapest trim is the homoglyph
 3x3 matrix. The 10 MB oversized case dominates payload size — make sure the client
 timeout (10 s) and any body-size limits are set with that in mind.
 

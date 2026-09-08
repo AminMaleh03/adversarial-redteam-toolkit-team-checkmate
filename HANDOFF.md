@@ -2,27 +2,23 @@
 
 ## Current Checkpoint
 
-- Updated: 2026-09-09 00:22 +04:00 (Asia/Dubai), before publishing this checkpoint.
+- Updated: 2026-09-09 00:27 +04:00 (Asia/Dubai).
 - Agent: Codex, working with Ahsan in the local shared checkout.
-- Branch / implementation HEAD: `main` / `33e2dcc`. Codex refreshed `origin` before publishing.
-  This checkpoint accompanies a later documentation commit; use Git for its hash and delivery state.
-- Active request: shared Codex/Claude instructions are complete; Ahsan requested commit and push.
-- Authorization: Ahsan explicitly requested `AGENTS.md` and allowed appropriate `CLAUDE.md`
-  changes on 2026-09-09, then explicitly requested committing and pushing these three files.
-- Progress: completed the shared rulebook, Claude entry point and populated handoff.
-  Documentation links, UTF-8, whitespace and migrated rule sections checked successfully.
-  No application code changed; the 64-test result below predates these documentation edits.
-- Delivery scope: new `AGENTS.md`, new `HANDOFF.md`, modified `CLAUDE.md` on `main`.
-  At checkpoint time the files are ready to commit and push. Check `git status --short`,
-  `git log -1`, and refreshed `origin/main` before repeating any delivery operation.
-  Claude's pre-existing manifest and scaffold-status edits were preserved in the shared
-  rulebook and the implementation snapshot below.
+- Branch / observed HEAD: `main` / `24ea950`. Shared instructions were committed and pushed.
+  A subsequent remote refresh confirmed all existing remote branches are included in `main`.
+- Active request: evaluate Ahsan's final proposed ClickUp task for Khalid, especially whether
+  it resolves category mapping and weighting. This is a review, not implementation approval.
+- Progress: read the supplied task and checked `contract.py`, manifest schema/oracles, and
+  analysis stubs. Original category concern is addressed in the specification; implementation
+  remains pending. Review clarifications are recorded below, not silently adopted as decisions.
+- Changed files this turn: this factual handoff checkpoint only; uncommitted. No application
+  code or shared project rules changed. No new tests were needed for this specification review.
 - Running processes / temporary files: none left running or created by Codex for this task.
   Check independently for processes from other sessions before starting servers.
 
 ## Verified Pipeline Snapshot
 
-Verified locally by Codex on 2026-09-09, at the HEAD above:
+Verified locally by Codex on 2026-09-09, at implementation HEAD `33e2dcc` (unchanged by `24ea950`):
 
 | Component | Owner | State |
 | --- | --- | --- |
@@ -92,9 +88,11 @@ ClickUp task was subsequently edited or sent:
 
 ## Open Questions and Parked Work
 
-- Category mapping and weighting for analysis/report remain unresolved. Encoding is 973/1,886
-  cases (~52%); raw failure counts can reflect unequal test coverage. Six source categories are
-  confirmed, but their final report mapping and aggregation are not implemented or settled.
+- Ahsan's supplied Khalid task now specifies the six unchanged top-level categories, rates with
+  explicit eligible denominators, exclusion of unresolved review/diagnostic cases, grouping by
+  category/subfamily/failure mode, and maximum supporting-instance severity rather than sums.
+  This resolves the original mapping/raw-count concern at the specification level. It is not
+  yet implemented or validated; descriptive rates remain dependent on the suite composition.
 - Apply the manifest's per-case oracle and validity tier. `REVIEW` and `DIAGNOSTIC` cases must
   not be automatically counted as vulnerabilities; see `attacks/INTEGRATION_NOTES.md`.
   Claude proposed qualified language for `SILVER` cases; report implementation remains pending.
@@ -113,10 +111,22 @@ ClickUp task was subsequently edited or sent:
 
 ## Next Action
 
-The shared-instructions request is complete. Finish the authorized commit/push if Git shows
-it is still outstanding; do not repeat it if the documentation is already committed and pushed.
-No component implementation is currently assigned to the agent. The next pipeline milestone
-belongs to Amin: runner implementation and a smoke run, then full V1/V2 runs.
+Review feedback on Khalid's supplied task:
+
+- Matching planned-suite hashes do not prove completed coverage. Distinguish planned versus
+  executed cases, require trustworthy payload/baseline identity for pairing, and never call a
+  missing V2 result a resolved finding. The manifest currently exports metadata, not payload hashes.
+- Define oracle-specific eligibility and unknown/not-evaluable outcomes, same-version baseline
+  joins and zero denominators. A low-confidence/missing clean reference is not a passing flip test.
+- Label which magnitude adjustment applies to each failure mode; define connection-failure
+  severity, continuous tier boundaries and where payload-size evidence comes from. A failed
+  health check establishes observed unavailability, not proof that the server process died.
+- Specify a separate summary artifact for version/subfamily/failure-mode/validity/statistics,
+  grouping separately per version; the frozen `Finding` lacks these fields. Keep remediation required.
+- Remove the duplicated fingerprint paragraph and outdated loader-PR caveat (loader is merged).
+
+No component implementation is assigned to the agent. Await Ahsan's response to this review.
+The next pipeline milestone remains Amin's runner, then Khalid's analysis and Ahsan's report.
 
 For a takeover, read `AGENTS.md` and this file, inspect Git state, and resume only the latest
 user-authorized task. Update this checkpoint whenever progress or scope changes.

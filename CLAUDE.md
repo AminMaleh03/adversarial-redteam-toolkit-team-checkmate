@@ -1,7 +1,9 @@
 # CLAUDE.md — Team Checkmate
 
-Before doing any project work, read and follow [AGENTS.md](AGENTS.md), then read
-[HANDOFF.md](HANDOFF.md). These instructions apply to every team member's Claude Code session.
+@AGENTS.md
+
+Before doing any project work, read [HANDOFF.md](HANDOFF.md). These instructions apply to every
+team member's Claude Code session.
 
 `AGENTS.md` is the shared rulebook for Claude Code and Codex. It contains the ownership table,
 contracts, architecture, settled decisions, environment constraints, and handoff procedure.

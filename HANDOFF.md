@@ -2,19 +2,24 @@
 
 ## Current Checkpoint
 
-- Updated: 2026-09-09 00:27 +04:00 (Asia/Dubai).
-- Agent: Codex, working with Ahsan in the local shared checkout.
-- Branch / observed HEAD: `main` / `24ea950`. Shared instructions were committed and pushed.
-  A subsequent remote refresh confirmed all existing remote branches are included in `main`.
-- Active request: evaluate Ahsan's final proposed ClickUp task for Khalid, especially whether
-  it resolves category mapping and weighting. This is a review, not implementation approval.
-- Progress: read the supplied task and checked `contract.py`, manifest schema/oracles, and
-  analysis stubs. Original category concern is addressed in the specification; implementation
-  remains pending. Review clarifications are recorded below, not silently adopted as decisions.
-- Changed files this turn: this factual handoff checkpoint only; uncommitted. No application
-  code or shared project rules changed. No new tests were needed for this specification review.
-- Running processes / temporary files: none left running or created by Codex for this task.
-  Check independently for processes from other sessions before starting servers.
+- Updated: 2026-09-09 01:08 +04:00 (Asia/Dubai).
+- Agent: Claude Code, working with Ahsan in the local shared checkout. The preceding
+  documentation edit in this checkpoint was made by Codex.
+- Branch / observed HEAD: `main` / `470b314` before this commit. The previous checkpoint recorded
+  `24ea950`, which was already stale; `470b314` was the actual tip and is corrected here.
+- Active request: keep Codex and Claude Code instructions synchronized, then commit and push.
+- Progress: Codex corrected the cross-component import rule to permit the runner's documented
+  public integration points while retaining the analysis-to-attacks prohibition, and `CLAUDE.md`
+  now imports the shared rules with `@AGENTS.md`. Claude verified the three named integration
+  points resolve against the real code (`baseline.load.load_baseline`; `attacks.library`
+  exposing `standalone_cases`, `build_derived`, `build_suite`, `write_manifest`;
+  `endpoint.model.tokenizer` with `MAX_SEQUENCE_LENGTH` = 512) and that `git diff --check` is
+  clean. Documentation-only change, so the application test suite was not rerun.
+- Changed files this turn: `AGENTS.md`, `CLAUDE.md`, and this checkpoint. Committed and pushed
+  directly to `main` on Ahsan's explicit instruction, the documented exception to the
+  feature-branch rule. No application code changed.
+- Running processes / temporary files: none left running. Claude created scratch verification
+  scripts outside the repository, under the session scratchpad; nothing to clean up in-tree.
 
 ## Verified Pipeline Snapshot
 
@@ -100,9 +105,8 @@ ClickUp task was subsequently edited or sent:
   baseline sentences to improve scores. Claude raised this as a limitation to assess.
 - Permanent endpoint tests for over-length rejection/non-truncation and Unicode cleanup remain
   parked. Claude reported temporary live checks passing; those are historical evidence.
-- Documentation inconsistencies to resolve within an authorized task: the broad cross-folder
-  import wording versus the runner's specified public entry-point imports; the older
-  `contract.py` comment equating raw mode with invalid JSON; integration notes using
+- Documentation inconsistencies to resolve within an authorized task: the older `contract.py`
+  comment equating raw mode with invalid JSON; integration notes using
   `attack_manifest.json` instead of the agreed `manifest.json`; README's plain-Python venv
   command. Do not quietly edit other owners' code while resolving documentation.
 - Endpoint orphaned docstrings remain a parked cosmetic issue.
@@ -111,22 +115,10 @@ ClickUp task was subsequently edited or sent:
 
 ## Next Action
 
-Review feedback on Khalid's supplied task:
-
-- Matching planned-suite hashes do not prove completed coverage. Distinguish planned versus
-  executed cases, require trustworthy payload/baseline identity for pairing, and never call a
-  missing V2 result a resolved finding. The manifest currently exports metadata, not payload hashes.
-- Define oracle-specific eligibility and unknown/not-evaluable outcomes, same-version baseline
-  joins and zero denominators. A low-confidence/missing clean reference is not a passing flip test.
-- Label which magnitude adjustment applies to each failure mode; define connection-failure
-  severity, continuous tier boundaries and where payload-size evidence comes from. A failed
-  health check establishes observed unavailability, not proof that the server process died.
-- Specify a separate summary artifact for version/subfamily/failure-mode/validity/statistics,
-  grouping separately per version; the frozen `Finding` lacks these fields. Keep remediation required.
-- Remove the duplicated fingerprint paragraph and outdated loader-PR caveat (loader is merged).
-
-No component implementation is assigned to the agent. Await Ahsan's response to this review.
-The next pipeline milestone remains Amin's runner, then Khalid's analysis and Ahsan's report.
+The revised runner and analysis briefs passed review and are ready for ClickUp. No component
+implementation is assigned to the agent. Amin can implement the runner while Khalid builds and
+unit-tests analysis against synthetic fixtures; real runner output then provides integration
+validation. Ahsan implements the report after the analysis output shape is available.
 
 For a takeover, read `AGENTS.md` and this file, inspect Git state, and resume only the latest
 user-authorized task. Update this checkpoint whenever progress or scope changes.

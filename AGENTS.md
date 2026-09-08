@@ -77,7 +77,14 @@ fear, joy, neutral, sadness, surprise.
 payloads. `runner` sends everything to the endpoint and records results. `analysis` compares clean
 results against attacked ones. `report` renders findings.
 
-No folder imports from another except through `contract.py`. **Analysis never imports from attacks.**
+Cross-component imports are limited to the documented integration points:
+
+- Shared data shapes come from `contract.py`.
+- The runner may import `baseline.load.load_baseline`, the public functions in
+  `attacks.library`, and `tokenizer` / `MAX_SEQUENCE_LENGTH` from `endpoint.model`.
+- Analysis consumes the generated result, manifest, and run-metadata files. **Analysis never
+  imports from `attacks/`.**
+- Same-package imports are allowed. Any other cross-component dependency needs team agreement.
 
 ## File Ownership
 

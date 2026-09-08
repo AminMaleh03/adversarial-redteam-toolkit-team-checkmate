@@ -95,12 +95,12 @@ def build_derived(baseline: BaselineCase) -> list[AttackCase]:
     if len(words) >= 4:
         half = len(words) // 2
         _add(cases, baseline, "signal_head_only", " ".join(words[:half]),
-             relation=md.REL_INVARIANT, oracle=md.ORACLE_DIAGNOSTIC,
+             relation=md.REL_DIAGNOSTIC, oracle=md.ORACLE_DIAGNOSTIC,
              tier=md.TIER_DIAGNOSTIC, risk="high", position="start",
              sanitizer=md.SAN_NOT_APPLICABLE, http=md.HTTP_EXPECT_200,
              notes="First half of the sentence only; truncation may change meaning -> inspect, never auto-score.")
         _add(cases, baseline, "signal_tail_only", " ".join(words[half:]),
-             relation=md.REL_INVARIANT, oracle=md.ORACLE_DIAGNOSTIC,
+             relation=md.REL_DIAGNOSTIC, oracle=md.ORACLE_DIAGNOSTIC,
              tier=md.TIER_DIAGNOSTIC, risk="high", position="end",
              sanitizer=md.SAN_NOT_APPLICABLE, http=md.HTTP_EXPECT_200,
              notes="Second half of the sentence only; truncation may change meaning -> inspect, never auto-score.")

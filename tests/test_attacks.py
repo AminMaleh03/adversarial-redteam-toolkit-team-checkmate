@@ -15,6 +15,7 @@ type are additionally asserted raw. Flagged for Ahsan in the PR.
 """
 
 import json
+import random
 import unicodedata
 from dataclasses import fields
 
@@ -312,7 +313,7 @@ def test_over_limit_truncation_is_not_a_label_oracle():
 def test_standalone_family_counts():
     from collections import Counter
     counts = Counter(c.category for c in library.standalone_cases())
-    assert counts["malformed"] == 13   # 5 schema + 5 nesting + 3 oversized
+    assert counts["malformed"] == 21   # 5 schema + 8 transport + 5 nesting + 3 oversized
     assert counts["boundary"] == 11    # 3 strings + 5 type-confusion + 3 length
     assert counts["encoding"] == 1     # null byte
 
@@ -320,7 +321,107 @@ def test_standalone_family_counts():
 def test_derived_family_floors():
     from collections import Counter
     counts = Counter(c.category for c in library.build_derived(BASELINES[0]))
-    assert counts["encoding"] >= 12
+    assert counts["encoding"] >= 20    # cyrillic 9 + greek 6 + zw 3 + deletion 3 + fullwidth + bidi
     assert counts["perturbation"] >= 6
     assert counts["whitespace"] >= 5
     assert counts["truncation"] >= 4
+
+
+# --------------------------------------------------------------------------------------
+# Expansion Pack 1: confusable fixture validation, Greek, ligatures, transport, provenance
+# --------------------------------------------------------------------------------------
+
+def test_curated_confusables_exist_in_pinned_uts39_fixture():
+    """Every runtime mapping must appear in the vendored UTS #39 excerpt (no invented pairs)."""
+    fixture = encoding.load_confusable_fixture()  # {confusable: latin}
+    for name, mapping in (("Cyrillic", encoding.LATIN_TO_CONFUSABLE),
+                          ("Greek", encoding.LATIN_TO_GREEK)):
+        for latin, confusable in mapping.items():
+            assert fixture.get(confusable) == latin, f"{name}: {latin!r}->{confusable!r} not in fixture"
+
+
+def test_greek_homoglyphs_present_and_survive_nfkc():
+    md.reset()
+    b = BaselineCase("bg", "operations analysis and procedures", "neutral", "hw")
+    cases = {c.attack_id: c for c in encoding.build_derived(b)}
+    greek = [aid for aid in cases if ".homoglyph_greek." in aid]
+    assert greek
+    text = cases[greek[0]].attacked_text
+    assert unicodedata.normalize("NFKC", text) == text  # confusables not folded
+
+
+def test_ligature_folds_under_nfkc():
+    out, applied = encoding.to_ligatures("a fine flight of affluent office work")
+    assert applied > 0
+    assert unicodedata.normalize("NFKC", out) == "a fine flight of affluent office work"
+
+
+def test_transport_pack_present_and_shaped():
+    by_id = {c.attack_id: c for c in library.standalone_cases()}
+    for name in ("duplicate_text_keys", "top_level_array", "top_level_string",
+                 "top_level_number", "utf8_bom", "malformed_utf8", "trailing_garbage",
+                 "unusual_json_escapes"):
+        assert f"malformed.{name}" in by_id
+    # the two encoding-boundary cases carry raw bytes bodies
+    assert isinstance(by_id["malformed.utf8_bom"].raw_body, bytes)
+    assert isinstance(by_id["malformed.malformed_utf8"].raw_body, bytes)
+
+
+def test_diagnostic_relation_used_where_meaning_may_change():
+    md.reset()
+    library.build_derived(BASELINES[0])
+    for aid in ("b001.truncation.signal_head_only", "b001.truncation.signal_tail_only",
+                "b001.whitespace.repeated_punctuation"):
+        meta = md.metadata_for(aid)
+        assert meta.relation == md.REL_DIAGNOSTIC
+        assert meta.oracle == md.ORACLE_DIAGNOSTIC
+
+
+def test_provenance_points_at_the_right_authority():
+    md.reset()
+    library.build_derived(BASELINES[0])
+    library.standalone_cases()
+    fw = md.metadata_for("b001.encoding.compatibility_fullwidth.whole")
+    assert "tr15" in fw.source_url  # NFKC authority is UAX #15, not UTS #39
+    extra = md.metadata_for("malformed.extra_field")
+    assert "pydantic" in extra.source_url  # not the generic OWASP url
+    homo = md.metadata_for("b001.encoding.homoglyph.leading.d1")
+    assert "rev 32" in homo.source_version  # exact pinned UTS #39 revision
+
+
+# --------------------------------------------------------------------------------------
+# Property-based fuzz over the pure transformers (dependency-free, seeded/deterministic).
+# Chose seeded random over Hypothesis to avoid adding a dependency to the shared
+# requirements.txt for a test-only tool; this covers the same properties.
+# --------------------------------------------------------------------------------------
+
+_ALPHABET = "abcdefghijklmnopqrstuvwxyz ABC XYZ .,!?" + "".join(chr(c) for c in (0x00E9, 0x4E2D, 0x1F600))
+
+
+def _random_strings(n, seed=1234):
+    rng = random.Random(seed)
+    out = [""]
+    for _ in range(n):
+        length = rng.randint(0, 40)
+        out.append("".join(rng.choice(_ALPHABET) for _ in range(length)))
+    return out
+
+
+def test_transformers_never_crash_and_are_deterministic():
+    for s in _random_strings(300):
+        for fn in (encoding.apply_homoglyphs, encoding.insert_zero_width, encoding.apply_deletion):
+            for pos in ("leading", "middle", "trailing"):
+                a, na = fn(s, 3, pos)
+                b, nb = fn(s, 3, pos)
+                assert a == b and na == nb          # deterministic
+                assert na <= len(s) + 1             # applied count is bounded
+        assert encoding.apply_bidi_reorder(s)[0] == encoding.apply_bidi_reorder(s)[0]
+        assert encoding.to_fullwidth(s)[0] == encoding.to_fullwidth(s)[0]
+
+
+def test_homoglyph_only_changes_eligible_positions():
+    for s in _random_strings(200, seed=99):
+        out, applied = encoding.apply_homoglyphs(s, 5, "leading")
+        assert len(out) == len(s)  # length-preserving
+        changed = sum(1 for x, y in zip(s, out) if x != y)
+        assert changed == applied

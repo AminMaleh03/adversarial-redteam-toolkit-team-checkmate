@@ -58,21 +58,24 @@ def unicode_spaces(text: str) -> str:
 # Layer 2: builder.
 # ======================================================================================
 
-# (subfamily, transformer, sanitizer, tier, risk, notes)
+# (subfamily, transformer, sanitizer, tier, risk, relation, oracle, notes)
+_INV, _DIAG = md.REL_INVARIANT, md.REL_DIAGNOSTIC
+_O_MATCH, _O_DIAG = md.ORACLE_LABEL_MATCH_BASELINE, md.ORACLE_DIAGNOSTIC
 _WHITESPACE = [
-    ("interior_runs", interior_runs, md.SAN_V2_COLLAPSES_WS, md.TIER_SILVER, "low",
+    ("interior_runs", interior_runs, md.SAN_V2_COLLAPSES_WS, md.TIER_SILVER, "low", _INV, _O_MATCH,
      "Multiple spaces between words; V2 collapses to single spaces."),
-    ("tabs", tabs, md.SAN_V2_COLLAPSES_WS, md.TIER_SILVER, "low",
+    ("tabs", tabs, md.SAN_V2_COLLAPSES_WS, md.TIER_SILVER, "low", _INV, _O_MATCH,
      "Spaces replaced by tabs; V2 collapses whitespace runs."),
-    ("newlines", newlines, md.SAN_V2_COLLAPSES_WS, md.TIER_SILVER, "low",
+    ("newlines", newlines, md.SAN_V2_COLLAPSES_WS, md.TIER_SILVER, "low", _INV, _O_MATCH,
      "Spaces replaced by newlines; V2 collapses whitespace runs."),
-    ("leading_trailing", leading_trailing, md.SAN_V2_COLLAPSES_WS, md.TIER_SILVER, "low",
+    ("leading_trailing", leading_trailing, md.SAN_V2_COLLAPSES_WS, md.TIER_SILVER, "low", _INV, _O_MATCH,
      "Leading/trailing padding; V2 strips it."),
-    # Repeated punctuation is NOT whitespace and can nudge intensity/sentiment, so it is
-    # not a guaranteed invariance case -> REVIEW, medium risk, not auto-scored.
+    # Repeated punctuation is NOT whitespace and can nudge intensity/sentiment, so there is
+    # no guaranteed invariance relation -> diagnostic, REVIEW, medium risk, never auto-scored.
     ("repeated_punctuation", repeated_punctuation, md.SAN_V2_PASSES_THROUGH, md.TIER_REVIEW, "medium",
-     "Repeated punctuation; not whitespace, may shift intensity, so V2 leaves it intact and we do not auto-score."),
-    ("unicode_spaces", unicode_spaces, md.SAN_V2_COLLAPSES_WS, md.TIER_SILVER, "low",
+     _DIAG, _O_DIAG,
+     "Repeated punctuation; not whitespace, may shift intensity -> diagnostic, V2 leaves it intact."),
+    ("unicode_spaces", unicode_spaces, md.SAN_V2_COLLAPSES_WS, md.TIER_SILVER, "low", _INV, _O_MATCH,
      "NBSP/em-space instead of normal spaces; NFKC folds them, then whitespace collapse."),
 ]
 
@@ -82,7 +85,7 @@ def build_derived(baseline: BaselineCase) -> list[AttackCase]:
     cases: list[AttackCase] = []
     text = baseline.text
 
-    for subfamily, transformer, sanitizer, tier, risk, notes in _WHITESPACE:
+    for subfamily, transformer, sanitizer, tier, risk, relation, oracle, notes in _WHITESPACE:
         attacked = transformer(text)
         if attacked == text:
             continue
@@ -98,9 +101,10 @@ def build_derived(baseline: BaselineCase) -> list[AttackCase]:
             attack_id=aid,
             family="whitespace",
             subfamily=subfamily,
-            relation=md.REL_INVARIANT,
-            oracle=md.ORACLE_LABEL_MATCH_BASELINE,
+            relation=relation,
+            oracle=oracle,
             source="NL-Augmenter (formatting noise), CheckList INV",
+            source_url="https://github.com/GEM-benchmark/NL-Augmenter",
             validity_tier=tier,
             semantic_risk=risk,
             requires_baseline=True,

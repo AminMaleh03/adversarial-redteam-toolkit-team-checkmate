@@ -46,12 +46,15 @@ REL_INVARIANT = "invariant"        # meaning preserved -> label must not change
 REL_SCHEMA = "schema"              # request malformed/invalid -> rejected cleanly
 REL_BOUNDARY = "boundary"          # around a defined limit -> defined, graceful behaviour
 REL_AVAILABILITY = "availability"  # unusual but bounded -> service must stay up
+REL_DIAGNOSTIC = "diagnostic"      # NO guaranteed semantic relation; observe behaviour only,
+#                                    never auto-score (e.g. a truncated sentence, whose meaning
+#                                    may have changed for a human too).
 REL_DIRECTIONAL = "directional"    # RESERVED for Phase 2 (negation/contrast/intensity);
 #                                    changes the oracle, so it is a team decision, defined
 #                                    here only to complete the vocabulary.
 
 RELATIONS = frozenset(
-    {REL_INVARIANT, REL_SCHEMA, REL_BOUNDARY, REL_AVAILABILITY, REL_DIRECTIONAL}
+    {REL_INVARIANT, REL_SCHEMA, REL_BOUNDARY, REL_AVAILABILITY, REL_DIAGNOSTIC, REL_DIRECTIONAL}
 )
 
 # What decides whether the observed behaviour is a defect. Analysis reads this.
@@ -128,6 +131,7 @@ class AttackMetadata:
     # provenance
     source_version: Optional[str] = None
     source_url: Optional[str] = None
+    source_doi: Optional[str] = None
     transform_version: str = "v1"
     # generic attack facts
     dose: Optional[int] = None
@@ -168,18 +172,22 @@ _FINGERPRINTS: dict[str, str] = {}
 
 
 def _fingerprint(case: AttackCase) -> str:
-    """Deterministic digest of a case's payload, so a reused id with a different payload is caught."""
-    parts = [
-        case.attack_id,
-        case.category,
-        str(case.is_raw),
-        case.attacked_text or "",
-        (case.raw_body.decode("utf-8", "surrogatepass")
-         if isinstance(case.raw_body, bytes) else (case.raw_body or "")),
-        json.dumps(case.raw_headers, sort_keys=True) if case.raw_headers else "",
-    ]
-    blob = "\x1f".join(parts).encode("utf-8", "surrogatepass")
-    return hashlib.sha256(blob).hexdigest()
+    """
+    Deterministic digest of a case's payload, so a reused id with a different payload is
+    caught. Hashes bytes directly (raw_body may be intentionally invalid UTF-8, e.g. the
+    malformed_utf8 transport case), so we never try to decode it.
+    """
+    digest = hashlib.sha256()
+    for part in (case.attack_id, case.category, str(case.is_raw), case.attacked_text or "",
+                 json.dumps(case.raw_headers, sort_keys=True) if case.raw_headers else ""):
+        digest.update(part.encode("utf-8", "surrogatepass"))
+        digest.update(b"\x1f")
+    body = case.raw_body
+    if isinstance(body, bytes):
+        digest.update(body)
+    elif body:
+        digest.update(body.encode("utf-8", "surrogatepass"))
+    return digest.hexdigest()
 
 
 def register(case: AttackCase, meta: AttackMetadata) -> AttackCase:

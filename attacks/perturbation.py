@@ -27,6 +27,13 @@ _TEXTBUGGER = "TextBugger (Li et al., NDSS 2019)"
 _NATURAL_NOISE = "Natural typing noise (NL-Augmenter-inspired)"
 _CHECKLIST = "CheckList INV (Ribeiro et al., ACL 2020)"
 
+# source -> (source_url, source_doi). Only citations verified real are included.
+_SOURCE_META = {
+    _TEXTBUGGER: ("https://arxiv.org/abs/1812.05271", None),
+    _NATURAL_NOISE: ("https://github.com/GEM-benchmark/NL-Augmenter", None),
+    _CHECKLIST: ("https://aclanthology.org/2020.acl-main.442/", "10.18653/v1/2020.acl-main.442"),
+}
+
 _STOPWORDS = frozenset({
     "i", "a", "an", "the", "am", "is", "are", "was", "were", "be", "been", "being",
     "to", "of", "in", "on", "at", "it", "its", "and", "or", "but", "so", "very",
@@ -200,10 +207,12 @@ def build_derived(baseline: BaselineCase) -> list[AttackCase]:
             attack_id=aid, baseline_id=baseline.baseline_id, category="perturbation",
             original_text=text, attacked_text=attacked,
         )
+        source_url, source_doi = _SOURCE_META.get(source, (None, None))
         meta = md.AttackMetadata(
             attack_id=aid, family="perturbation", subfamily=subfamily,
             relation=md.REL_INVARIANT, oracle=md.ORACLE_LABEL_MATCH_BASELINE,
-            source=source, validity_tier=tier, semantic_risk=risk, requires_baseline=True,
+            source=source, source_url=source_url, source_doi=source_doi,
+            validity_tier=tier, semantic_risk=risk, requires_baseline=True,
             dose=dose, position="content_word",
             expected_sanitizer_behavior=md.SAN_V2_PASSES_THROUGH,
             expected_http_behavior=md.HTTP_EXPECT_200,

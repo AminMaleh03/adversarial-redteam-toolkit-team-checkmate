@@ -1,6 +1,6 @@
-"""Assembles all baseline sources into BaselineCase objects and writes baseline/baseline.json."""
-"""
-Build the clean baseline that every attack is measured against.
+"""Assembles all baseline sources into BaselineCase objects and writes baseline/baseline.json.
+
+This is the clean baseline that every attack is measured against.
 
 The model predicts seven labels: anger, disgust, fear, joy, neutral,
 sadness, surprise. Five overlap with dair-ai/emotion and are SAMPLED
@@ -134,4 +134,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-# TODO(Khalid): implement baseline assembly.

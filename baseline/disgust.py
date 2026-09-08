@@ -1,7 +1,4 @@
-"""Supplies the disgust-label baseline sentences."""
-
-"""
-Hand-written DISGUST sentences.
+"""Supplies the disgust-label baseline sentences.
 
 dair-ai/emotion has no `disgust` label, but the model predicts one, so
 these are written by hand and marked source="handwritten" in the

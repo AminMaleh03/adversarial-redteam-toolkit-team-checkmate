@@ -1,0 +1,254 @@
+[
+  {
+    "baseline_id": "dataset-anger-0",
+    "text": "i didnt think i was angry but now that im typing away feeling my words evaporate into cyberspace i am very pissed that this is happening",
+    "label": "anger",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-anger-1",
+    "text": "i feel tortured every moment and theres nowhere i can go to get away from it or to get back to what i was used to",
+    "label": "anger",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-anger-2",
+    "text": "i never kissed a guy because every time i d try i d freak out and feel disgusted",
+    "label": "anger",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-anger-3",
+    "text": "i dont like the way i feel when i am angry",
+    "label": "anger",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-anger-4",
+    "text": "ive been taking to stop the bleeding in my guts has left me feeling far more irritable and violent than usual",
+    "label": "anger",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-anger-5",
+    "text": "i also cant sleep because all my life feels totally totally fucked and it makes no sense at all on one level i am sober and therefore all should be well but i have been living in so much self centered self willed thought and action and iam in such a world of pain right now",
+    "label": "anger",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-fear-0",
+    "text": "i feel scared that i own it",
+    "label": "fear",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-fear-1",
+    "text": "i feel like someone s strange uncle trying to break the ice at a party by showing this amazing talent thinking that guests will be impressed but in turn just made everything a hundred times more awkward",
+    "label": "fear",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-fear-2",
+    "text": "i can remember a year ago yesterday feeling so unsure so scared of what our future held",
+    "label": "fear",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-fear-3",
+    "text": "i feel like it would make the startled person laugh and think it would be a nice eid gift",
+    "label": "fear",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-fear-4",
+    "text": "i remember feeling nervous that i wasnt progressing so i was so thrilled",
+    "label": "fear",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-fear-5",
+    "text": "ive had this urgent feeling to write to you and tell you how the files make me feel but have felt hesitant because of fear as to where it will lead me",
+    "label": "fear",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-joy-0",
+    "text": "i strongly feel that at this point in my life i am no longer desiring to walk this path that i am on and to be truthful i have no clue as to where i am going with my life from here",
+    "label": "joy",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-joy-1",
+    "text": "i read too much about discovery and exploration in the wild west and while i feel that those concepts are precious taking part in them often myself this book just brings a refined feel when i sit back in the chair for some quiet time",
+    "label": "joy",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-joy-2",
+    "text": "i love that i feel valuable i love making the choice i love that it s easy to make the choice to feel good",
+    "label": "joy",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-joy-3",
+    "text": "ive come home for the holidays i feel so much more mellow",
+    "label": "joy",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-joy-4",
+    "text": "i feel as though i gush on an on about the gorgeous colors of the produce we receive through our farm share and i have to do it again this week",
+    "label": "joy",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-joy-5",
+    "text": "im feeling just pretty rich",
+    "label": "joy",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-sadness-0",
+    "text": "i feel as though the rest of my year will be jaded due to my love for this first",
+    "label": "sadness",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-sadness-1",
+    "text": "i am feeling quite weepy can you get rid of them and she did",
+    "label": "sadness",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-sadness-2",
+    "text": "i walked away from the weekend feeling simply dirty like i had done something really harmful and this feeling more than anything is what overpowers my feeble attempts to justify my actions last weekend",
+    "label": "sadness",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-sadness-3",
+    "text": "i feel all depressed",
+    "label": "sadness",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-sadness-4",
+    "text": "i feel unloved you are there to remind me you love me",
+    "label": "sadness",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-sadness-5",
+    "text": "i feel like i should go for a run to expend all this idiotic energy but iv decided to do some homework now instead and store the energy for a social event im going to this evening",
+    "label": "sadness",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-surprise-0",
+    "text": "im feeling really weird",
+    "label": "surprise",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-surprise-1",
+    "text": "i was overwhelmed by the feeling of being impressed i think these kids theyre years younger than me i can call them kids right",
+    "label": "surprise",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-surprise-2",
+    "text": "i beside see smiling feel very funny",
+    "label": "surprise",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-surprise-3",
+    "text": "ive ever written although im not gonna reproduce it here because it is full of boring academic references and also it specifically analyses several prominent bloggers and their treatment of romantic relationships and id feel weird about putting that on the internet",
+    "label": "surprise",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-surprise-4",
+    "text": "i feel like falling in love with her is part of being amazed at how she makes our family so much better she tells the advocate",
+    "label": "surprise",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "dataset-surprise-5",
+    "text": "i know so many people rave about it that i m feeling a bit weird",
+    "label": "surprise",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "handwritten-neutral-0",
+    "text": "The train departs from platform four at nine in the morning.",
+    "label": "neutral",
+    "source": "handwritten"
+  },
+  {
+    "baseline_id": "handwritten-neutral-1",
+    "text": "The report is due at the end of the month.",
+    "label": "neutral",
+    "source": "handwritten"
+  },
+  {
+    "baseline_id": "handwritten-neutral-2",
+    "text": "She placed the folder on the desk and turned on the computer.",
+    "label": "neutral",
+    "source": "handwritten"
+  },
+  {
+    "baseline_id": "handwritten-neutral-3",
+    "text": "The meeting has been moved to the third-floor conference room.",
+    "label": "neutral",
+    "source": "handwritten"
+  },
+  {
+    "baseline_id": "handwritten-neutral-4",
+    "text": "Water boils at one hundred degrees Celsius at sea level.",
+    "label": "neutral",
+    "source": "handwritten"
+  },
+  {
+    "baseline_id": "handwritten-neutral-5",
+    "text": "The store closes at eight on weekdays.",
+    "label": "neutral",
+    "source": "handwritten"
+  },
+  {
+    "baseline_id": "handwritten-disgust-0",
+    "text": "The milk had curdled into lumps and the smell made me gag.",
+    "label": "disgust",
+    "source": "handwritten"
+  },
+  {
+    "baseline_id": "handwritten-disgust-1",
+    "text": "There were maggots crawling through the rotting meat in the bin.",
+    "label": "disgust",
+    "source": "handwritten"
+  },
+  {
+    "baseline_id": "handwritten-disgust-2",
+    "text": "He spat the mouldy bread out, revolted by the taste.",
+    "label": "disgust",
+    "source": "handwritten"
+  },
+  {
+    "baseline_id": "handwritten-disgust-3",
+    "text": "The bathroom was smeared with filth and reeked of sewage.",
+    "label": "disgust",
+    "source": "handwritten"
+  },
+  {
+    "baseline_id": "handwritten-disgust-4",
+    "text": "Cockroaches scattered across the greasy, food-crusted counter.",
+    "label": "disgust",
+    "source": "handwritten"
+  },
+  {
+    "baseline_id": "handwritten-disgust-5",
+    "text": "The rotten eggs oozed a foul, sulphuric slime.",
+    "label": "disgust",
+    "source": "handwritten"
+  }
+]

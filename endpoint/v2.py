@@ -71,7 +71,9 @@ def predict_endpoint(request: PredictRequest):
     # Defense 1: length limit, checked before inference. Uses the same
     # tokenizer model.py uses, so "too long" means exactly what the
     # model can't handle — no arbitrary number.
-    token_count = len(tokenizer.encode(cleaned, add_special_tokens=True))
+    # truncation=False passed explicitly, same as model.py: this call must
+    # measure the FULL length, never silently trim it before we can count it.
+    token_count = len(tokenizer.encode(cleaned, add_special_tokens=True, truncation=False))
     if token_count > MAX_SEQUENCE_LENGTH:
         raise HTTPException(
             status_code=422,

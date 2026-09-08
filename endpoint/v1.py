@@ -1,6 +1,5 @@
 """Unhardened FastAPI app: accepts input as-is and passes it straight to the model."""
 
-# TODO(Rayyan): implement the V1 app.
 
 """
 V1 — deliberately unhardened endpoint. Runs on port 8000.

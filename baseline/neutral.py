@@ -1,7 +1,4 @@
-"""Supplies the neutral-label baseline sentences."""
-
-"""
-Hand-written NEUTRAL sentences.
+"""Supplies the neutral-label baseline sentences.
 
 dair-ai/emotion has no `neutral` label, but the model predicts one, so
 these are written by hand and marked source="handwritten" in the

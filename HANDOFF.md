@@ -2,9 +2,9 @@
 
 ## Current Checkpoint - Codex
 
-- Updated: 2026-09-09T17:47:11+04:00, Codex; branch `khalid/analysis`, observed HEAD `b7d6489`.
+- Updated: 2026-09-09T17:54:39+04:00, Codex; branch `khalid/analysis`, observed HEAD `29d0dcc`.
 - User authorized fixing the major analysis comparison issue: unevaluable V2 evidence
-  must not resolve a V1 finding. Implemented and verified; fix committed at `2ca2473`, publication in progress.
+  must not resolve a V1 finding. Implemented and verified; fix committed at `2ca2473`, pushed in draft PR #6.
 - Changed: `analysis/analyze.py`, `analysis/compare.py`, `tests/test_analysis.py`, and
   this handoff. Baseline, frozen contract, and other owners' components unchanged.
 - Comparison now intersects metadata completion with actual evidence evaluable for
@@ -28,13 +28,18 @@
   oracle/tier inconsistency, severity rounding at tier boundaries, comparison rate
   denominators. This task does not establish that the entire area has no issues.
 - User authorized committing and publishing the reviewed draft PR on 2026-09-09.
-  Push only `khalid/analysis`; do not push to main or merge the PR. Approved PR text
-  includes the remaining analysis concerns and omits teammate benchmark discussion.
-- Publication in progress: origin/main advanced to `67034fc`, changing only the
-  shared handoff and attack integration notes. The handoff conflict was reconciled by retaining both histories on the feature
-  branch; analysis code is unaffected.
-- Next: finish the documentation merge, push the feature branch, create and verify
-  the approved draft PR. Incoming integration notes are unchanged from origin/main.
+  Fix committed as `2ca2473`; upstream documentation merged as `29d0dcc`, retaining
+  both handoff histories. Confirmed analysis/tests/contract unchanged by that merge;
+  incoming attack integration notes match origin/main exactly.
+- Branch `khalid/analysis` pushed. Draft PR #6 is open against `main`:
+  https://github.com/AminMaleh03/adversarial-redteam-toolkit-team-checkmate/pull/6
+  GitHub creation response confirmed open/draft, head khalid/analysis, base main.
+  Approved description includes remaining concerns; no direct main push or PR merge.
+- Publication used local Git credentials through Git and the GitHub REST API; the
+  connector could not access this repository. No credentials written or printed.
+- Next: Ahsan reviews draft PR #6. Remaining smaller issues stay disclosed above;
+  no additional fixes are in progress. This final documentation checkpoint is being
+  committed and pushed to the same feature branch. No processes left running.
 
 ## Historical checkpoint - Claude
 

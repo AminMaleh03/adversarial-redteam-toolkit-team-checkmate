@@ -751,18 +751,20 @@ class TestFindingResolution:
     def test_different_v2_failure_mode_is_resolved_plus_newly_appearing(self):
         v1_group = compare.FindingGroupRef("encoding", "homoglyph", "unhandled_5xx", ["a1"])
         v2_group = compare.FindingGroupRef("encoding", "homoglyph", "info_leak", ["a1"])
-        resolutions, newly_appearing = compare.compare_findings([v1_group], [v2_group], {"a1"})
+        resolutions, newly_appearing = compare.compare_findings(
+            [v1_group], [v2_group], {"a1"}, {"unhandled_5xx": {"a1"}}
+        )
         assert resolutions[0].status == "resolved"
         assert newly_appearing == [v2_group]
 
     def test_newly_appearing_finding_with_no_v1_counterpart(self):
         v2_group = compare.FindingGroupRef("boundary", "under_limit", "slow_response", ["a9"])
-        resolutions, newly_appearing = compare.compare_findings([], [v2_group], {"a9"})
+        resolutions, newly_appearing = compare.compare_findings([], [v2_group], {"a9"}, {})
         assert newly_appearing == [v2_group]
         assert resolutions == []
 
     def test_unmatched_and_uncompleted_handled_without_crashing(self):
-        resolutions, newly_appearing = compare.compare_findings([], [], set())
+        resolutions, newly_appearing = compare.compare_findings([], [], set(), {})
         assert resolutions == []
         assert newly_appearing == []
 
@@ -778,7 +780,8 @@ class TestCompareVersionsIntegration:
 
         v1_groups = [compare.FindingGroupRef("encoding", "homoglyph", "unhandled_5xx", ["a1", "a2"])]
         result = compare.compare_versions(
-            meta_v1=meta_v1, meta_v2=meta_v2, v1_groups=v1_groups, v2_groups=[]
+            meta_v1=meta_v1, meta_v2=meta_v2, v1_groups=v1_groups, v2_groups=[],
+            v2_evaluable_attack_ids_by_mode={"unhandled_5xx": {"a1", "a2"}},
         )
         # a2 never completed on V2 (it's in run_meta's own missing list) -> unavailable,
         # not silently resolved.
@@ -791,7 +794,8 @@ class TestCompareVersionsIntegration:
         # not compare.py's. It still surfaces the mismatch so the caller can act on it.
         meta_v1 = make_run_meta(planned_fp="fp1")
         meta_v2 = make_run_meta(planned_fp="fp2")
-        result = compare.compare_versions(meta_v1=meta_v1, meta_v2=meta_v2, v1_groups=[], v2_groups=[])
+        result = compare.compare_versions(meta_v1=meta_v1, meta_v2=meta_v2, v1_groups=[],
+                                          v2_groups=[], v2_evaluable_attack_ids_by_mode={})
         assert result.fingerprints.whole_suite_comparable is False
 
 
@@ -1068,3 +1072,110 @@ class TestComparisonWithholdsOnFingerprintMismatch:
         assert "comparison_withheld_reason" not in summary
         assert "findings_resolved" in summary
         assert "category_failure_rates" in summary
+
+
+class TestComparisonEvidenceEligibility:
+    """Recorded completion is not proof that a weakness could be evaluated."""
+
+    def _summary(self, v2_rows, *, mode="prediction_flip", v2_manifest=None):
+        manifest = {"a1": make_meta()}
+        v1_attack = make_result(label="sadness") if mode == "prediction_flip" else make_result(
+            status_code=500, label=None, confidence=None, response_body=""
+        )
+        v1 = analyze.analyze_version([make_baseline(), v1_attack], manifest)
+        v2 = analyze.analyze_version(v2_rows, v2_manifest or manifest)
+        meta = make_run_meta(planned=2, completed=2)
+        meta["case_ids"]["completed"] = ["baseline:b1", "attack:a1"]
+        return analyze.build_comparison_summary(v1, v2, meta, meta)
+
+    @pytest.mark.parametrize("changes", [
+        dict(status_code=None, label=None, confidence=None, error="connection_error: test"),
+        dict(status_code=None, label=None, confidence=None, error="transport_error: test"),
+        dict(status_code=None, label=None, confidence=None, latency_band="timeout", error="timeout: test"),
+        dict(status_code=200, label=None, confidence=None, response_body="{}"),
+        dict(status_code=422, label=None, confidence=None, response_body='{"detail":[]}'),
+    ])
+    def test_unusable_v2_prediction_never_resolves_flip(self, changes):
+        summary = self._summary([make_baseline(version="v2"), make_result(version="v2", **changes)])
+        assert ["encoding", "homoglyph", "prediction_flip"] not in summary["findings_resolved"]
+        assert summary["findings_unavailable"] == [{
+            "key": ["encoding", "homoglyph", "prediction_flip"], "unavailable_ids": ["a1"]
+        }]
+
+    @pytest.mark.parametrize("baselines", [[], [make_baseline(version="v2", label=None, confidence=None)],
+                                             [make_baseline(version="v2", confidence=0.4)]])
+    def test_unusable_clean_reference_never_resolves_flip(self, baselines):
+        summary = self._summary(baselines + [make_result(version="v2")])
+        assert summary["findings_unavailable"][0]["unavailable_ids"] == ["a1"]
+
+    @pytest.mark.parametrize("mode", ["prediction_flip", "unhandled_5xx"])
+    def test_metadata_completion_without_result_is_unavailable(self, mode):
+        summary = self._summary([make_baseline(version="v2")], mode=mode)
+        assert summary["findings_unavailable"][0]["key"][2] == mode
+        assert summary["findings_resolved"] == []
+
+    @pytest.mark.parametrize("tier", ["REVIEW", "DIAGNOSTIC"])
+    def test_unscored_v2_case_never_resolves_finding(self, tier):
+        summary = self._summary(
+            [make_baseline(version="v2"), make_result(version="v2")],
+            mode="unhandled_5xx", v2_manifest={"a1": make_meta(validity_tier=tier)},
+        )
+        assert summary["findings_unavailable"][0]["unavailable_ids"] == ["a1"]
+
+    def test_connection_failure_does_not_resolve_server_error(self):
+        summary = self._summary([make_result(version="v2", status_code=None, label=None,
+                                             confidence=None, error="connection_error: test")],
+                                mode="unhandled_5xx")
+        assert summary["findings_unavailable"][0]["key"][2] == "unhandled_5xx"
+
+    @pytest.mark.parametrize("label,expected", [("joy", "findings_resolved"), ("sadness", "findings_remaining")])
+    def test_usable_predictions_still_resolve_or_remain(self, label, expected):
+        summary = self._summary([make_baseline(version="v2"), make_result(version="v2", label=label)])
+        assert len(summary[expected]) == 1
+        assert summary["findings_unavailable"] == []
+
+    def test_clean_rejection_can_resolve_server_error_without_a_prediction(self):
+        summary = self._summary([make_result(version="v2", status_code=422, label=None,
+                                             confidence=None, response_body='{"detail":[]}')],
+                                mode="unhandled_5xx")
+        assert summary["findings_resolved"] == [["encoding", "homoglyph", "unhandled_5xx"]]
+
+    def test_changed_observable_failure_mode_still_resolves_and_appears(self):
+        summary = self._summary([make_result(version="v2", status_code=400, label=None,
+                                             confidence=None, response_body="Traceback (most recent call last)")],
+                                mode="unhandled_5xx")
+        assert summary["findings_resolved"] == [["encoding", "homoglyph", "unhandled_5xx"]]
+        assert summary["findings_newly_appearing"] == [["encoding", "homoglyph", "info_leak"]]
+
+
+    def test_partly_unevaluable_group_is_not_resolved(self):
+        manifest = {aid: make_meta(attack_id=aid) for aid in ("a1", "a2")}
+        v1 = analyze.analyze_version([make_baseline()] + [
+            make_result(attack_id=aid, label="sadness") for aid in manifest
+        ], manifest)
+        v2 = analyze.analyze_version([
+            make_baseline(version="v2"), make_result(attack_id="a1", version="v2"),
+            make_result(attack_id="a2", version="v2", status_code=None, label=None,
+                        confidence=None, error="connection_error: test"),
+        ], manifest)
+        meta = make_run_meta(planned=3, completed=3)
+        meta["case_ids"]["completed"] = ["baseline:b1", "attack:a1", "attack:a2"]
+        summary = analyze.build_comparison_summary(v1, v2, meta, meta)
+        assert summary["findings_resolved"] == []
+        assert summary["findings_unavailable"] == [{
+            "key": ["encoding", "homoglyph", "prediction_flip"], "unavailable_ids": ["a2"]
+        }]
+
+    def test_health_failure_remains_observable_after_connection_failure(self):
+        manifest = {"a1": make_meta()}
+        rows = [make_result(status_code=None, label=None, confidence=None,
+                            error="connection_error: test", endpoint_alive_after=False)]
+        v1 = analyze.analyze_version(rows, manifest)
+        v2 = analyze.analyze_version([dataclasses.replace(rows[0], version="v2")], manifest)
+        meta = make_run_meta(planned=1, completed=1)
+        meta["case_ids"]["completed"] = ["attack:a1"]
+        summary = analyze.build_comparison_summary(v1, v2, meta, meta)
+        assert summary["findings_remaining"] == [{
+            "key": ["encoding", "homoglyph", "service_unavailable"], "remaining_ids": ["a1"]
+        }]
+        assert summary["findings_unavailable"] == []

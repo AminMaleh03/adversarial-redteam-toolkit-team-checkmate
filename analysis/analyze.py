@@ -439,6 +439,30 @@ class VersionAnalysis:
     review_cases: list
     drift: "drift.DriftSummary"
     operational: dict
+    evaluable_attack_ids_by_mode: dict[str, set[str]]
+
+
+def comparison_evidence(
+    evaluations: list[CaseEvaluation], drift_summary: drift.DriftSummary
+) -> dict[str, set[str]]:
+    """Keep evaluability separate from whether a request was recorded as completed.
+
+    Only actual automatically evaluated rows can rule out operational failures.
+    A connection failure alone cannot establish that an HTTP weakness was fixed,
+    though any positively observed failure (such as failed health) remains evidence.
+    Flip resolution additionally needs an eligible clean/attacked prediction pair;
+    clean rejection does not supply a prediction and cannot demonstrate invariance.
+    """
+    usable = {e.attack_id for e in evaluations
+              if e.bucket in ("pass", "fail") and not e.is_connection_failure}
+    by_mode = {mode: set(usable) for mode in severity.BASE_WEIGHTS}
+    for evaluation in evaluations:
+        for instance in evaluation.instances:
+            by_mode[instance.failure_mode].add(evaluation.attack_id)
+    by_mode[severity.FINDING_PREDICTION_FLIP] = {
+        record.attack_id for record in drift_summary.records if record.status == "eligible"
+    }
+    return by_mode
 
 
 def analyze_version(results: list[RunResult], manifest: dict[str, dict]) -> VersionAnalysis:
@@ -481,6 +505,7 @@ def analyze_version(results: list[RunResult], manifest: dict[str, dict]) -> Vers
         review_cases=review_cases,
         drift=drift_summary,
         operational=operational,
+        evaluable_attack_ids_by_mode=comparison_evidence(evaluations, drift_summary),
     )
 
 
@@ -582,6 +607,7 @@ def build_comparison_summary(
         meta_v2=meta_v2,
         v1_groups=v1_analysis.finding_groups,
         v2_groups=v2_analysis.finding_groups,
+        v2_evaluable_attack_ids_by_mode=v2_analysis.evaluable_attack_ids_by_mode,
     )
 
     summary = {

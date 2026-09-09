@@ -1,6 +1,43 @@
 # Handoff — Team Checkmate
 
-## Current Checkpoint
+## Current Checkpoint - Codex
+
+- Updated: 2026-09-09T17:47:11+04:00, Codex; branch `khalid/analysis`, observed HEAD `b7d6489`.
+- User authorized fixing the major analysis comparison issue: unevaluable V2 evidence
+  must not resolve a V1 finding. Implemented and verified; preparing the authorized commit and PR.
+- Changed: `analysis/analyze.py`, `analysis/compare.py`, `tests/test_analysis.py`, and
+  this handoff. Baseline, frozen contract, and other owners' components unchanged.
+- Comparison now intersects metadata completion with actual evidence evaluable for
+  each failure mode. Flip resolution requires an eligible clean/attacked pair;
+  missing rows, unusable predictions/references, low-confidence references, unscored
+  review/diagnostic cases, and connection failures cannot silently prove a fix.
+  Clean rejection still resolves an observable server-error finding. Positively
+  observed health failures remain reportable even with a connection failure.
+- Internal API change: `compare_versions` and `compare_findings` require
+  `v2_evaluable_attack_ids_by_mode`; the orchestrator supplies it from VersionAnalysis.
+- Added 19 regression cases. Before implementation, the first 17 produced 13 failures
+  and 4 passing controls with `.venv/Scripts/python.exe -B -m pytest -p no:cacheprovider
+  tests/test_analysis.py -q -k ComparisonEvidenceEligibility --tb=line`.
+- Final validation by Codex: `.venv/Scripts/python.exe -B -m pytest -p no:cacheprovider
+  tests/test_analysis.py tests/test_baseline.py -q`: 158 passed in 0.92s.
+  `git diff --check`: clean. No model tests or live endpoints run for this change.
+- Repeated `run_analysis_from_dir('results/khalid_validation/full2')` after the fix:
+  deterministic; 1,928 completed rows each; comparison remains 15 resolved, 14 remaining,
+  0 unavailable, 0 newly appearing. Per-version counts and drift totals unchanged.
+- Remaining smaller review concerns are not fixed: mixed-version input, diagnostic
+  oracle/tier inconsistency, severity rounding at tier boundaries, comparison rate
+  denominators. This task does not establish that the entire area has no issues.
+- User authorized committing and publishing the reviewed draft PR on 2026-09-09.
+  Push only `khalid/analysis`; do not push to main or merge the PR. Approved PR text
+  includes the remaining analysis concerns and omits teammate benchmark discussion.
+- Publication in progress: origin/main advanced to `67034fc`, changing only the
+  shared handoff and attack integration notes. A handoff merge conflict must be
+  reconciled on the feature branch before submission; analysis code is unaffected.
+- Next: commit this verified fix, incorporate upstream documentation while preserving
+  both handoff histories, push the feature branch, create and verify the draft PR.
+
+## Historical checkpoint - Claude
+
 
 - Updated: 2026-09-09 (session timezone not specified), Claude.
 - Active request: Khalid's analysis subtask. Implement `analysis/drift.py`,

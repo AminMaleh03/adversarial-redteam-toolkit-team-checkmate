@@ -7,8 +7,8 @@ Three steps, in order, matching the ClickUp brief:
 
 Resolution happens at the grouped-finding level (category, subfamily, failure_mode), never
 by re-deriving pass/fail from a raw case count, and a finding backed by V2 evidence that is
-missing or skipped is "unavailable", never silently "resolved". Absence of evidence is not
-evidence of a fix.
+missing, skipped, or unevaluable is "unavailable", never silently "resolved".
+Absence of evidence is not evidence of a fix.
 """
 
 from __future__ import annotations
@@ -105,22 +105,13 @@ def resolve_finding_group(
     v2_groups_by_key: dict[tuple[str, str, str], FindingGroupRef],
     v2_completed_attack_ids: set[str],
 ) -> FindingResolution:
-    """Resolve one V1 finding group against V2.
+    """Resolve a group using completed IDs already restricted to usable evidence.
 
-    Availability is decided by direct membership in V2's own *completed* id set, never by
-    the absence of a missing/skipped marker. Trusting an "is it missing or skipped"
-    negative check would let a case that never reached V2 for some other reason -- a
-    runner bug, a truncated results file, any inconsistency between run_meta and the
-    results file -- look identical to a case V2 actually ran and fixed. Requiring positive
-    proof of completion closes that gap.
-
-    - unavailable: any required V1 evidence id did not complete on V2. Not resolved --
-      this is the case that quietly inflates a before/after claim if handled wrong.
-    - remaining: every required id completed on V2, and at least one still shows the same
-      (category, subfamily, failure_mode).
-    - resolved: every required id completed on V2, and none show that failure mode there.
-      An id that completed but now shows a *different* failure mode still counts as
-      resolved here -- the new behaviour is a separate, newly-appearing finding elsewhere.
+    The caller must intersect recorded completion with evidence evaluable for this
+    group's failure mode. A recorded request alone does not prove a fix: for example,
+    a connection failure supplies no prediction with which to rule out a flip.
+    Missing or unevaluable evidence takes priority over resolution. A different
+    observed failure may resolve this mode only when this mode itself is evaluable.
     """
     required = v1_group.evidence_ids
     unavailable_ids = [aid for aid in required if aid not in v2_completed_attack_ids]
@@ -147,11 +138,16 @@ def compare_findings(
     v1_groups: list[FindingGroupRef],
     v2_groups: list[FindingGroupRef],
     v2_completed_attack_ids: set[str],
+    v2_evaluable_attack_ids_by_mode: dict[str, set[str]],
 ) -> tuple[list[FindingResolution], list[FindingGroupRef]]:
     v2_by_key = {g.key: g for g in v2_groups}
     v1_keys = {g.key for g in v1_groups}
     resolutions = [
-        resolve_finding_group(g, v2_by_key, v2_completed_attack_ids) for g in v1_groups
+        resolve_finding_group(
+            g, v2_by_key,
+            v2_completed_attack_ids & v2_evaluable_attack_ids_by_mode.get(g.failure_mode, set()),
+        )
+        for g in v1_groups
     ]
     newly_appearing = [g for g in v2_groups if g.key not in v1_keys]
     return resolutions, newly_appearing
@@ -168,22 +164,22 @@ def compare_versions(
     meta_v2: dict,
     v1_groups: list[FindingGroupRef],
     v2_groups: list[FindingGroupRef],
+    v2_evaluable_attack_ids_by_mode: dict[str, set[str]],
 ) -> ComparisonResult:
-    """The full three-step comparison. Callers pass grouped-finding refs (built by
-    analyze.py from its own Finding objects), plus the two run-metadata dicts as read
-    from ``run_meta_v1.json`` / ``run_meta_v2.json``.
+    """Compare coverage and findings using metadata plus observed evidence.
 
-    V2 completion is read directly from ``meta_v2["case_ids"]["completed"]`` -- the one
-    positive, authoritative signal for "did this case actually run on V2" -- rather than
-    accepting missing/skipped sets from the caller, which would only prove a case was
-    *expected* to be absent, not that everything else present.
+    Completion comes from run metadata; evaluability comes from analyze.py's actual
+    result rows and drift verdicts. Both are required, separately for each failure mode.
+    Metadata cannot make a missing or unusable result count as a demonstrated fix.
     """
     fingerprints = check_fingerprints(meta_v1, meta_v2)
     coverage = compare_coverage(meta_v1, meta_v2)
     v2_completed_attack_ids = _attack_ids_from_case_keys(
         meta_v2.get("case_ids", {}).get("completed", [])
     )
-    resolutions, newly_appearing = compare_findings(v1_groups, v2_groups, v2_completed_attack_ids)
+    resolutions, newly_appearing = compare_findings(
+        v1_groups, v2_groups, v2_completed_attack_ids, v2_evaluable_attack_ids_by_mode
+    )
     return ComparisonResult(
         fingerprints=fingerprints,
         coverage=coverage,

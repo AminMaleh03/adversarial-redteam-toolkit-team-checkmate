@@ -1,6 +1,6 @@
 ## Current implementation checkpoint - Codex
 
-- Updated: 2026-09-09T20:49:00+04:00, Codex; main at 4b37ab6.
+- Updated: 2026-09-09T20:50:11+04:00, Codex; main at 81aa53e.
 - Ahsan explicitly authorized implementing the review recommendations on Khalid's behalf and committing/pushing directly to main. This is the task-specific exception to analysis ownership and the feature-branch/PR rule. No teammate messages requested.
 - Implemented: strict artifact validation, symmetric comparison evidence, diagnostic exclusion, connection-failure findings, safe leak detection, unrounded severity, and documented report output with explicit rate counts. Scope: analysis/, its tests, HANDOFF.md; contract and other components remain untouched.
 - Policy choice under delegated project-lead authorization: connection_failure gets 70/High, no size adjustment; separate from service unavailability. Existing severity weights remain unchanged.
@@ -11,7 +11,8 @@
 - `.\.venv\Scripts\python.exe results/analysis_review_4b37ab6/verify_remediation.py`: passed. Strict validation, repeat analysis and real CLI produce identical schema-v2 JSON; retained original artifact hashes unchanged. Actual V2 TestClient reflection probe returns 422 and zero findings. Output: results/analysis_remediation/report_input.json and verification.json (ignored).
 - Saved full benchmark remains 1,928 rows/version; 14 resolved, 14 remaining, zero unavailable/new; flips 218/1370 vs 112/1373; 36/42 eligible clean baselines each. No fresh endpoint benchmark or report rendering was run. PR's separate full2 dataset remains absent here.
 - Final diff review confirms only analysis code/docs, analysis tests, and HANDOFF.md changed; no contract/baseline/endpoint/runner/attacks/report changes. Fetch confirmed origin/main equals local starting HEAD 4b37ab6. All reviewed issues are addressed with documented semantics; report work can proceed against schema v2.
-- Next: commit and push authorized main update. No running processes or pending test sessions. Earlier review evidence is historical; retained under ignored results/analysis_review_4b37ab6.
+- Committed and pushed implementation as 81aa53e (`fix(analysis): validate artifacts and require comparable finding evidence`). Push confirmed 4b37ab6..81aa53e main -> main; subsequent HEAD/origin/main both 81aa53e and working tree clean. This documentation checkpoint records publication and is being committed/pushed under the same authorization.
+- Next: Ahsan can begin report implementation using analysis/README.md (schema v2) and results/analysis_remediation/report_input.json. No remaining blocker from the reviewed analysis issues. No running processes or pending test sessions. Earlier review evidence is historical; retained under ignored results/analysis_review_4b37ab6.
 
 ## Historical review checkpoint - Codex
 

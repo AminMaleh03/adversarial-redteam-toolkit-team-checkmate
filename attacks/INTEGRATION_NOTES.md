@@ -33,7 +33,7 @@ already rejects it, so both should 422.
 (`boundary_source="approximate_word_estimate"`). To get exact N-1 / N / N+1 cases, call:
 ```python
 from endpoint.model import tokenizer, MAX_SEQUENCE_LENGTH
-count = lambda s: len(tokenizer.encode(s, add_special_tokens=True))
+count = lambda s: len(tokenizer.encode(s, add_special_tokens=True, truncation=False))
 cases = library.standalone_cases(token_counter=count, max_tokens=MAX_SEQUENCE_LENGTH)
 ```
 The measured token count is stored in each case's metadata (`boundary_measured`).
@@ -42,7 +42,7 @@ The measured token count is stored in each case's metadata (`boundary_measured`)
 Every case's relation/oracle/provenance/expected-V2-behaviour lives in the sidecar,
 keyed by `attack_id`. After building the suite, dump it with:
 ```python
-library.write_manifest("results/attack_manifest.json")
+library.write_manifest("results/manifest.json")
 ```
 Use the `oracle` field to decide what "failure" means per case; **never auto-score
 `REVIEW` or `DIAGNOSTIC` cases** as vulnerabilities. `expected_sanitizer_behavior` /

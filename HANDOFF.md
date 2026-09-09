@@ -2,20 +2,22 @@
 
 ## Current Checkpoint
 
-- Updated: 2026-09-09 13:31 +04:00 (Asia/Dubai), Codex.
+- Updated: 2026-09-09 13:34 +04:00 (Asia/Dubai), Codex.
 - Active request: remediate the six runner review issues, commit, merge PR #5 onto main, push,
   and document for Claude. Ahsan explicitly authorized these actions in this conversation on
   9 September, including this task's exception to Amin's file ownership and agent merging.
   No teammate messages or edits to contract/attacks/endpoint/baseline/analysis/report authorized.
-- Branch / observed HEAD: `runner-amin` / `e1997d1`, tracking `origin/runner-amin`.
-  Main and refreshed origin/main were `7a06f3d`. GitHub PR #5 originally points at
-  `e1997d109fe778d8a61cde05ccfdd63b39ee9b5e`.
-- Status: six fixes implemented and verified; commits, merge and push are the remaining steps.
-  Changed tracked files: `runner/run.py`, `tests/test_runner.py`, `HANDOFF.md`; new tracked
-  documentation to add: `runner/README.md`. Existing Codex/Claude handoff work was reconciled
-  into this checkpoint and the history below. No other contributor changes were discarded.
-- Next: inspect/stage the exact files, commit and push the PR branch, merge it into main and
-  push main, confirm GitHub PR state and remote refs, then record the final Git outcome.
+- Branch / observed implementation HEAD: `main` / `39fb79b`, pushed to `origin/main`.
+  This final documentation checkpoint follows that merge; use `git log -1` for its own tip.
+- Status: all six fixes implemented, verified, committed and pushed. Fix commit `5dea5e7`
+  was pushed to `runner-amin`; merge commit `39fb79b` was pushed to main. GitHub API confirmed
+  PR #5 is closed with `merged=true`, merge SHA `39fb79b1bc70f5576683ed9f3b52b5cc18b6521a`,
+  merged at 2026-09-09 13:33:32 +04:00. The PR branch is retained.
+- Committed files: `runner/run.py`, `tests/test_runner.py`, `runner/README.md`, and `HANDOFF.md`.
+  Existing Codex/Claude handoff work was reconciled into this checkpoint/history. No contract
+  or other components changed. This follow-up checkpoint is documentation-only.
+- Next: hand back on main after committing/pushing this final checkpoint. No component work
+  remains assigned; Claude should read this file and AGENTS.md before any new task.
 - Processes: none remain. Runner test session 43569, full test session 32798 and live smoke
   session 61026 completed; all diagnostic/local endpoint servers shut down.
 
@@ -64,7 +66,10 @@ Python: root `.venv`, Python 3.11.9. No new dependencies or model downloads.
   V2 422. Extra-field request returned V1 200 / V2 422; invalid UTF-8 returned 400 on both.
 - Full-suite planned fingerprint: `7fcccf16989784ca046317158a97fca6fcb52299eae99deda62ab0c63914a430`.
   Manifest SHA: `0471bccbf293095d15287904a7ddfdef15161e3fb2efdcb773ccd1b952cca717`.
-- `git diff --check`: clean before documentation finalization; check again before commit.
+- `git diff --check` and staged diff checks: clean before implementation commit. The merge
+  introduced no changes relative to the tested PR branch (verified with
+  `git diff runner-amin HEAD -- runner tests/test_runner.py contract.py`). No model-test rerun
+  needed for this documentation-only follow-up; check its diff before committing.
 - Initial root pytest collection hit duplicate modules from the old ignored review snapshot.
   Local ignored `results/conftest.py` now excludes generated artifacts from ordinary discovery;
   no tracked pytest configuration or component tests were bypassed.
@@ -80,7 +85,7 @@ Python: root `.venv`, Python 3.11.9. No new dependencies or model downloads.
 | endpoint/ | Rayyan | V1/V2 implemented; tests and runner smoke pass |
 | baseline/ | Khalid | 42 committed sentences and loader |
 | attacks/ | Lamei | Six categories; 1,886 attacks, 33 standalone and 1,853 derived |
-| runner/ | Amin | Implemented with six verified fixes on runner-amin; merge pending |
+| runner/ | Amin | Implemented; six verified fixes merged and pushed to main in PR #5 |
 | analysis/ | Khalid | Stubs; downstream file integration unverified |
 | report/ | Ahsan | Renderer/template stubs |
 
@@ -163,9 +168,9 @@ These are now verified implementation facts, not claims about whether a ClickUp 
 
 ## Next Action
 
-Complete the authorized commit/merge/push recorded in the checkpoint, then hand back on main.
-Khalid owns analysis and its input-file integration; Ahsan owns report implementation. Those
-components remain parked unless the current user assigns them.
+Runner remediation and PR #5 merge are complete. Khalid owns analysis and its input-file
+integration; Ahsan owns report implementation. Those components remain parked unless the
+current user assigns them.
 
 For a takeover, read `AGENTS.md` and this file, inspect Git state, and resume only the latest
 user-authorized task. Update this checkpoint whenever progress or scope changes.

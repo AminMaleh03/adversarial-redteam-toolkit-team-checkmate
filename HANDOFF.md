@@ -247,19 +247,22 @@ so it is **not** a defect in `runner/run.py` and should not be reported to Amin 
     reaching the 60 High boundary, which needs clean confidence of exactly 1.00.
 - One genuine difference from Amin's reported run, stated plainly: our V1 returned a 500 on
   `malformed.oversized_10mb` where his timed out. That exactly reconciles the counts --
-  ours shows V1 unhandled_5xx 91 / timeouts 0, his shows 90 / 1. On our V2 it did time out.
+  ours shows V1 unhandled_5xx 91 / timeouts 0, his shows 90 / 1.
+  **Correction to an earlier draft of this note: on our V2 the case did NOT time out.**
+  The recorded row is `status_code 422`, `latency_band "slow"`, 4,013.8 ms, no error --
+  V2 reached its length check and rejected cleanly. Our V1 row is `status_code 500`,
+  `slow`, 2,487.7 ms. Neither version timed out on this hardware. See the
+  "Real-run validation" section above for what that implies for the team.
   This case is timing- and machine-sensitive, which reinforces the brief's decision to
   record it as measured and treat its cause as out of scope. It is also why our run cannot
   substitute for his artifacts in the report.
-- Next: (1) get the real `results/full_20260909_135157/` artifacts onto disk and run
-  `analysis.analyze.run_analysis(...)` against them for integration validation, per the
-  brief's required handling of the three specific known issues (oversized_10mb timeout,
-  six low-confidence baselines excluded from flip scoring only, five mispredicted
-  baselines noted as a limitation) -- the implementation is written generically and should
-  already satisfy all three without special-casing, but this is unverified against real
-  data. (2) Once validated, commit and open Khalid's analysis PR for Ahsan per the
-  Definition of Done. Do not commit before the user asks.
-- Processes: none running.
+- Next: (1) push `khalid/analysis` and open the PR for Ahsan (three commits: `a068b7d`,
+  `c7c7d71`, plus this checkpoint). (2) When Amin's `results/full_20260909_135157/`
+  artifacts arrive, run `analysis.analyze.run_analysis(...)` over them -- the report must
+  be written against his benchmark run, not ours. Expect his oversized_10mb row to be a
+  timeout on both versions, which the code already handles generically.
+- Processes: none running. Both local uvicorn endpoints were shut down and ports 8000/8001
+  confirmed released.
 
 ## Six Fixes and Consumer Notes
 

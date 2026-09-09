@@ -2,59 +2,112 @@
 
 ## Current Checkpoint
 
-- Updated: 2026-09-09 01:08 +04:00 (Asia/Dubai).
-- Agent: Claude Code, working with Ahsan in the local shared checkout. The preceding
-  documentation edit in this checkpoint was made by Codex.
-- Branch / observed HEAD: `main` / `470b314` before this commit. The previous checkpoint recorded
-  `24ea950`, which was already stale; `470b314` was the actual tip and is corrected here.
-- Active request: keep Codex and Claude Code instructions synchronized, then commit and push.
-- Progress: Codex corrected the cross-component import rule to permit the runner's documented
-  public integration points while retaining the analysis-to-attacks prohibition, and `CLAUDE.md`
-  now imports the shared rules with `@AGENTS.md`. Claude verified the three named integration
-  points resolve against the real code (`baseline.load.load_baseline`; `attacks.library`
-  exposing `standalone_cases`, `build_derived`, `build_suite`, `write_manifest`;
-  `endpoint.model.tokenizer` with `MAX_SEQUENCE_LENGTH` = 512) and that `git diff --check` is
-  clean. Documentation-only change, so the application test suite was not rerun.
-- Changed files this turn: `AGENTS.md`, `CLAUDE.md`, and this checkpoint. Committed and pushed
-  directly to `main` on Ahsan's explicit instruction, the documented exception to the
-  feature-branch rule. No application code changed.
-- Running processes / temporary files: none left running. Claude created scratch verification
-  scripts outside the repository, under the session scratchpad; nothing to clean up in-tree.
+- Updated: 2026-09-09 13:31 +04:00 (Asia/Dubai), Codex.
+- Active request: remediate the six runner review issues, commit, merge PR #5 onto main, push,
+  and document for Claude. Ahsan explicitly authorized these actions in this conversation on
+  9 September, including this task's exception to Amin's file ownership and agent merging.
+  No teammate messages or edits to contract/attacks/endpoint/baseline/analysis/report authorized.
+- Branch / observed HEAD: `runner-amin` / `e1997d1`, tracking `origin/runner-amin`.
+  Main and refreshed origin/main were `7a06f3d`. GitHub PR #5 originally points at
+  `e1997d109fe778d8a61cde05ccfdd63b39ee9b5e`.
+- Status: six fixes implemented and verified; commits, merge and push are the remaining steps.
+  Changed tracked files: `runner/run.py`, `tests/test_runner.py`, `HANDOFF.md`; new tracked
+  documentation to add: `runner/README.md`. Existing Codex/Claude handoff work was reconciled
+  into this checkpoint and the history below. No other contributor changes were discarded.
+- Next: inspect/stage the exact files, commit and push the PR branch, merge it into main and
+  push main, confirm GitHub PR state and remote refs, then record the final Git outcome.
+- Processes: none remain. Runner test session 43569, full test session 32798 and live smoke
+  session 61026 completed; all diagnostic/local endpoint servers shut down.
+
+## Six Fixes and Consumer Notes
+
+1. Prediction HTTP operations use a cancellable total ten-second deadline, including connection,
+   upload, response headers and body. A persistent `asyncio.Runner` + `httpx.AsyncClient`
+   implements it behind the synchronous Runner interface. Sending stays sequential; no attack
+   retries. Client cancellation closes the operation; server-side inference may still continue.
+2. Manifest is exported once to a staging directory under the chosen output directory before
+   even the health preflight. Only successful preflight publishes `manifest.json` and starts
+   replacing results. Failed preflight exits 2 and preserves old manifest/results/metadata.
+   It does not publish a new zero-row run. Completed-run replacement remains intentional.
+3. CLI and Runner reject prediction timeouts other than the settled ten seconds. Positive,
+   finite health timeouts remain configurable and effective settings go into run metadata.
+4. Skips are determined from the selected plan before execution, so early death cannot lose
+   unreached skip IDs. Limit exclusion takes precedence when an ID is both beyond the limited
+   prefix and named in --skip. The planned fingerprint still covers the full built suite.
+5. Ctrl+C returns 130 and finalizes started runs with `termination_reason="interrupted"`,
+   preserving completed rows and missing IDs. Success is assigned only after execution ends.
+   Interrupted preflight also preserves existing artifacts.
+6. Negative attack limits are rejected before building the suite or sending requests. Zero
+   remains valid and sends all clean baselines with no attacks.
+
+- Added 21 regression cases: CLI lifecycle/settings/coverage plus a real socket drip canceled
+  at ten seconds, socket cleanup and a successful subsequent request.
+- Public filenames and dataclass fields are unchanged. Async injected transports are now
+  required for direct Runner tests; HTTPX MockTransport supports both interfaces.
+- Close directly instantiated Runner objects in finally blocks to release client/event loop.
+- Durable usage, artifact behavior and exit codes: [runner/README.md](runner/README.md).
+
+## Validation by Codex for These Fixes
+
+Python: root `.venv`, Python 3.11.9. No new dependencies or model downloads.
+
+- `.\.venv\Scripts\python.exe -m pytest tests/test_runner.py -q`:
+  **59 passed in 11.28s**.
+- `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`, then
+  `.\.venv\Scripts\python.exe -m pytest -q`: **123 passed, 1 warning in 15.57s**.
+  Warning is the existing Starlette/AnyIO deprecation. Includes real endpoint/model tests.
+- `.\.venv\Scripts\python.exe results/runner_review_e1997d1/live_smoke.py --source . --out results/runner_remediation/live_smoke`:
+  **passed**, exit 0. Actual local Uvicorn V1 and V2, real model/tokenizer, --limit 40 and
+  --skip malformed.oversized_10mb: 81 rows each (42 clean, 32 standalone, 7 derived).
+  Matching full-suite and manifest fingerprints, all result fields/joins checked, no failed
+  health, no missing selected cases. 511/512 tokens accepted by both; 513 returned V1 500 /
+  V2 422. Extra-field request returned V1 200 / V2 422; invalid UTF-8 returned 400 on both.
+- Full-suite planned fingerprint: `7fcccf16989784ca046317158a97fca6fcb52299eae99deda62ab0c63914a430`.
+  Manifest SHA: `0471bccbf293095d15287904a7ddfdef15161e3fb2efdcb773ccd1b952cca717`.
+- `git diff --check`: clean before documentation finalization; check again before commit.
+- Initial root pytest collection hit duplicate modules from the old ignored review snapshot.
+  Local ignored `results/conftest.py` now excludes generated artifacts from ordinary discovery;
+  no tracked pytest configuration or component tests were bypassed.
+- Generated evidence remains ignored: `results/runner_remediation/live_smoke/` has logs, JSONL,
+  metadata, manifest and summary; `results/runner_review_e1997d1/` retains the unmodified PR
+  archive/snapshot, original review and probes. No full post-fix live benchmark was run.
 
 ## Verified Pipeline Snapshot
 
-Verified locally by Codex on 2026-09-09, at implementation HEAD `33e2dcc` (unchanged by `24ea950`):
-
 | Component | Owner | State |
 | --- | --- | --- |
-| `contract.py` | Ahsan | Four implemented dataclasses; frozen |
-| `endpoint/` | Rayyan | V1 and V2 implemented; existing tests pass |
-| `baseline/` | Khalid | 42 committed sentences and `baseline.load.load_baseline()` |
-| `attacks/` | Lamei | Six categories; default suite builds 1,886 attacks |
-| `runner/` | Amin | Stub; immediate blocker to a full run |
-| `analysis/` | Khalid | Stubs |
-| `report/` | Ahsan | Renderer and HTML template are stubs |
+| contract.py | Ahsan | Four unchanged dataclasses; frozen |
+| endpoint/ | Rayyan | V1/V2 implemented; tests and runner smoke pass |
+| baseline/ | Khalid | 42 committed sentences and loader |
+| attacks/ | Lamei | Six categories; 1,886 attacks, 33 standalone and 1,853 derived |
+| runner/ | Amin | Implemented with six verified fixes on runner-amin; merge pending |
+| analysis/ | Khalid | Stubs; downstream file integration unverified |
+| report/ | Ahsan | Renderer/template stubs |
 
-No local `results/` directory existed at verification. Component tests passing does not mean
-the full V1/V2 run, analysis, or report has happened.
+Component tests and smoke runs do not establish complete analysis or report generation.
 
-Validation already completed by Codex before this documentation task:
+## Short Decision and Review History
 
-- `.\.venv\Scripts\python.exe -m pytest -q`: **64 passed, 1 warning in 53.44s**.
-  The warning is Starlette's deprecated AnyIO `BlockingPortal` alias.
-- In-memory `load_baseline()` -> `build_suite(baselines)` check: 42 baselines, 1,886 attacks,
-  1,886 unique attack IDs, zero orphaned baseline references. This used default approximate
-  boundaries, not the real-tokenizer mode intended for the actual runner.
-- Category counts: malformed 21, boundary 11, perturbation 377, encoding 973, whitespace 252,
-  truncation 252.
+- Prior instruction-sync work is committed at `7a06f3d`. CLAUDE.md imports AGENTS.md.
+- Codex reviewed original PR #5 on 9 September: 102 existing tests passed (38 runner tests);
+  six extra probes failed, reproducing the six issues now fixed. A full 1,928-case simulated
+  transport check and real V1/V2 81-row smoke runs passed. Details remain in the ignored
+  `results/runner_review_e1997d1/REVIEW.md` (historical review, not current implementation status).
+- Claude independently verified the same original snapshot on 9 September: 42 + 1,886 cases,
+  the same fingerprints, explicit non-truncation, 102 tests passing in 5.95s, and extra-field /
+  100 KB / 1 MB differences via TestClient. These are Claude's historical results; the full
+  suite does load the endpoint/model. Amin's claimed full live runs were not independently
+  verified because his generated artifacts are not in Git.
+- The manifest filename is settled as `manifest.json` by AGENTS.md. The older integration
+  notes saying `attack_manifest.json` are a documentation inconsistency, not an open decision.
 
 ## Decisions and User Scope to Preserve
 
 Source: Ahsan's local Claude Code conversations from 8–9 September, recovered by Codex and
 checked against the repository where possible.
 
-- **Leave the runner to Amin.** Ahsan explicitly stopped Claude from implementing it on
-  8 September, late evening. A general takeover request does not reverse that instruction.
+- Runner ownership remains Amin's. The 8 September stop on implementing it was superseded
+  only for the six-issue remediation/merge explicitly authorized on 9 September (see checkpoint).
 - Khalid handles analysis after Amin's runner work; Ahsan handles the report afterward.
   Do not start those implementations based solely on this handoff.
 - Ahsan specifically authorized the baseline loader, its tests/cosmetic cleanup, and V2's
@@ -66,10 +119,10 @@ checked against the repository where possible.
   change was needed. Claude saved the manifest rule and corrected scaffold status but hit
   its limit before final verification. These facts now live in the shared files.
 
-## Runner Brief — Specified, Not Implemented
+## Runner Requirements
 
 Ahsan wrote a ClickUp brief and asked Claude to review it. Preserve its requirements when
-reviewing Amin's future work:
+maintaining the runner:
 
 - Use the baseline loader; build a deterministic suite, with real-tokenizer counts and explicit
   `truncation=False` for exact boundaries.
@@ -81,15 +134,10 @@ reviewing Amin's future work:
   Append and flush results incrementally; separate output by version; stop after failed health.
 - Fingerprint the ordered inputs so the V1/V2 comparison can establish matching inputs.
 
-Claude's review proposed three clarifications. The transcript does not establish that the
-ClickUp task was subsequently edited or sent:
-
-1. Store the fingerprint in a separate metadata file, e.g. `results/run_meta_<version>.json`;
-   do not add a field to the frozen `RunResult`.
-2. Explicitly require `all_scores`.
-3. Explain differing skips/limits and their effect on fingerprints/comparability. The precise
-   distinction between the full planned suite and selected/executed inputs still needs to be
-   made explicit in the runner metadata design.
+The implementation stores fingerprints in `run_meta_<version>.json`, populates `all_scores`,
+and separates planned, selected, completed, skipped, limit-excluded and missing IDs. The full
+planned fingerprint stays unchanged by limit/skip flags; analysis must also check coverage.
+These are now verified implementation facts, not claims about whether a ClickUp brief was sent.
 
 ## Open Questions and Parked Work
 
@@ -115,10 +163,9 @@ ClickUp task was subsequently edited or sent:
 
 ## Next Action
 
-The revised runner and analysis briefs passed review and are ready for ClickUp. No component
-implementation is assigned to the agent. Amin can implement the runner while Khalid builds and
-unit-tests analysis against synthetic fixtures; real runner output then provides integration
-validation. Ahsan implements the report after the analysis output shape is available.
+Complete the authorized commit/merge/push recorded in the checkpoint, then hand back on main.
+Khalid owns analysis and its input-file integration; Ahsan owns report implementation. Those
+components remain parked unless the current user assigns them.
 
 For a takeover, read `AGENTS.md` and this file, inspect Git state, and resume only the latest
 user-authorized task. Update this checkpoint whenever progress or scope changes.

@@ -146,6 +146,45 @@
   the suite composition still reproducing 21/11/377/973/252/252, output still
   deterministic and JSON-serialisable, `git diff --check` clean, `analysis/` still imports
   nothing from `attacks/`.
+- REAL-RUN VALIDATION DONE (same session). Rather than wait for Amin's folder, we ran the
+  suite ourselves: local uvicorn V1 on :8000 and V2 on :8001 (Rayyan's endpoints, executed
+  not edited), model already cached, `python -m runner.run` per version into
+  `results/khalid_validation/` (gitignored; NOT `results/` root, so Amin's incoming folder
+  cannot be clobbered). Both versions: 1,928/1,928, coverage 1.0000,
+  `termination_reason: completed`, matching planned fingerprint and manifest hash. V1 took
+  44s, V2 50s. Runs were done sequentially, never in parallel, so CPU contention could not
+  inflate latency and corrupt the 2s `slow` band that severity depends on.
+  Both servers have since been shut down; no stray python processes remain.
+  This substantially closes the "validated against real runner output" DoD item. It is our
+  run, not Amin's artifacts, so his benchmark folder is still what the report must be
+  written against.
+- What the real run corroborated:
+  - The six sub-0.6 baselines reproduce Amin's reported figures EXACTLY to four decimals:
+    handwritten-neutral-4 0.4655, handwritten-neutral-0 0.4688, dataset-surprise-0 0.4906,
+    handwritten-disgust-4 0.5072, handwritten-disgust-2 0.5228, dataset-surprise-5 0.5481.
+    "36 of 42 baselines eligible" reproduces exactly. Amin's numbers are independently
+    confirmed, not taken on trust.
+  - 84 of V1's unhandled 500s are exactly two truncation subfamilies at 42 evidence ids
+    each (`signal_end_over_limit`, `signal_start_over_limit`), precisely the concentration
+    the brief warned would overstate a single defect under an unweighted rate. Grouping
+    collapses them to 2 findings, not 84.
+  - Health never failed on either version (`service_unavailable: 0` both), as the brief says.
+  - Category rates reproduce the brief's stated trap: on V1 encoding has the highest RAW
+    failure count (104) but only an 11.17% rate, while truncation is 52.38% and whitespace
+    32.38%. Ranking by raw count would have named the wrong worst category.
+  - The strongest before/after results: whitespace 32.38% -> 0.00%, truncation 52.38% ->
+    2.38%, boundary 9.09% -> 0.00%. V2's NFKC + whitespace cleanup and length limit work.
+  - The honest non-improvement is visible and preserved: perturbation is 45/377 = 11.94% on
+    BOTH versions, identical, because no retraining was done. Homoglyph and homoglyph_greek
+    flips also remain on V2, matching Lamei's `v2_passes_through` expectation.
+  - Flip severities landed at 50.5-59.8 (Medium) on real confidences -- approaching but not
+    reaching the 60 High boundary, which needs clean confidence of exactly 1.00.
+- One genuine difference from Amin's reported run, stated plainly: our V1 returned a 500 on
+  `malformed.oversized_10mb` where his timed out. That exactly reconciles the counts --
+  ours shows V1 unhandled_5xx 91 / timeouts 0, his shows 90 / 1. On our V2 it did time out.
+  This case is timing- and machine-sensitive, which reinforces the brief's decision to
+  record it as measured and treat its cause as out of scope. It is also why our run cannot
+  substitute for his artifacts in the report.
 - Next: (1) get the real `results/full_20260909_135157/` artifacts onto disk and run
   `analysis.analyze.run_analysis(...)` against them for integration validation, per the
   brief's required handling of the three specific known issues (oversized_10mb timeout,

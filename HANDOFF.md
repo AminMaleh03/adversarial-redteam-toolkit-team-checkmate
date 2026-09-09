@@ -11,10 +11,11 @@
   locally; it is gitignored and was to be sent directly) -- no integration validation
   against real V1/V2 output has happened yet. That remains the next step once the folder
   is actually available.
-- Branch: `khalid/analysis` (unchanged from session start). No commits made this session;
-  changes are on disk, uncommitted, pending user review/commit instruction.
-- Status: implementation complete, unit-tested, not yet committed, not yet validated
-  against real data, not yet opened as a PR.
+- Branch: `khalid/analysis`. Two commits made this session: `a068b7d` (the four analysis
+  modules + tests + handoff) and `c7c7d71` (corrupt-results-row loader fix). Working tree
+  clean. Neither has been pushed; no PR opened yet.
+- Status: implementation complete, unit-tested, **and now validated against a real full
+  V1/V2 run executed locally** (see "Real-run validation" below). Not pushed, no PR yet.
 - Files written/changed this session: `analysis/drift.py`, `analysis/severity.py`,
   `analysis/compare.py`, `analysis/analyze.py`, `tests/test_analysis.py` (all previously
   stubs/empty). No other files touched; no edits outside `analysis/`/`baseline/`/
@@ -76,6 +77,71 @@
   documented no-op since their failure modes are already covered by the cross-cutting
   checks). All 102 tests in `tests/test_analysis.py` pass after the fixes (91 before this
   round + 11 new); full-repo collection is clean at 225 tests (up from 214).
+## Real-run validation (Claude, 2026-09-09, this checkout)
+
+Rather than wait for Amin's benchmark folder, we generated a full run locally: uvicorn
+V1 on 127.0.0.1:8000 and V2 on 127.0.0.1:8001 (Rayyan's endpoints, run not edited), then
+`python -m runner.run` for each version into `results/khalid_validation/full2/`
+(gitignored). 1,928/1,928 both versions, coverage 1.0000, `termination_reason: completed`,
+~45s per version. **Both servers have since been shut down; no processes left running.**
+
+This is a cross-check, NOT a replacement for the agreed benchmark dataset. The report must
+still be written against Amin's `full_20260909_135157/` run, because the team's required
+handling references his specific measured values.
+
+Independently reproduced from Amin's reported figures:
+- Planned-suite fingerprint `7fcccf16989784ca...` and manifest SHA `0471bccbf293095d...`,
+  both identical to his, with 1,886 manifest entries. Recomputed manifest hash matches the
+  value stored in run_meta, which also proves the oracles were registered before any
+  request was sent.
+- The six sub-0.6 baselines match **to four decimal places**: handwritten-neutral-4
+  0.4655, handwritten-neutral-0 0.4688, dataset-surprise-0 0.4906, handwritten-disgust-4
+  0.5072, handwritten-disgust-2 0.5228, dataset-surprise-5 0.5481. "36 of 42 eligible"
+  reproduces exactly.
+- Suite composition 21/11/377/973/252/252 across the six categories.
+- The 5xx concentration the brief warns about: 84 of the V1 unhandled 500s are exactly two
+  truncation subfamilies (`signal_end_over_limit`, `signal_start_over_limit`) at 42
+  baselines each. Grouping collapses them to 2 findings, not 84.
+
+Measured outcome on this hardware (V1 -> V2): unhandled 5xx 91 -> 0; observed
+unavailability 0 -> 0; connection failures 0 -> 0; flip rate 218/1370 (15.9%) ->
+112/1373 (8.2%). Category failure rates: malformed .1905 -> .0476, boundary .0909 -> 0,
+perturbation .1194 -> .1194, encoding .1117 -> .0677, whitespace .3238 -> 0,
+truncation .5238 -> .0238. Comparison: 15 findings resolved, 14 remaining, 0 newly
+appearing, 0 unavailable.
+
+Two findings the team needs, both material:
+
+1. **`malformed.oversized_10mb` is hardware-dependent, and on this machine V2 DID reject
+   it.** Amin recorded no response on either version, ~9,993 ms, `latency_band: "timeout"`.
+   Here V1 returned **500 at 2,488 ms** and V2 returned **422 at 4,014 ms** — both in the
+   `slow` band, neither timed out. This fully explains the only discrepancy in the headline
+   numbers: 91 unhandled 500s here vs his 90, the extra one being the 10 MB case that
+   500'd instead of timing out. The other 90 match.
+   Consequence: the brief's instruction "Do not classify it as a V2 length rejection. V2
+   returned nothing; it did not reject" is correct **for his run** but is not a property of
+   the system — given more headroom V2's length check is reached and returns 422. The
+   analysis code writes no causal explanation either way and needs no change; this is
+   reported as new evidence for the team, not a re-derivation of his dataset. It also means
+   that case's severity is environment-dependent (timeout 60/High on his run vs
+   unhandled_5xx + slow here), so it should not be leaned on as a stable benchmark row.
+
+2. **The honest non-improvement is confirmed empirically.** Perturbation failure rate is
+   *identical* on V1 and V2 (45/377, .1194 both), and all 12 perturbation/homoglyph
+   prediction-flip findings are "remaining". V2's application-layer defenses do not touch
+   model-level typo sensitivity because no retraining was done, exactly as the brief says
+   must be preserved rather than quietly omitted. Homoglyph flips persisting also matches
+   Lamei's pre-registered `v2_passes_through` expectation (NFKC does not fold mixed-script
+   homoglyphs). The 15 resolved findings are all genuine application-layer wins: whitespace
+   and fullwidth normalisation, over-limit and oversized 5xx, and `extra_field`.
+
+Bug found by real data and fixed in `c7c7d71`: a truncated JSONL row surfaced as a bare
+`JSONDecodeError` naming neither file nor line. `load_results` now raises a `ValueError`
+identifying file, line, offending text and likely cause, and still never skips the row.
+The corruption itself was an orphaned background runner from a killed session colliding
+with a fresh write; a clean re-run into a fresh directory produced 1,928/1,928 valid rows,
+so it is **not** a defect in `runner/run.py` and should not be reported to Amin as one.
+
 - Runnable-state verification (same session, after the fix round). A throwaway harness in
   the session scratchpad (`dryrun_analysis.py`, outside the repo, nothing written into
   `results/`) built synthetic artifacts using the REAL schemas -- manifest via

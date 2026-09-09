@@ -22,6 +22,9 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -30,6 +33,7 @@ import httpx
 import pytest
 
 from contract import AttackCase, BaselineCase
+from runner import run as runner_module
 from runner.run import (
     BAND_NORMAL,
     BAND_SLOW,
@@ -52,6 +56,22 @@ from runner.run import (
 )
 
 TARGET = "http://endpoint.test"
+
+
+@pytest.fixture(autouse=True)
+def close_runner_clients(monkeypatch):
+    """Close the per-run event loop and client, including in assertion failures."""
+    created = []
+    original_init = Runner.__init__
+
+    def track(self, *args, **kwargs):
+        original_init(self, *args, **kwargs)
+        created.append(self)
+
+    monkeypatch.setattr(Runner, "__init__", track)
+    yield
+    for runner in reversed(created):
+        runner.close()
 
 
 # --------------------------------------------------------------------------
@@ -808,3 +828,226 @@ def test_no_address_or_port_is_hardcoded_in_the_runner():
     )
     for forbidden in ("localhost", "127.0.0.1", "0.0.0.0", ":8000", ":8001"):
         assert forbidden not in code, f"{forbidden!r} is hardcoded in runner/run.py"
+
+
+# CLI regressions: exercise main() so artifact and settings bugs cannot be
+# hidden by calling build_meta() with manually correct inputs.
+@pytest.fixture
+def cli_run(monkeypatch, tmp_path):
+    baselines = [baseline("b1")]
+    attacks = [attack(aid) for aid in ("a1", "a2", "a3")]
+    state = {"posts": 0, "health": 0, "dead_after": None, "interrupt_after": None,
+             "manifest_writes": 0, "manifest_path": None, "settings": None}
+    monkeypatch.setattr(runner_module, "load_baseline", lambda: baselines)
+    monkeypatch.setattr(runner_module, "build_suite_once", lambda *args: attacks)
+
+    def manifest(path):
+        state["manifest_writes"] += 1
+        state["manifest_path"] = Path(path)
+        Path(path).write_text('{"new": "manifest"}', encoding="utf-8")
+    monkeypatch.setattr(runner_module.library, "write_manifest", manifest)
+
+    def handler(request):
+        if request.url.path == "/health":
+            # Expectations exist before preflight, but prior published files
+            # remain untouched until health succeeds.
+            if state["health"] == 0:
+                assert state["manifest_path"].read_text() == '{"new": "manifest"}'
+            state["health"] += 1
+            dead = state["dead_after"] is not None and state["posts"] >= state["dead_after"]
+            return httpx.Response(503 if dead else 200)
+        assert (tmp_path / "manifest.json").read_text() == '{"new": "manifest"}'
+        state["posts"] += 1
+        return predict_response()
+
+    def client(runner):
+        state["settings"] = (runner.timeout, runner.health_timeout)
+        return httpx.AsyncClient(transport=httpx.MockTransport(handler), timeout=runner.timeout)
+    monkeypatch.setattr(Runner, "_new_client", client)
+    original_send = Runner.send
+
+    def interruptible_send(runner, *args):
+        if state["interrupt_after"] is not None and state["posts"] >= state["interrupt_after"]:
+            raise KeyboardInterrupt()
+        return original_send(runner, *args)
+    monkeypatch.setattr(Runner, "send", interruptible_send)
+
+    def invoke(*flags):
+        return runner_module.main(["--target", TARGET, "--version", "v1", "--no-tokenizer",
+                                   "--out", str(tmp_path), *flags])
+    def meta():
+        return json.loads((tmp_path / "run_meta_v1.json").read_text())
+    return invoke, meta, state, tmp_path
+
+
+def test_cli_early_death_records_unreached_skip(cli_run):
+    invoke, meta, state, _ = cli_run
+    state["dead_after"] = 1
+    assert invoke("--skip", "a3") == 1
+    data = meta()
+    assert data["case_ids"]["skipped"] == ["attack:a3"]
+    assert data["case_ids"]["missing"] == ["attack:a1", "attack:a2"]
+    coverage = data["coverage"]
+    assert coverage["planned"] == coverage["selected"] + coverage["skipped"] + coverage["limit_excluded"]
+
+
+def test_runner_early_death_records_unreached_skip(tmp_path):
+    def handler(request):
+        return httpx.Response(503) if request.url.path == "/health" else predict_response()
+    runner, writer = make_runner(tmp_path, handler, skip=("a3",))
+    with pytest.raises(EndpointDied):
+        runner.run([baseline()], [attack(aid) for aid in ("a1", "a2", "a3")])
+    writer.close()
+    assert runner.skipped == ["attack:a3"]
+
+
+def test_cli_limit_takes_precedence_over_overlapping_skip(cli_run):
+    invoke, meta, _, _ = cli_run
+    assert invoke("--limit", "2", "--skip", "a2", "--skip", "a3") == 0
+    data = meta()
+    assert data["case_ids"]["skipped"] == ["attack:a2"]
+    assert data["case_ids"]["limit_excluded"] == ["attack:a3"]
+    assert data["case_ids"]["completed"] == ["baseline:b1", "attack:a1"]
+    assert data["coverage"] == dict(planned=4, selected=2, completed=2, skipped=1,
+                                    limit_excluded=1, missing=0, coverage_rate=.5)
+
+
+def test_cli_metadata_records_effective_settings(cli_run):
+    invoke, meta, state, _ = cli_run
+    assert invoke("--timeout", "10", "--health-timeout", "0.1") == 0
+    settings = meta()["runner_settings"]
+    assert (settings["request_timeout_s"], settings["health_timeout_s"]) == state["settings"] == (10, .1)
+
+
+@pytest.mark.parametrize("flags", [
+    ("--limit", "-1"), ("--timeout", "0.25"), ("--timeout", "20"),
+    ("--timeout", "nan"), ("--health-timeout", "0"), ("--health-timeout", "-1"),
+    ("--health-timeout", "nan"), ("--health-timeout", "inf"),
+])
+def test_cli_rejects_invalid_settings_before_build_or_network(cli_run, monkeypatch, flags):
+    invoke, _, state, _ = cli_run
+    def unexpected_load():
+        pytest.fail("invalid arguments must be rejected before loading/building the suite")
+    monkeypatch.setattr(runner_module, "load_baseline", unexpected_load)
+    with pytest.raises(SystemExit) as exited:
+        invoke(*flags)
+    assert exited.value.code == 2
+    assert state["posts"] == state["health"] == state["manifest_writes"] == 0
+
+
+def test_select_attacks_rejects_negative_limit():
+    with pytest.raises(ValueError, match="non-negative"):
+        select_attacks([attack()], -1)
+
+
+def test_runner_rejects_nonstandard_request_timeout(tmp_path):
+    with ResultWriter(tmp_path / "unused.jsonl") as writer:
+        with pytest.raises(ValueError, match="request timeout must be"):
+            Runner(TARGET, "v1", writer, timeout=.25)
+
+
+@pytest.mark.parametrize("interrupt_after", [0, 1])
+def test_cli_interrupt_has_honest_status_and_preserves_rows(cli_run, interrupt_after):
+    invoke, meta, state, output = cli_run
+    state["interrupt_after"] = interrupt_after
+    assert invoke() == 130
+    data = meta()
+    assert data["termination_reason"] == runner_module.TERM_INTERRUPTED
+    assert data["coverage"]["completed"] == interrupt_after
+    assert data["coverage"]["missing"] == 4 - interrupt_after
+    assert len(read_rows(output / "results_v1.jsonl")) == interrupt_after
+
+
+def test_cli_failed_preflight_preserves_all_existing_artifacts(cli_run):
+    invoke, _, state, output = cli_run
+    assert invoke() == 0
+    artifacts = [output / name for name in ("results_v1.jsonl", "run_meta_v1.json", "manifest.json")]
+    previous = {path: path.read_bytes() for path in artifacts}
+    state["dead_after"] = 0
+    assert invoke() == 2
+    assert {path: path.read_bytes() for path in artifacts} == previous
+    assert not list(output.glob(".runner-*"))
+
+
+def test_cli_failed_preflight_does_not_publish_a_new_run(cli_run):
+    invoke, _, state, output = cli_run
+    state["dead_after"] = 0
+    assert invoke() == 2
+    assert state["posts"] == 0
+    assert list(output.iterdir()) == []
+
+
+def test_cli_manifest_written_once_before_network_and_published_before_cases(cli_run):
+    invoke, meta, state, output = cli_run
+    assert invoke() == 0
+    assert state["manifest_writes"] == 1
+    assert state["posts"] == 4 and state["health"] == 5
+    assert not list(output.glob(".runner-*"))
+    assert meta()["fingerprints"]["manifest_sha256"] == runner_module.sha256_file(output / "manifest.json")
+
+
+def test_cli_zero_limit_sends_baselines_only(cli_run):
+    invoke, meta, state, _ = cli_run
+    assert invoke("--limit", "0") == 0
+    assert state["posts"] == 1
+    assert meta()["coverage"]["limit_excluded"] == 3
+
+
+def test_total_deadline_cancels_dripping_response_and_allows_next_request(tmp_path):
+    """Real sockets: progress must not reset the default ten-second deadline."""
+    stop = threading.Event()
+    handler_done = threading.Event()
+    requests = []
+
+    class Endpoint(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_POST(self):
+            body = self.rfile.read(int(self.headers["Content-Length"]))
+            requests.append(body)
+            if json.loads(body)["text"] != "drip":
+                response = b'{"label":"joy","confidence":0.94,"all_scores":{"joy":0.94}}'
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(response)))
+                self.end_headers()
+                self.wfile.write(response)
+                return
+            self.send_response(200)
+            self.send_header("Content-Length", "120")
+            self.end_headers()
+            try:
+                for _ in range(120):
+                    if stop.wait(.1):
+                        break
+                    self.wfile.write(b"x")
+                    self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                pass
+            finally:
+                handler_done.set()
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Endpoint)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        with ResultWriter(tmp_path / "deadline.jsonl") as writer:
+            runner = Runner(f"http://127.0.0.1:{server.server_port}", "v1", writer)
+            start = time.perf_counter()
+            result = runner.send(None, "drip")
+            elapsed = time.perf_counter() - start
+            assert result["latency_band"] == BAND_TIMEOUT
+            assert result["status_code"] is None
+            assert result["error"].startswith(ERR_TIMEOUT)
+            assert 9.5 <= elapsed < 11.5
+            assert runner.counts["timeouts"] == 1
+            assert runner.send(None, "healthy")["status_code"] == 200
+            assert [json.loads(body)["text"] for body in requests] == ["drip", "healthy"]
+            runner.close()
+            assert handler_done.wait(2), "cancelled request left its socket open"
+    finally:
+        stop.set()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+        assert not thread.is_alive()

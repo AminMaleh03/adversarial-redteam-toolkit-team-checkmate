@@ -24,12 +24,15 @@ rate, no severity. The analysis reads only what is written here.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import base64
 import dataclasses
 import hashlib
 import json
+import math
 import os
 import sys
+import tempfile
 import time
 import uuid
 from datetime import datetime, timezone
@@ -66,6 +69,7 @@ TERM_COMPLETED = "completed"
 TERM_LIMIT = "stopped_on_limit"
 TERM_HEALTH = "stopped_on_health_failure"
 TERM_ERROR = "errored"
+TERM_INTERRUPTED = "interrupted"
 
 # A tokenizer whose config omits model_max_length reports a sentinel around
 # 1e19. Boundary cases built around that number would be meaningless, and the
@@ -336,16 +340,20 @@ class Runner:
         self,
         target: str,
         version: str,
-        writer: ResultWriter,
+        writer: ResultWriter | None,
         predict_path: str = "/predict",
         health_path: str = "/health",
         timeout: float = REQUEST_TIMEOUT,
         health_timeout: float = HEALTH_TIMEOUT,
-        transport: httpx.BaseTransport | None = None,
+        transport: httpx.AsyncBaseTransport | None = None,
         clock: Callable[[], float] = time.perf_counter,
         skip: Sequence[str] = (),
         on_record: Callable[[RunResult], None] | None = None,
     ) -> None:
+        if timeout != REQUEST_TIMEOUT:
+            raise ValueError(f"request timeout must be {REQUEST_TIMEOUT} seconds")
+        if not math.isfinite(health_timeout) or health_timeout <= 0:
+            raise ValueError("health timeout must be finite and greater than zero")
         self.base = target.rstrip("/")
         self.version = version
         self.writer = writer
@@ -369,27 +377,42 @@ class Runner:
             "health_ping_retries": 0,
             "health_failures": 0,
         }
+        # One loop for the lifetime of the connection pool. The public runner
+        # remains synchronous and sends exactly one request at a time.
+        self._async_runner = asyncio.Runner()
+        self._closed = False
         self.client = self._new_client()
 
     # -- connections --------------------------------------------------------
 
-    def _new_client(self) -> httpx.Client:
-        return httpx.Client(
+    def _new_client(self) -> httpx.AsyncClient:
+        return httpx.AsyncClient(
             timeout=self.timeout, transport=self._transport, follow_redirects=False
         )
 
     def reset_client(self) -> None:
         try:
-            self.client.close()
+            self._async_runner.run(self.client.aclose())
         except Exception:
             pass
         self.client = self._new_client()
 
     def close(self) -> None:
+        if self._closed:
+            return
         try:
-            self.client.close()
-        except Exception:
-            pass
+            self._async_runner.run(self.client.aclose())
+        finally:
+            self._async_runner.close()
+            self._closed = True
+
+    async def _request(self, method: str, url: str, timeout: float, **kwargs) -> httpx.Response:
+        # HTTPX's individual I/O timeouts reset as a response progresses. This
+        # outer deadline includes connection, upload, headers and the full body.
+        # Cancellation closes the in-flight response; no worker thread or retry
+        # continues the attack after it has been recorded as timed out.
+        async with asyncio.timeout(timeout):
+            return await self.client.request(method, url, timeout=timeout, **kwargs)
 
     # -- sending ------------------------------------------------------------
 
@@ -412,13 +435,15 @@ class Runner:
                 # Verbatim. These bytes may be deliberately invalid UTF-8, and
                 # the headers are part of the test. Using json= here, or adding
                 # a header, would repair the very thing being tested.
-                response = self.client.post(
-                    self.predict_url,
+                response = self._async_runner.run(self._request(
+                    "POST", self.predict_url, self.timeout,
                     content=body,
                     headers=dict(case.raw_headers or {}),
-                )
+                ))
             else:
-                response = self.client.post(self.predict_url, json={"text": text})
+                response = self._async_runner.run(self._request(
+                    "POST", self.predict_url, self.timeout, json={"text": text}
+                ))
 
             latency_ms = (self.clock() - started) * 1000.0
             if response.status_code >= 500:
@@ -431,7 +456,7 @@ class Runner:
                 "latency_band": band_latency(latency_ms, timed_out=False),
             }
 
-        except httpx.TimeoutException as exc:
+        except (TimeoutError, httpx.TimeoutException) as exc:
             latency_ms = (self.clock() - started) * 1000.0
             self.counts["timeouts"] += 1
             return {
@@ -476,9 +501,11 @@ class Runner:
         """
         for attempt in (1, 2):
             try:
-                response = self.client.get(self.health_url, timeout=self.health_timeout)
+                response = self._async_runner.run(self._request(
+                    "GET", self.health_url, self.health_timeout
+                ))
                 return response.status_code == 200
-            except httpx.TransportError:
+            except (TimeoutError, httpx.TransportError):
                 if attempt == 1:
                     self.counts["health_ping_retries"] += 1
                     self.reset_client()
@@ -528,6 +555,8 @@ class Runner:
             latency_band=outcome["latency_band"],
             endpoint_alive_after=alive,
         )
+        if self.writer is None:
+            raise RuntimeError("a result writer is required before sending cases")
         self.writer.write(result)          # on disk before we act on it
         self.completed.append(key)
         if self.on_record:
@@ -550,7 +579,9 @@ class Runner:
 
     def send_attack(self, case: AttackCase) -> RunResult | None:
         if case.attack_id in self.skip:
-            self.skipped.append(attack_key(case.attack_id))
+            key = attack_key(case.attack_id)
+            if key not in self.skipped:
+                self.skipped.append(key)
             return None
         text = case.attacked_text if case.attacked_text is not None else case.original_text
         outcome = self.send(case, text)
@@ -567,6 +598,9 @@ class Runner:
 
     def run(self, baselines: Sequence[BaselineCase], attacks: Sequence[AttackCase]) -> None:
         """Baselines, then standalone attacks, then derived attacks."""
+        # Skips are a property of the plan, including cases never reached after
+        # a health failure. main() has already applied the limit to attacks.
+        self.skipped = [attack_key(case.attack_id) for case in attacks if case.attack_id in self.skip]
         for baseline in baselines:
             self.send_baseline(baseline)
         standalone, derived = partition_attacks(attacks)
@@ -592,6 +626,8 @@ def select_attacks(
     """
     if limit is None:
         return list(attacks), []
+    if limit < 0:
+        raise ValueError("attack limit must be non-negative")
     kept = list(attacks[:limit])
     excluded = [attack_key(case.attack_id) for case in attacks[limit:]]
     return kept, excluded
@@ -617,6 +653,8 @@ def build_meta(
     limit: int | None,
     counts: dict,
     suite_sizes: dict,
+    request_timeout: float = REQUEST_TIMEOUT,
+    health_timeout: float = HEALTH_TIMEOUT,
 ) -> dict:
     """The meta file.
 
@@ -667,8 +705,8 @@ def build_meta(
         },
         "transport_counts": counts,
         "runner_settings": {
-            "request_timeout_s": REQUEST_TIMEOUT,
-            "health_timeout_s": HEALTH_TIMEOUT,
+            "request_timeout_s": request_timeout,
+            "health_timeout_s": health_timeout,
             "slow_band_from_ms": SLOW_FROM_MS,
         },
     }
@@ -683,6 +721,20 @@ def write_meta(path: Path, meta: dict) -> Path:
 # --------------------------------------------------------------------------
 # cli
 # --------------------------------------------------------------------------
+
+
+def nonnegative_int(value: str) -> int:
+    number = int(value)
+    if number < 0:
+        raise argparse.ArgumentTypeError("must be non-negative")
+    return number
+
+
+def positive_seconds(value: str) -> float:
+    number = float(value)
+    if not math.isfinite(number) or number <= 0:
+        raise argparse.ArgumentTypeError("must be finite and greater than zero")
+    return number
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -700,7 +752,7 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"output directory (default {DEFAULT_OUT}; send smoke runs to {DEFAULT_OUT}/smoke)",
     )
     parser.add_argument(
-        "--limit", type=int, default=None,
+        "--limit", type=nonnegative_int, default=None,
         help="send at most N attacks. All baselines are always sent.",
     )
     parser.add_argument(
@@ -709,8 +761,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--predict-path", default="/predict")
     parser.add_argument("--health-path", default="/health")
-    parser.add_argument("--timeout", type=float, default=REQUEST_TIMEOUT)
-    parser.add_argument("--health-timeout", type=float, default=HEALTH_TIMEOUT)
+    parser.add_argument("--timeout", type=float, choices=(REQUEST_TIMEOUT,), default=REQUEST_TIMEOUT,
+                        help="fixed total request deadline in seconds (10)")
+    parser.add_argument("--health-timeout", type=positive_seconds, default=HEALTH_TIMEOUT)
     # Approximate boundaries produce a manifest that describes different cases
     # from the ones a real run sends, so this is not for real runs.
     parser.add_argument("--no-tokenizer", action="store_true", help=argparse.SUPPRESS)
@@ -742,13 +795,6 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     attacks = build_suite_once(baselines, token_counter, max_tokens)
 
-    # Written before the run and only once: these are the expectations
-    # registered when each attack was built, before any result existed.
-    # Without this file the analysis would have to invent pass/fail criteria
-    # after seeing the results.
-    library.write_manifest(str(manifest_path))
-    manifest_sha = sha256_file(manifest_path) if manifest_path.exists() else None
-
     planned_fingerprint = fingerprint_suite(baselines, attacks)
     standalone, derived = partition_attacks(attacks)
 
@@ -757,6 +803,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     ]
     kept_attacks, limit_excluded = select_attacks(attacks, args.limit)
     skip_set = set(args.skip)
+    # Limit takes precedence: an attack outside the limited prefix is only
+    # limit-excluded, even when its ID also appears in --skip.
+    skipped_keys = [attack_key(a.attack_id) for a in kept_attacks if a.attack_id in skip_set]
     selected_keys = [baseline_key(b.baseline_id) for b in baselines] + [
         attack_key(a.attack_id) for a in kept_attacks if a.attack_id not in skip_set
     ]
@@ -778,7 +827,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(f"sending   {len(selected_keys)} cases"
           + (f" (--limit {args.limit})" if args.limit is not None else "")
           + (f", skipping {len(args.skip)}" if args.skip else ""))
-    print(f"manifest  {manifest_path}  sha256 {(manifest_sha or 'MISSING')[:16]}")
     print(f"planned   fingerprint {planned_fingerprint[:16]}")
     print(f"out       {results_path}")
     print()
@@ -788,9 +836,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"  {describe(result):<64} {str(status):>12} {result.latency_ms:>9.1f} ms "
               f"{result.latency_band}", flush=True)
 
-    termination = TERM_COMPLETED
+    # Success is assigned only after the selected plan actually finishes.
+    termination = TERM_ERROR
     exit_code = 0
-    writer = ResultWriter(results_path)
+    writer = None
+    manifest_sha = None
     runner = Runner(
         target=args.target,
         version=args.version,
@@ -802,73 +852,95 @@ def main(argv: Sequence[str] | None = None) -> int:
         skip=args.skip,
         on_record=progress,
     )
+    runner.skipped = skipped_keys
 
     try:
-        if not runner.preflight():
-            print(f"the endpoint at {args.target} is not answering {args.health_path}.")
-            print("Nothing was sent. Start it, or check --target and --health-path.")
-            termination = TERM_ERROR
-            exit_code = 2
-        else:
-            try:
-                runner.run(baselines, kept_attacks)
-                termination = TERM_LIMIT if args.limit is not None else TERM_COMPLETED
-            except EndpointDied as died:
-                termination = TERM_HEALTH
-                exit_code = 1
-                print()
-                print("=" * 72)
-                print("THE ENDPOINT STOPPED ANSWERING /health")
-                print(f"  killed by: {died.describe}")
-                print(f"  status returned: {died.result.status_code}")
-                print(f"  recorded as the last row in {results_path}")
-                print()
-                print("  Stopping here: everything after a dead endpoint is a")
-                print("  connection error carrying no information.")
-                if died.result.attack_id:
-                    print(f"  Re-run with --skip {died.result.attack_id} for a complete run.")
-                else:
-                    print(f"  This was a clean baseline ({died.result.baseline_id}), not an")
-                    print("  attack, so there is nothing to skip. Restart the endpoint.")
-                print("=" * 72)
+        # Register expectations once, before even the preflight health request.
+        # Stage them in this output directory so a failed preflight cannot
+        # replace an earlier run's manifest, results or metadata. Publication
+        # happens before the first prediction, preserving the oracle boundary.
+        with tempfile.TemporaryDirectory(prefix=".runner-", dir=out_dir) as staging:
+            staged_manifest = Path(staging) / MANIFEST_NAME
+            library.write_manifest(str(staged_manifest))
+            manifest_sha = sha256_file(staged_manifest)
+            if not runner.preflight():
+                print(f"the endpoint at {args.target} is not answering {args.health_path}.")
+                print("No cases were sent; previous run artifacts were preserved.")
+                print("Start it, or check --target and --health-path.")
+                return 2
+            staged_manifest.replace(manifest_path)
+
+        writer = ResultWriter(results_path)
+        runner.writer = writer
+        print(f"manifest  {manifest_path}  sha256 {manifest_sha[:16]}")
+        try:
+            runner.run(baselines, kept_attacks)
+            termination = TERM_LIMIT if args.limit is not None else TERM_COMPLETED
+        except EndpointDied as died:
+            termination = TERM_HEALTH
+            exit_code = 1
+            print()
+            print("=" * 72)
+            print("THE ENDPOINT STOPPED ANSWERING /health")
+            print(f"  killed by: {died.describe}")
+            print(f"  status returned: {died.result.status_code}")
+            print(f"  recorded as the last row in {results_path}")
+            print()
+            print("  Stopping here: everything after a dead endpoint is a")
+            print("  connection error carrying no information.")
+            if died.result.attack_id:
+                print(f"  Re-run with --skip {died.result.attack_id} for a complete run.")
+            else:
+                print(f"  This was a clean baseline ({died.result.baseline_id}), not an")
+                print("  attack, so there is nothing to skip. Restart the endpoint.")
+            print("=" * 72)
+    except KeyboardInterrupt:
+        termination = TERM_INTERRUPTED
+        exit_code = 130
+        print("\nRun interrupted; completed rows have been preserved.", file=sys.stderr)
     except Exception as exc:                      # noqa: BLE001
         termination = TERM_ERROR
         exit_code = 3
         print(f"\nthe run errored: {type(exc).__name__}: {exc}", file=sys.stderr)
         raise
     finally:
-        runner.close()
-        writer.close()
-        # Written even when the run stopped early. A run that died is exactly
-        # the run whose coverage numbers matter most.
-        meta = build_meta(
-            run_id=run_id,
-            version=args.version,
-            started_at=started_at,
-            ended_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            is_smoke=args.limit is not None,
-            termination_reason=termination,
-            planned_fingerprint=planned_fingerprint,
-            manifest_sha256=manifest_sha,
-            manifest_path=str(manifest_path),
-            target=args.target,
-            planned=planned_keys,
-            selected=selected_keys,
-            completed=runner.completed,
-            skipped=runner.skipped,
-            limit_excluded=limit_excluded,
-            limit=args.limit,
-            counts=runner.counts,
-            suite_sizes=suite_sizes,
-        )
-        write_meta(meta_path, meta)
-        coverage = meta["coverage"]
-        print()
-        print(f"recorded  {writer.count} rows to {results_path}")
-        print(f"coverage  {coverage['completed']}/{coverage['planned']} "
-              f"(rate {coverage['coverage_rate']:.4f}), {coverage['missing']} missing, "
-              f"{coverage['skipped']} skipped, {coverage['limit_excluded']} limit-excluded")
-        print(f"meta      {meta_path}  termination {termination}")
+        try:
+            runner.close()
+        finally:
+            # A preflight failure has no new result file and must not replace
+            # the metadata describing the previous invocation.
+            if writer is not None:
+                writer.close()
+                meta = build_meta(
+                    run_id=run_id,
+                    version=args.version,
+                    started_at=started_at,
+                    ended_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                    is_smoke=args.limit is not None,
+                    termination_reason=termination,
+                    planned_fingerprint=planned_fingerprint,
+                    manifest_sha256=manifest_sha,
+                    manifest_path=str(manifest_path),
+                    target=args.target,
+                    planned=planned_keys,
+                    selected=selected_keys,
+                    completed=runner.completed,
+                    skipped=skipped_keys,
+                    limit_excluded=limit_excluded,
+                    limit=args.limit,
+                    counts=runner.counts,
+                    suite_sizes=suite_sizes,
+                    request_timeout=runner.timeout,
+                    health_timeout=runner.health_timeout,
+                )
+                write_meta(meta_path, meta)
+                coverage = meta["coverage"]
+                print()
+                print(f"recorded  {writer.count} rows to {results_path}")
+                print(f"coverage  {coverage['completed']}/{coverage['planned']} "
+                      f"(rate {coverage['coverage_rate']:.4f}), {coverage['missing']} missing, "
+                      f"{coverage['skipped']} skipped, {coverage['limit_excluded']} limit-excluded")
+                print(f"meta      {meta_path}  termination {termination}")
 
     return exit_code
 

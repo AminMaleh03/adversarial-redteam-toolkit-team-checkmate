@@ -14,6 +14,7 @@ from typing import Optional
 
 FINDING_SERVICE_UNAVAILABLE = "service_unavailable"
 FINDING_UNHANDLED_5XX = "unhandled_5xx"
+FINDING_CONNECTION_FAILURE = "connection_failure"
 FINDING_INFO_LEAK = "info_leak"
 FINDING_TIMEOUT = "timeout"
 FINDING_PREDICTION_FLIP = "prediction_flip"
@@ -25,6 +26,9 @@ FINDING_SLOW_RESPONSE = "slow_response"
 BASE_WEIGHTS: dict[str, float] = {
     FINDING_SERVICE_UNAVAILABLE: 100.0,
     FINDING_UNHANDLED_5XX: 70.0,
+    # Added under Ahsan's delegated remediation authority, 2026-09-09:
+    # request-level failure, no claim of service death and no size adjustment.
+    FINDING_CONNECTION_FAILURE: 70.0,
     FINDING_INFO_LEAK: 65.0,
     FINDING_TIMEOUT: 60.0,
     FINDING_PREDICTION_FLIP: 40.0,
@@ -138,8 +142,8 @@ def compute_severity(failure_mode: str, **context) -> tuple[float, str]:
     elif failure_mode in (FINDING_UNHANDLED_5XX, FINDING_TIMEOUT):
         adjustment = size_adjustment(context.get("subfamily"))
 
-    # Round away float noise (e.g. 19.499999999999996) before it can shift a tier boundary.
-    score = round(base + adjustment, 6)
+    # Preserve the raw score through grouping/tiering; display formatting is separate.
+    score = base + adjustment
     return score, tier_for_score(score)
 
 

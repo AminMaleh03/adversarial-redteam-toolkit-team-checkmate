@@ -81,6 +81,7 @@ def compare_coverage(meta_v1: dict, meta_v2: dict) -> CoverageComparison:
         case_ids = meta.get("case_ids", {})
         unavailable |= set(case_ids.get("missing", []))
         unavailable |= set(case_ids.get("skipped", []))
+        unavailable |= set(case_ids.get("limit_excluded", []))
     return CoverageComparison(
         v1_coverage=meta_v1.get("coverage", {}),
         v2_coverage=meta_v2.get("coverage", {}),
@@ -98,6 +99,7 @@ class FindingResolution:
     status: str
     unavailable_ids: list[str] = field(default_factory=list)
     remaining_ids: list[str] = field(default_factory=list)
+    improved_ids: list[str] = field(default_factory=list)
 
 
 def resolve_finding_group(
@@ -110,20 +112,21 @@ def resolve_finding_group(
     The caller must intersect recorded completion with evidence evaluable for this
     group's failure mode. A recorded request alone does not prove a fix: for example,
     a connection failure supplies no prediction with which to rule out a flip.
-    Missing or unevaluable evidence takes priority over resolution. A different
-    observed failure may resolve this mode only when this mode itself is evaluable.
+    Positive V2 evidence establishes persistence even on a different case. Otherwise
+    every V1 supporting case needs usable V2 evidence before resolution is established.
     """
     required = v1_group.evidence_ids
     unavailable_ids = [aid for aid in required if aid not in v2_completed_attack_ids]
-    if unavailable_ids:
-        return FindingResolution(v1_group.key, "unavailable", unavailable_ids=unavailable_ids)
-
     v2_group = v2_groups_by_key.get(v1_group.key)
     v2_evidence = set(v2_group.evidence_ids) if v2_group else set()
-    still_present = [aid for aid in required if aid in v2_evidence]
-    if still_present:
-        return FindingResolution(v1_group.key, "remaining", remaining_ids=still_present)
-    return FindingResolution(v1_group.key, "resolved")
+    improved = sorted((set(required) & v2_completed_attack_ids) - v2_evidence)
+    if v2_evidence:
+        return FindingResolution(v1_group.key, "remaining", sorted(unavailable_ids),
+                                 sorted(v2_evidence), improved)
+    if unavailable_ids:
+        return FindingResolution(v1_group.key, "unavailable", sorted(unavailable_ids),
+                                 improved_ids=improved)
+    return FindingResolution(v1_group.key, "resolved", improved_ids=improved)
 
 
 @dataclass
@@ -132,6 +135,7 @@ class ComparisonResult:
     coverage: CoverageComparison
     resolutions: list[FindingResolution]
     newly_appearing: list[FindingGroupRef]
+    inconclusive_new: list[FindingGroupRef]
 
 
 def compare_findings(
@@ -139,6 +143,9 @@ def compare_findings(
     v2_groups: list[FindingGroupRef],
     v2_completed_attack_ids: set[str],
     v2_evaluable_attack_ids_by_mode: dict[str, set[str]],
+    *,
+    v1_completed_attack_ids: set[str] | None = None,
+    v1_evaluable_attack_ids_by_mode: dict[str, set[str]] | None = None,
 ) -> tuple[list[FindingResolution], list[FindingGroupRef]]:
     v2_by_key = {g.key: g for g in v2_groups}
     v1_keys = {g.key for g in v1_groups}
@@ -149,7 +156,17 @@ def compare_findings(
         )
         for g in v1_groups
     ]
-    newly_appearing = [g for g in v2_groups if g.key not in v1_keys]
+    v1_completed = v1_completed_attack_ids or set()
+    v1_evaluable = v1_evaluable_attack_ids_by_mode or {}
+    newly_appearing = []
+    for group in v2_groups:
+        if group.key in v1_keys:
+            continue
+        proven_new = (set(group.evidence_ids) & v2_completed_attack_ids
+                      & v1_completed & v1_evaluable.get(group.failure_mode, set()))
+        if proven_new:
+            newly_appearing.append(FindingGroupRef(group.category, group.subfamily,
+                                                   group.failure_mode, sorted(proven_new)))
     return resolutions, newly_appearing
 
 
@@ -165,6 +182,7 @@ def compare_versions(
     v1_groups: list[FindingGroupRef],
     v2_groups: list[FindingGroupRef],
     v2_evaluable_attack_ids_by_mode: dict[str, set[str]],
+    v1_evaluable_attack_ids_by_mode: dict[str, set[str]] | None = None,
 ) -> ComparisonResult:
     """Compare coverage and findings using metadata plus observed evidence.
 
@@ -178,11 +196,22 @@ def compare_versions(
         meta_v2.get("case_ids", {}).get("completed", [])
     )
     resolutions, newly_appearing = compare_findings(
-        v1_groups, v2_groups, v2_completed_attack_ids, v2_evaluable_attack_ids_by_mode
+        v1_groups, v2_groups, v2_completed_attack_ids, v2_evaluable_attack_ids_by_mode,
+        v1_completed_attack_ids=_attack_ids_from_case_keys(meta_v1.get("case_ids", {}).get("completed", [])),
+        v1_evaluable_attack_ids_by_mode=v1_evaluable_attack_ids_by_mode,
     )
+    v1_keys = {g.key for g in v1_groups}
+    new_by_key = {g.key: set(g.evidence_ids) for g in newly_appearing}
+    inconclusive_new = [
+        FindingGroupRef(g.category, g.subfamily, g.failure_mode,
+                        sorted(set(g.evidence_ids) - new_by_key.get(g.key, set())))
+        for g in v2_groups if g.key not in v1_keys
+        and set(g.evidence_ids) - new_by_key.get(g.key, set())
+    ]
     return ComparisonResult(
         fingerprints=fingerprints,
         coverage=coverage,
         resolutions=resolutions,
         newly_appearing=newly_appearing,
+        inconclusive_new=inconclusive_new,
     )

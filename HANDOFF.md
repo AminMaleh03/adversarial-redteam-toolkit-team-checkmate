@@ -1,3 +1,30 @@
+## Current implementation checkpoint - Codex
+
+- Updated: 2026-09-09T20:49:00+04:00, Codex; main at 4b37ab6.
+- Ahsan explicitly authorized implementing the review recommendations on Khalid's behalf and committing/pushing directly to main. This is the task-specific exception to analysis ownership and the feature-branch/PR rule. No teammate messages requested.
+- Implemented: strict artifact validation, symmetric comparison evidence, diagnostic exclusion, connection-failure findings, safe leak detection, unrounded severity, and documented report output with explicit rate counts. Scope: analysis/, its tests, HANDOFF.md; contract and other components remain untouched.
+- Policy choice under delegated project-lead authorization: connection_failure gets 70/High, no size adjustment; separate from service unavailability. Existing severity weights remain unchanged.
+- Verified so far: `.\.venv\Scripts\python.exe -m pytest tests/test_analysis.py tests/test_analysis_remediation.py tests/test_baseline.py -q --tb=short`: 233 passed in 1.86s. New regression file covers 75 cases; existing tests updated for corrected behavior. Saved full benchmark validates and remains 14 resolved / 14 remaining.
+- Data-driven correction to proposed validation: shipped repeated_punctuation entries use diagnostic oracle + REVIEW tier. These are preserved and excluded by oracle, with tier differences exposed in diagnostic observations; recognized mixed combinations are not rejected. Unknown values still fail. No manifest or attack edits.
+- Added analysis/README.md documenting schema_version 2, report integration, rate objects, case-level evidence, and policy changes. CLI supports both flat and v1/v2 directory layouts and verifies both retained manifests.
+- Final validation by Codex: `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`, then `.\.venv\Scripts\python.exe -m pytest -q`: 337 passed, one existing Starlette/AnyIO warning, 17.32s. `git diff --check`: passed. No source changes since those tests.
+- `.\.venv\Scripts\python.exe results/analysis_review_4b37ab6/verify_remediation.py`: passed. Strict validation, repeat analysis and real CLI produce identical schema-v2 JSON; retained original artifact hashes unchanged. Actual V2 TestClient reflection probe returns 422 and zero findings. Output: results/analysis_remediation/report_input.json and verification.json (ignored).
+- Saved full benchmark remains 1,928 rows/version; 14 resolved, 14 remaining, zero unavailable/new; flips 218/1370 vs 112/1373; 36/42 eligible clean baselines each. No fresh endpoint benchmark or report rendering was run. PR's separate full2 dataset remains absent here.
+- Final diff review confirms only analysis code/docs, analysis tests, and HANDOFF.md changed; no contract/baseline/endpoint/runner/attacks/report changes. Fetch confirmed origin/main equals local starting HEAD 4b37ab6. All reviewed issues are addressed with documented semantics; report work can proceed against schema v2.
+- Next: commit and push authorized main update. No running processes or pending test sessions. Earlier review evidence is historical; retained under ignored results/analysis_review_4b37ab6.
+
+## Historical review checkpoint - Codex
+
+- Updated: 2026-09-09T20:11:55+04:00, Codex; branch main, observed HEAD 4b37ab6 (merged PR #6).
+- User requested independent review/testing against contracts and architecture. Review complete; no implementation fixes, commits, pushes, or teammate messages authorized or performed.
+- Verdict: architecture/imports/dataclasses align; correctness fixes needed before final report use. Confirmed four disclosed issues plus persistent-group false resolution, unsupported newly-appearing claims, unchecked actual manifest hash/vocabulary, missing connection-failure findings, and reflected-input false leaks.
+- Full details, code locations, reproductions and recommendations: results/analysis_review_4b37ab6/REVIEW.md (ignored). Harness probe.py; observations probe_output.json; full saved-data output analysis_output.json; actual V2 response reflected_path.json. altered_manifest.json is an intentional COPY for a negative probe; original artifacts unchanged. Keep these as local review evidence.
+- Validation by Codex: Python 3.11.9; HF_HUB_OFFLINE=1 and TRANSFORMERS_OFFLINE=1 then `.\.venv\Scripts\python.exe -m pytest -q`: 262 passed, one existing Starlette/AnyIO warning in 20.73s. `.\.venv\Scripts\python.exe -m pytest tests/test_analysis.py tests/test_baseline.py -q`: 158 passed in 3.20s.
+- `.\.venv\Scripts\python.exe results/analysis_review_4b37ab6/probe.py`: exit 0, reproduces incorrect behaviors (observation harness, not desired-behavior passing regression tests). Actual V2 TestClient returned 422 with reflected user path that analysis falsely calls a leak.
+- Independently checked saved results/full_20260909_135157/{v1,v2}: 1928 unique ordered rows each matching metadata completion/version, actual manifest hashes match and manifests byte-identical. Analysis repeated deterministically: 14 resolved/14 remaining/0 unavailable/0 new; 36/42 baselines eligible each; flips 218/1370 vs 112/1373; 5xx 90 vs 0; timeouts 1 each. No fresh live benchmark. PR's results/khalid_validation/full2 is absent here; its 15/14 claim refers to different artifacts.
+- report/generate.py remains a stub: no full HTML/PDF report validation possible. Contract/baseline/other component source unchanged by merge and review. Tracked review change is HANDOFF.md only.
+- Next: Ahsan assigns scoped fixes to Khalid or explicitly authorizes remediation. No running processes or pending test sessions. `git diff --check`: passed; final status contains HANDOFF.md only.
+
 # Handoff — Team Checkmate
 
 ## Current Checkpoint - Codex

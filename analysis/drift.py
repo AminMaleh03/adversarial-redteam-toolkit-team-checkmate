@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from contract import RunResult
+from analysis.validation import validate_rows
 
 ORACLE_LABEL_MATCH_BASELINE = "label_should_match_baseline"
 ORACLE_REQUEST_REJECTED = "request_should_be_rejected_cleanly"
@@ -100,7 +101,7 @@ def baseline_confidence_census(results: list[RunResult]) -> BaselineCensus:
         if result.case_type != "baseline":
             continue
         census.total += 1
-        if result.label is None or result.confidence is None:
+        if not has_usable_prediction(result):
             census.no_prediction_ids.append(result.baseline_id)
         elif result.confidence >= CLEAN_CONFIDENCE_THRESHOLD:
             census.eligible += 1
@@ -149,7 +150,9 @@ class DriftSummary:
 
 
 def has_usable_prediction(result: Optional[RunResult]) -> bool:
-    return result is not None and result.label is not None and result.confidence is not None
+    return (result is not None and result.status_code == 200
+            and result.latency_band != "timeout" and bool(result.label)
+            and result.confidence is not None and 0 <= result.confidence <= 1)
 
 
 def evaluate_pair(
@@ -163,6 +166,9 @@ def evaluate_pair(
     """Judge one derived-attack / clean-baseline pair against the frozen flip rule."""
     if meta is None:
         return DriftRecord(attack_id, baseline_id, version, "excluded", EXCLUDE_MISSING_METADATA)
+    for row in (clean, attacked):
+        if row is not None and (row.version != version or row.baseline_id != baseline_id):
+            raise ValueError("drift pair has mismatched version or baseline identity")
     if meta.get("oracle") != ORACLE_LABEL_MATCH_BASELINE:
         return DriftRecord(attack_id, baseline_id, version, "excluded", EXCLUDE_NOT_LABEL_ORACLE)
     if meta.get("validity_tier") == TIER_DIAGNOSTIC:
@@ -208,22 +214,22 @@ def evaluate_pair(
 def compute_drift(results: list[RunResult], manifest: dict[str, dict]) -> DriftSummary:
     """Compute drift over one version's results (baseline rows + attack rows mixed).
 
-    Pairing never crosses versions: only baseline rows found in this same ``results``
-    list are used as the clean reference, so a V1 attack can never be compared against
-    a V2 clean result. Standalone attacks (no baseline_id) are skipped cleanly -- they
+    Mixed versions and duplicate keys are rejected. References are indexed by version
+    and baseline ID. Standalone attacks (no baseline_id) are skipped cleanly -- they
     never enter any counter, eligible or excluded.
     """
-    clean_by_baseline: dict[str, RunResult] = {}
+    validate_rows(results)
+    clean_by_baseline: dict[tuple[str, str], RunResult] = {}
     for result in results:
         if result.case_type == "baseline":
-            clean_by_baseline[result.baseline_id] = result
+            clean_by_baseline[(result.version, result.baseline_id)] = result
 
     summary = DriftSummary(baselines=baseline_confidence_census(results))
     for result in results:
         if result.case_type != "attack" or result.baseline_id is None:
             continue
         meta = manifest.get(result.attack_id)
-        clean = clean_by_baseline.get(result.baseline_id)
+        clean = clean_by_baseline.get((result.version, result.baseline_id))
         record = evaluate_pair(
             result.attack_id, result.baseline_id, result.version, clean, result, meta
         )

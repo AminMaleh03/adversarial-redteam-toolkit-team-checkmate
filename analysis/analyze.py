@@ -10,6 +10,7 @@ report-facing summary JSON described in the ClickUp brief. Imports nothing from
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import json
 import re
 from dataclasses import dataclass, field
@@ -19,6 +20,7 @@ from typing import Optional
 from contract import Finding, RunResult
 
 from analysis import compare, drift, severity
+from analysis.validation import validate_manifest, validate_rows, validate_run
 from analysis.compare import FindingGroupRef
 from analysis.drift import (
     ORACLE_DIAGNOSTIC,
@@ -71,9 +73,25 @@ _INTERNAL_NAME_MARKERS = (
 )
 
 
-def detect_leak(body: Optional[str]) -> Optional[str]:
+def detect_leak(body: Optional[str], status_code: Optional[int] = None) -> Optional[str]:
     if not body:
         return None
+    # FastAPI 422 validation reflects user values (including nested objects) in input,
+    # and user field names in loc. Inspect server diagnostics, not these reflections.
+    # Restrict filtering to the actual validation shape, never arbitrary "input" keys.
+    if status_code == 422:
+        try:
+            parsed = json.loads(body)
+        except ValueError:
+            parsed = None
+        if isinstance(parsed, dict) and isinstance(parsed.get("detail"), list):
+            details = parsed["detail"]
+            if all(isinstance(item, dict) and isinstance(item.get("type"), str)
+                   and isinstance(item.get("msg"), str) and isinstance(item.get("loc"), list)
+                   for item in details):
+                parsed["detail"] = [{k: v for k, v in item.items() if k not in ("input", "loc")}
+                                    for item in details]
+                body = json.dumps(parsed, ensure_ascii=False)
     if any(marker in body for marker in _STACK_TRACE_MARKERS):
         return "stack_or_path"
     if _WIN_PATH_RE.search(body) or _UNIX_PATH_RE.search(body):
@@ -164,10 +182,12 @@ def evaluate_case(
     tier = meta.get("validity_tier")
     attack_id = result.attack_id
 
-    if tier == TIER_DIAGNOSTIC:
+    if tier == TIER_DIAGNOSTIC or meta.get("oracle") == ORACLE_DIAGNOSTIC:
         return CaseEvaluation(attack_id, category, subfamily, tier, "diagnostic")
     if tier == TIER_REVIEW:
         return CaseEvaluation(attack_id, category, subfamily, tier, "review")
+    if tier not in (drift.TIER_GOLD, drift.TIER_SILVER) or meta.get("oracle") not in ORACLE_HANDLERS:
+        raise ValueError(f"{attack_id}: unknown oracle or validity tier")
 
     instances: list[Instance] = []
 
@@ -183,12 +203,14 @@ def evaluate_case(
     # message prefix, which is a private implementation detail of runner/run.py.
     is_connfail = result.status_code is None and not is_timeout
     is_slow = result.status_code is not None and result.latency_band == "slow"
-    leak_kind = detect_leak(result.response_body)
+    leak_kind = detect_leak(result.response_body, result.status_code)
 
     if service_unavailable:
         add(severity.FINDING_SERVICE_UNAVAILABLE)
     if is_5xx:
         add(severity.FINDING_UNHANDLED_5XX, subfamily=subfamily)
+    if is_connfail:
+        add(severity.FINDING_CONNECTION_FAILURE)
     if is_timeout:
         add(severity.FINDING_TIMEOUT, subfamily=subfamily)
     if leak_kind:
@@ -203,8 +225,6 @@ def evaluate_case(
 
     if instances:
         bucket = "fail"
-    elif is_connfail:
-        bucket = "unevaluable"
     else:
         bucket = "pass"
 
@@ -285,6 +305,7 @@ def compute_operational_stats(evaluations: list[CaseEvaluation]) -> dict:
 # --------------------------------------------------------------------------------------
 
 FAILURE_MODE_TITLES = {
+    severity.FINDING_CONNECTION_FAILURE: "request connection failure",
     severity.FINDING_SERVICE_UNAVAILABLE: "observed service unavailability",
     severity.FINDING_UNHANDLED_5XX: "unhandled server error",
     severity.FINDING_INFO_LEAK: "error response leaked internal details",
@@ -297,6 +318,10 @@ FAILURE_MODE_TITLES = {
 # Precise wording per failure mode. The availability line in particular is deliberate:
 # a failed health check proves observed unavailability, never process death.
 FAILURE_MODE_DETAIL = {
+    severity.FINDING_CONNECTION_FAILURE: (
+        "the request failed without an HTTP response for a reason other than timeout; "
+        "this alone does not establish service unavailability or process death"
+    ),
     severity.FINDING_SERVICE_UNAVAILABLE: (
         "the health check after the request did not answer, which is observed "
         "unavailability and is not evidence of process death"
@@ -327,6 +352,10 @@ FAILURE_MODE_DETAIL = {
 }
 
 REMEDIATIONS = {
+    severity.FINDING_CONNECTION_FAILURE: (
+        "Investigate the recorded transport error and handle request failures cleanly; "
+        "check connection handling and resource limits without inferring process death."
+    ),
     severity.FINDING_SERVICE_UNAVAILABLE: (
         "Add resource limits and process supervision so a single request cannot take the "
         "service down; alert on health-check failure."
@@ -443,7 +472,8 @@ class VersionAnalysis:
 
 
 def comparison_evidence(
-    evaluations: list[CaseEvaluation], drift_summary: drift.DriftSummary
+    evaluations: list[CaseEvaluation], drift_summary: drift.DriftSummary,
+    results: list[RunResult],
 ) -> dict[str, set[str]]:
     """Keep evaluability separate from whether a request was recorded as completed.
 
@@ -453,9 +483,17 @@ def comparison_evidence(
     Flip resolution additionally needs an eligible clean/attacked prediction pair;
     clean rejection does not supply a prediction and cannot demonstrate invariance.
     """
-    usable = {e.attack_id for e in evaluations
-              if e.bucket in ("pass", "fail") and not e.is_connection_failure}
-    by_mode = {mode: set(usable) for mode in severity.BASE_WEIGHTS}
+    scored = {e.attack_id for e in evaluations if e.bucket in ("pass", "fail")}
+    rows = {r.attack_id: r for r in results if r.case_type == "attack"}
+    responses = {aid for aid in scored if rows[aid].status_code is not None}
+    by_mode = {mode: set(responses) for mode in severity.BASE_WEIGHTS}
+    # Health and request outcome are observed even when HTTP/prediction evidence is absent.
+    for mode in (severity.FINDING_SERVICE_UNAVAILABLE, severity.FINDING_CONNECTION_FAILURE,
+                 severity.FINDING_TIMEOUT):
+        by_mode[mode] = set(scored)
+    by_mode[severity.FINDING_SLOW_RESPONSE] |= {
+        aid for aid in scored if rows[aid].latency_band == "timeout"
+    }
     for evaluation in evaluations:
         for instance in evaluation.instances:
             by_mode[instance.failure_mode].add(evaluation.attack_id)
@@ -466,7 +504,8 @@ def comparison_evidence(
 
 
 def analyze_version(results: list[RunResult], manifest: dict[str, dict]) -> VersionAnalysis:
-    version = next((r.version for r in results if r.version), "")
+    validate_manifest(manifest)
+    version = validate_rows(results)
     drift_summary = drift.compute_drift(results, manifest)
     drift_by_attack = {record.attack_id: record for record in drift_summary.records}
 
@@ -487,7 +526,9 @@ def analyze_version(results: list[RunResult], manifest: dict[str, dict]) -> Vers
     findings, finding_meta, finding_groups = build_findings(evaluations, version)
 
     diagnostic_observations = [
-        {"attack_id": e.attack_id, "category": e.category, "subfamily": e.subfamily}
+        {"attack_id": e.attack_id, "category": e.category, "subfamily": e.subfamily,
+         "validity_tier": e.validity_tier, "oracle": manifest[e.attack_id]["oracle"],
+         "tier_differs_from_diagnostic": e.validity_tier != TIER_DIAGNOSTIC}
         for e in evaluations if e.bucket == "diagnostic"
     ]
     review_cases = [
@@ -505,7 +546,7 @@ def analyze_version(results: list[RunResult], manifest: dict[str, dict]) -> Vers
         review_cases=review_cases,
         drift=drift_summary,
         operational=operational,
-        evaluable_attack_ids_by_mode=comparison_evidence(evaluations, drift_summary),
+        evaluable_attack_ids_by_mode=comparison_evidence(evaluations, drift_summary, results),
     )
 
 
@@ -608,6 +649,7 @@ def build_comparison_summary(
         v1_groups=v1_analysis.finding_groups,
         v2_groups=v2_analysis.finding_groups,
         v2_evaluable_attack_ids_by_mode=v2_analysis.evaluable_attack_ids_by_mode,
+        v1_evaluable_attack_ids_by_mode=v1_analysis.evaluable_attack_ids_by_mode,
     )
 
     summary = {
@@ -658,8 +700,11 @@ def build_comparison_summary(
             },
             "category_failure_rates": {
                 category: {
-                    "v1": format_rate(v1_analysis.category_stats.get(category, {}).get("failure_rate")),
-                    "v2": format_rate(v2_analysis.category_stats.get(category, {}).get("failure_rate")),
+                    version: {"failed": stats[category]["failed"],
+                              "eligible": stats[category]["eligible"],
+                              "rate": format_rate(stats[category]["failure_rate"])}
+                    for version, stats in (("v1", v1_analysis.category_stats),
+                                           ("v2", v2_analysis.category_stats))
                 }
                 for category in CATEGORIES
             },
@@ -675,6 +720,20 @@ def build_comparison_summary(
                 for r in result.resolutions if r.status == "unavailable"
             ],
             "findings_newly_appearing": [list(g.key) for g in result.newly_appearing],
+            "inconclusive_new_findings": [
+                {"key": list(g.key), "unavailable_ids": g.evidence_ids}
+                for g in result.inconclusive_new
+            ],
+            "finding_comparisons": [
+                {"key": list(r.key), "status": r.status,
+                 "remaining_ids": r.remaining_ids, "unavailable_ids": r.unavailable_ids,
+                 "improved_ids": r.improved_ids}
+                for r in result.resolutions
+            ],
+            "new_finding_evidence": [
+                {"key": list(g.key), "regression_ids": g.evidence_ids}
+                for g in result.newly_appearing
+            ],
         }
     )
     return summary
@@ -687,7 +746,18 @@ def build_comparison_summary(
 
 def load_manifest(path) -> dict[str, dict]:
     with open(path, encoding="utf-8") as handle:
-        return json.load(handle)
+        manifest = json.load(handle, object_pairs_hook=_unique_object)
+    validate_manifest(manifest)
+    return manifest
+
+
+def _unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key {key!r}")
+        result[key] = value
+    return result
 
 
 def load_results(path) -> list[RunResult]:
@@ -707,7 +777,7 @@ def load_results(path) -> list[RunResult]:
             if not line:
                 continue
             try:
-                row = json.loads(line)
+                row = json.loads(line, object_pairs_hook=_unique_object)
             except ValueError as exc:
                 raise ValueError(
                     f"{path} line {line_number} is not valid JSON ({exc}). "
@@ -718,12 +788,13 @@ def load_results(path) -> list[RunResult]:
                 results.append(RunResult(**row))
             except TypeError as exc:
                 raise ValueError(f"{path} line {line_number} does not match RunResult: {exc}") from exc
+    validate_rows(results)
     return results
 
 
 def load_run_meta(path) -> dict:
     with open(path, encoding="utf-8") as handle:
-        return json.load(handle)
+        return json.load(handle, object_pairs_hook=_unique_object)
 
 
 def run_analysis(
@@ -733,18 +804,43 @@ def run_analysis(
     results_v2_path,
     meta_v1_path,
     meta_v2_path,
+    manifest_v2_path=None,
 ) -> dict:
     """Load every input, run both versions, and return findings + summary JSON for each."""
-    manifest = load_manifest(manifest_path)
+    # Hash and parse the same bytes, so scoring cannot read a different file snapshot.
+    manifest_bytes = Path(manifest_path).read_bytes()
+    manifest = json.loads(manifest_bytes.decode("utf-8"), object_pairs_hook=_unique_object)
+    validate_manifest(manifest)
+    manifest_sha = hashlib.sha256(manifest_bytes).hexdigest()
+    manifest_v2_sha = manifest_sha
+    if manifest_v2_path is not None:
+        v2_bytes = Path(manifest_v2_path).read_bytes()
+        manifest_v2_sha = hashlib.sha256(v2_bytes).hexdigest()
+        if v2_bytes != manifest_bytes:
+            raise ValueError("V1 and V2 manifest files differ; cannot score both with one oracle set")
     results_v1 = load_results(results_v1_path)
     results_v2 = load_results(results_v2_path)
     meta_v1 = load_run_meta(meta_v1_path)
     meta_v2 = load_run_meta(meta_v2_path)
 
+    validate_run(results_v1, meta_v1, manifest, "v1", manifest_sha)
+    validate_run(results_v2, meta_v2, manifest, "v2", manifest_v2_sha)
+    if (meta_v1["fingerprints"]["planned_suite_sha256"] == meta_v2["fingerprints"]["planned_suite_sha256"]
+            and meta_v1["case_ids"]["planned"] != meta_v2["case_ids"]["planned"]):
+        raise ValueError("matching planned fingerprints have inconsistent planned case IDs/order")
+    v1_attacks = {r.attack_id: r for r in results_v1 if r.case_type == "attack"}
+    for row in results_v2:
+        if row.case_type == "attack" and row.attack_id in v1_attacks:
+            if row.baseline_id != v1_attacks[row.attack_id].baseline_id:
+                raise ValueError(f"{row.attack_id}: baseline association differs across versions")
+
     analysis_v1 = analyze_version(results_v1, manifest)
     analysis_v2 = analyze_version(results_v2, manifest)
+    analysis_v1.version = "v1"
+    analysis_v2.version = "v2"
 
     return {
+        "schema_version": 2,
         "findings_v1": analysis_v1.findings,
         "findings_v2": analysis_v2.findings,
         "summary_v1": build_version_summary(analysis_v1, meta_v1),
@@ -754,8 +850,17 @@ def run_analysis(
 
 
 def run_analysis_from_dir(results_dir: str = "results") -> dict:
-    """Convenience wrapper using the five pinned filenames the runner writes."""
+    """Accept runner files in one directory or preserved v1/ and v2/ subdirectories."""
     base = Path(results_dir)
+    if not (base / DEFAULT_MANIFEST_NAME).exists() and (base / "v1" / DEFAULT_MANIFEST_NAME).exists():
+        return run_analysis(
+            manifest_path=base / "v1" / DEFAULT_MANIFEST_NAME,
+            manifest_v2_path=base / "v2" / DEFAULT_MANIFEST_NAME,
+            results_v1_path=base / "v1" / "results_v1.jsonl",
+            results_v2_path=base / "v2" / "results_v2.jsonl",
+            meta_v1_path=base / "v1" / "run_meta_v1.json",
+            meta_v2_path=base / "v2" / "run_meta_v2.json",
+        )
     return run_analysis(
         manifest_path=base / DEFAULT_MANIFEST_NAME,
         results_v1_path=base / "results_v1.jsonl",
@@ -769,5 +874,6 @@ if __name__ == "__main__":
     import sys
 
     output = run_analysis_from_dir(sys.argv[1] if len(sys.argv) > 1 else "results")
-    print(json.dumps({"summary_v1": output["summary_v1"], "summary_v2": output["summary_v2"],
-                       "comparison": output["comparison"]}, indent=2, default=str))
+    print(json.dumps({"schema_version": output["schema_version"],
+                     "summary_v1": output["summary_v1"], "summary_v2": output["summary_v2"],
+                     "comparison": output["comparison"]}, indent=2, allow_nan=False))

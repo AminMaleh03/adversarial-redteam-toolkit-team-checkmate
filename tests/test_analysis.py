@@ -334,8 +334,8 @@ class TestGroupScoring:
         with pytest.raises(ValueError):
             severity.score_group([])
 
-    def test_connection_failure_has_no_base_weight(self):
-        assert "connection_failure" not in severity.BASE_WEIGHTS
+    def test_connection_failure_has_request_failure_weight(self):
+        assert severity.compute_severity("connection_failure", subfamily="oversized_100kb") == (70.0, "High")
         assert "connection_error" not in severity.BASE_WEIGHTS
 
 
@@ -508,12 +508,12 @@ class TestOracleLookup:
 
 
 class TestConnectionFailureHandling:
-    def test_connection_failure_alone_is_unevaluable_not_scored(self):
+    def test_connection_failure_alone_is_scored(self):
         result = make_result(status_code=None, error="connection_error: boom", label=None, confidence=None)
         meta = make_meta(oracle="endpoint_should_stay_available", requires_baseline=False)
         evaluation = analyze.evaluate_case(result, meta, None)
-        assert evaluation.bucket == "unevaluable"
-        assert evaluation.instances == []
+        assert evaluation.bucket == "fail"
+        assert [i.failure_mode for i in evaluation.instances] == [severity.FINDING_CONNECTION_FAILURE]
         assert evaluation.is_connection_failure is True
 
     def test_connection_failure_with_health_failure_scores_service_unavailable(self):
@@ -524,7 +524,8 @@ class TestConnectionFailureHandling:
         meta = make_meta(oracle="endpoint_should_stay_available", requires_baseline=False)
         evaluation = analyze.evaluate_case(result, meta, None)
         assert evaluation.bucket == "fail"
-        assert [i.failure_mode for i in evaluation.instances] == [severity.FINDING_SERVICE_UNAVAILABLE]
+        assert [i.failure_mode for i in evaluation.instances] == [severity.FINDING_SERVICE_UNAVAILABLE,
+                                                                severity.FINDING_CONNECTION_FAILURE]
 
     @pytest.mark.parametrize(
         "error_text",
@@ -545,7 +546,7 @@ class TestConnectionFailureHandling:
         meta = make_meta(oracle="endpoint_should_stay_available", requires_baseline=False)
         evaluation = analyze.evaluate_case(result, meta, None)
         assert evaluation.is_connection_failure is True
-        assert evaluation.bucket == "unevaluable"
+        assert evaluation.bucket == "fail"
 
     def test_timeout_is_never_misclassified_as_a_connection_failure(self):
         result = make_result(
@@ -634,13 +635,14 @@ class TestCategoryStats:
         assert stats["truncation"]["review"] == 1
         assert stats["truncation"]["failure_rate"] is None
 
-    def test_unevaluable_operational_reported_separately(self):
+    def test_connection_failure_enters_category_failure_rate(self):
         r = make_result(attack_id="c1", category="malformed", status_code=None, error="connection_error: boom", label=None, confidence=None)
         m = make_meta(attack_id="c1", family="malformed", oracle="endpoint_should_stay_available", requires_baseline=False)
         evaluations = [analyze.evaluate_case(r, m, None)]
         stats = analyze.compute_category_stats(evaluations)
-        assert stats["malformed"]["unevaluable"] == 1
-        assert stats["malformed"]["eligible"] == 0
+        assert stats["malformed"]["unevaluable"] == 0
+        assert stats["malformed"]["eligible"] == 1
+        assert stats["malformed"]["failed"] == 1
 
 
 # ==========================================================================================
@@ -752,14 +754,18 @@ class TestFindingResolution:
         v1_group = compare.FindingGroupRef("encoding", "homoglyph", "unhandled_5xx", ["a1"])
         v2_group = compare.FindingGroupRef("encoding", "homoglyph", "info_leak", ["a1"])
         resolutions, newly_appearing = compare.compare_findings(
-            [v1_group], [v2_group], {"a1"}, {"unhandled_5xx": {"a1"}}
+            [v1_group], [v2_group], {"a1"}, {"unhandled_5xx": {"a1"}},
+            v1_completed_attack_ids={"a1"}, v1_evaluable_attack_ids_by_mode={"info_leak": {"a1"}},
         )
         assert resolutions[0].status == "resolved"
         assert newly_appearing == [v2_group]
 
     def test_newly_appearing_finding_with_no_v1_counterpart(self):
         v2_group = compare.FindingGroupRef("boundary", "under_limit", "slow_response", ["a9"])
-        resolutions, newly_appearing = compare.compare_findings([], [v2_group], {"a9"}, {})
+        resolutions, newly_appearing = compare.compare_findings(
+            [], [v2_group], {"a9"}, {}, v1_completed_attack_ids={"a9"},
+            v1_evaluable_attack_ids_by_mode={"slow_response": {"a9"}},
+        )
         assert newly_appearing == [v2_group]
         assert resolutions == []
 
@@ -1176,6 +1182,8 @@ class TestComparisonEvidenceEligibility:
         meta["case_ids"]["completed"] = ["attack:a1"]
         summary = analyze.build_comparison_summary(v1, v2, meta, meta)
         assert summary["findings_remaining"] == [{
+            "key": ["encoding", "homoglyph", "connection_failure"], "remaining_ids": ["a1"]
+        }, {
             "key": ["encoding", "homoglyph", "service_unavailable"], "remaining_ids": ["a1"]
         }]
         assert summary["findings_unavailable"] == []

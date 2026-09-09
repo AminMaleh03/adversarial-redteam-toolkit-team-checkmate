@@ -1,6 +1,312 @@
 # Handoff — Team Checkmate
 
-## Current Checkpoint
+## Current Checkpoint - Codex
+
+- Updated: 2026-09-09T17:54:39+04:00, Codex; branch `khalid/analysis`, observed HEAD `29d0dcc`.
+- User authorized fixing the major analysis comparison issue: unevaluable V2 evidence
+  must not resolve a V1 finding. Implemented and verified; fix committed at `2ca2473`, pushed in draft PR #6.
+- Changed: `analysis/analyze.py`, `analysis/compare.py`, `tests/test_analysis.py`, and
+  this handoff. Baseline, frozen contract, and other owners' components unchanged.
+- Comparison now intersects metadata completion with actual evidence evaluable for
+  each failure mode. Flip resolution requires an eligible clean/attacked pair;
+  missing rows, unusable predictions/references, low-confidence references, unscored
+  review/diagnostic cases, and connection failures cannot silently prove a fix.
+  Clean rejection still resolves an observable server-error finding. Positively
+  observed health failures remain reportable even with a connection failure.
+- Internal API change: `compare_versions` and `compare_findings` require
+  `v2_evaluable_attack_ids_by_mode`; the orchestrator supplies it from VersionAnalysis.
+- Added 19 regression cases. Before implementation, the first 17 produced 13 failures
+  and 4 passing controls with `.venv/Scripts/python.exe -B -m pytest -p no:cacheprovider
+  tests/test_analysis.py -q -k ComparisonEvidenceEligibility --tb=line`.
+- Final validation by Codex: `.venv/Scripts/python.exe -B -m pytest -p no:cacheprovider
+  tests/test_analysis.py tests/test_baseline.py -q`: 158 passed in 0.92s.
+  `git diff --check`: clean. No model tests or live endpoints run for this change.
+- Repeated `run_analysis_from_dir('results/khalid_validation/full2')` after the fix:
+  deterministic; 1,928 completed rows each; comparison remains 15 resolved, 14 remaining,
+  0 unavailable, 0 newly appearing. Per-version counts and drift totals unchanged.
+- Remaining smaller review concerns are not fixed: mixed-version input, diagnostic
+  oracle/tier inconsistency, severity rounding at tier boundaries, comparison rate
+  denominators. This task does not establish that the entire area has no issues.
+- User authorized committing and publishing the reviewed draft PR on 2026-09-09.
+  Fix committed as `2ca2473`; upstream documentation merged as `29d0dcc`, retaining
+  both handoff histories. Confirmed analysis/tests/contract unchanged by that merge;
+  incoming attack integration notes match origin/main exactly.
+- Branch `khalid/analysis` pushed. Draft PR #6 is open against `main`:
+  https://github.com/AminMaleh03/adversarial-redteam-toolkit-team-checkmate/pull/6
+  GitHub creation response confirmed open/draft, head khalid/analysis, base main.
+  Approved description includes remaining concerns; no direct main push or PR merge.
+- Publication used local Git credentials through Git and the GitHub REST API; the
+  connector could not access this repository. No credentials written or printed.
+- Next: Ahsan reviews draft PR #6. Remaining smaller issues stay disclosed above;
+  no additional fixes are in progress. This final documentation checkpoint is being
+  committed and pushed to the same feature branch. No processes left running.
+
+## Historical checkpoint - Claude
+
+
+- Updated: 2026-09-09 (session timezone not specified), Claude.
+- Active request: Khalid's analysis subtask. Implement `analysis/drift.py`,
+  `analysis/severity.py`, `analysis/compare.py`, `analysis/analyze.py`, and
+  `tests/test_analysis.py`, built and unit-tested against synthetic fixtures per the
+  ClickUp brief. Real runner output (`results/full_20260909_135157/...`) was described in
+  the task text but was **not** present on disk this session (`results/` does not exist
+  locally; it is gitignored and was to be sent directly) -- no integration validation
+  against real V1/V2 output has happened yet. That remains the next step once the folder
+  is actually available.
+- Branch: `khalid/analysis`. Two commits made this session: `a068b7d` (the four analysis
+  modules + tests + handoff) and `c7c7d71` (corrupt-results-row loader fix). Working tree
+  clean. Neither has been pushed; no PR opened yet.
+- Status: implementation complete, unit-tested, **and now validated against a real full
+  V1/V2 run executed locally** (see "Real-run validation" below). Not pushed, no PR yet.
+- Files written/changed this session: `analysis/drift.py`, `analysis/severity.py`,
+  `analysis/compare.py`, `analysis/analyze.py`, `tests/test_analysis.py` (all previously
+  stubs/empty). No other files touched; no edits outside `analysis/`/`baseline/`/
+  `tests/test_analysis.py` per ownership rules. `contract.py` unchanged.
+- Design decisions worth recording (not previously settled in AGENTS.md, made explicit in
+  code comments/docstrings too): oracle and validity-tier string constants are duplicated
+  as literals in `analysis/drift.py` (not imported from `attacks.metadata`), since analysis
+  must never import from `attacks/` and the manifest JSON -- not the Python module -- is
+  the real interface. `analysis/analyze.py` imports those constants from `analysis.drift`
+  (same-package import, allowed). A result whose `attack_id` has no manifest entry raises
+  `ValueError` rather than being silently skipped, matching the fail-loud pattern already
+  used in `baseline/load.py`.
+- Validation by Claude this session: `.venv` is Python 3.11.9 (already present, not
+  created this session). `.venv/Scripts/python.exe -m pytest tests/test_analysis.py -q`:
+  **91 passed**. `... tests/test_analysis.py tests/test_baseline.py -q`: **110 passed**.
+  `pytest --collect-only -q` across the whole repo: **214 tests collected, no import
+  errors** (this also triggers a real model download via `test_endpoint.py`'s module-level
+  import, unrelated to analysis; that succeeded too, incidentally, but was not the point of
+  running it). The model/endpoint/runner test suites were not otherwise re-run, since no
+  code outside `analysis/`/`tests/test_analysis.py` changed this session.
+- Follow-up review round (same session, same date): the user pasted external review
+  feedback on `severity.py`/`analyze.py`/`compare.py`. One part of that feedback (claims
+  of `FM_*` constants, a `score_instance` function, and a live `analysis/oracles.py`) did
+  not match this repo -- verified by re-reading the actual files and hashing
+  `severity.py`; no such file or names exist here, and this was called out to the user
+  rather than silently accepted. The rest of the feedback identified four real, confirmed
+  bugs, now fixed:
+  1. `analyze.py` leak detection had a bare `"pydantic."` marker in
+     `_INTERNAL_NAME_MARKERS`; Pydantic v2's default 422 body includes a public docs URL
+     (`errors.pydantic.dev`) containing that substring, so every ordinary type-confusion
+     422 would have been misclassified as an information leak. Marker removed; a test
+     with a real Pydantic v2 error body (including the `url` field) now asserts no leak.
+  2. `compare.py`'s `resolve_finding_group` decided "unavailable" only from V2's
+     missing/skipped lists, so an id absent from V2 for any other reason (a runner bug, a
+     truncated results file) would silently read as "resolved". Changed to require
+     positive proof of completion: it now takes `v2_completed_attack_ids` and marks
+     anything not in that set unavailable. `compare_versions` derives that set itself from
+     `meta_v2["case_ids"]["completed"]` rather than trusting a caller-supplied
+     missing/skipped set. The test that had asserted "resolved" on empty missing/skipped
+     sets (correctly flagged as enshrining the bug) was rewritten to require explicit
+     completion, plus a new test pins the exact gap (an id in neither list is
+     unavailable, not resolved).
+  3. `analyze.py`'s `is_connfail` matched on `error.startswith("connection_error")`,
+     Amin's exact runner string. This missed his other non-timeout no-response case
+     (`transport_error`-prefixed, from the generic `httpx.HTTPError` branch in
+     `runner/run.py`), which would have silently fallen through to `bucket="pass"`.
+     Changed to a structural check: `status_code is None and latency_band != "timeout"`,
+     which is correct for both error kinds regardless of message format. Tests added for
+     both prefixes plus arbitrary non-matching error text.
+  4. `build_comparison_summary` computed `whole_suite_comparable: false` on a fingerprint
+     mismatch but still emitted `findings_resolved`/`remaining`/`newly_appearing` and
+     paired category-rate deltas -- reporting the flag next to the claims it was supposed
+     to block. Now withholds those fields entirely (returns only fingerprints + coverage
+     + a `comparison_withheld_reason`) when the suite isn't comparable. Tests cover both
+     the withheld and the normal-emission path.
+  Also addressed on request: the six-oracle dispatch in `evaluate_case` was if/elif
+  branching; the brief asks for an explicit lookup. Refactored into `ORACLE_HANDLERS`, a
+  dict keyed by all six oracle constants, each mapping to a handler function (most are a
+  documented no-op since their failure modes are already covered by the cross-cutting
+  checks). All 102 tests in `tests/test_analysis.py` pass after the fixes (91 before this
+  round + 11 new); full-repo collection is clean at 225 tests (up from 214).
+## Real-run validation (Claude, 2026-09-09, this checkout)
+
+Rather than wait for Amin's benchmark folder, we generated a full run locally: uvicorn
+V1 on 127.0.0.1:8000 and V2 on 127.0.0.1:8001 (Rayyan's endpoints, run not edited), then
+`python -m runner.run` for each version into `results/khalid_validation/full2/`
+(gitignored). 1,928/1,928 both versions, coverage 1.0000, `termination_reason: completed`,
+~45s per version. **Both servers have since been shut down; no processes left running.**
+
+This is a cross-check, NOT a replacement for the agreed benchmark dataset. The report must
+still be written against Amin's `full_20260909_135157/` run, because the team's required
+handling references his specific measured values.
+
+Independently reproduced from Amin's reported figures:
+- Planned-suite fingerprint `7fcccf16989784ca...` and manifest SHA `0471bccbf293095d...`,
+  both identical to his, with 1,886 manifest entries. Recomputed manifest hash matches the
+  value stored in run_meta, which also proves the oracles were registered before any
+  request was sent.
+- The six sub-0.6 baselines match **to four decimal places**: handwritten-neutral-4
+  0.4655, handwritten-neutral-0 0.4688, dataset-surprise-0 0.4906, handwritten-disgust-4
+  0.5072, handwritten-disgust-2 0.5228, dataset-surprise-5 0.5481. "36 of 42 eligible"
+  reproduces exactly.
+- Suite composition 21/11/377/973/252/252 across the six categories.
+- The 5xx concentration the brief warns about: 84 of the V1 unhandled 500s are exactly two
+  truncation subfamilies (`signal_end_over_limit`, `signal_start_over_limit`) at 42
+  baselines each. Grouping collapses them to 2 findings, not 84.
+
+Measured outcome on this hardware (V1 -> V2): unhandled 5xx 91 -> 0; observed
+unavailability 0 -> 0; connection failures 0 -> 0; flip rate 218/1370 (15.9%) ->
+112/1373 (8.2%). Category failure rates: malformed .1905 -> .0476, boundary .0909 -> 0,
+perturbation .1194 -> .1194, encoding .1117 -> .0677, whitespace .3238 -> 0,
+truncation .5238 -> .0238. Comparison: 15 findings resolved, 14 remaining, 0 newly
+appearing, 0 unavailable.
+
+Two findings the team needs, both material:
+
+1. **`malformed.oversized_10mb` is hardware-dependent, and on this machine V2 DID reject
+   it.** Amin recorded no response on either version, ~9,993 ms, `latency_band: "timeout"`.
+   Here V1 returned **500 at 2,488 ms** and V2 returned **422 at 4,014 ms** — both in the
+   `slow` band, neither timed out. This fully explains the only discrepancy in the headline
+   numbers: 91 unhandled 500s here vs his 90, the extra one being the 10 MB case that
+   500'd instead of timing out. The other 90 match.
+   Consequence: the brief's instruction "Do not classify it as a V2 length rejection. V2
+   returned nothing; it did not reject" is correct **for his run** but is not a property of
+   the system — given more headroom V2's length check is reached and returns 422. The
+   analysis code writes no causal explanation either way and needs no change; this is
+   reported as new evidence for the team, not a re-derivation of his dataset. It also means
+   that case's severity is environment-dependent (timeout 60/High on his run vs
+   unhandled_5xx + slow here), so it should not be leaned on as a stable benchmark row.
+
+2. **The honest non-improvement is confirmed empirically.** Perturbation failure rate is
+   *identical* on V1 and V2 (45/377, .1194 both), and all 12 perturbation/homoglyph
+   prediction-flip findings are "remaining". V2's application-layer defenses do not touch
+   model-level typo sensitivity because no retraining was done, exactly as the brief says
+   must be preserved rather than quietly omitted. Homoglyph flips persisting also matches
+   Lamei's pre-registered `v2_passes_through` expectation (NFKC does not fold mixed-script
+   homoglyphs). The 15 resolved findings are all genuine application-layer wins: whitespace
+   and fullwidth normalisation, over-limit and oversized 5xx, and `extra_field`.
+
+Bug found by real data and fixed in `c7c7d71`: a truncated JSONL row surfaced as a bare
+`JSONDecodeError` naming neither file nor line. `load_results` now raises a `ValueError`
+identifying file, line, offending text and likely cause, and still never skips the row.
+The corruption itself was an orphaned background runner from a killed session colliding
+with a fresh write; a clean re-run into a fresh directory produced 1,928/1,928 valid rows,
+so it is **not** a defect in `runner/run.py` and should not be reported to Amin as one.
+
+- Runnable-state verification (same session, after the fix round). A throwaway harness in
+  the session scratchpad (`dryrun_analysis.py`, outside the repo, nothing written into
+  `results/`) built synthetic artifacts using the REAL schemas -- manifest via
+  `attacks.library.write_manifest` over the committed 42 baselines, run metadata via
+  `runner.run.build_meta` -- then ran `analysis.analyze.run_analysis_from_dir` over
+  1,928-row V1 and V2 files. Results:
+  - The join reproduces the documented suite composition exactly: malformed 21,
+    boundary 11, perturbation 377, encoding 973, whitespace 252, truncation 252. This is
+    the strongest available evidence that the `family`/`subfamily`/oracle/tier join
+    against Lamei's real manifest schema is correct.
+  - Full pipeline runs clean: findings emitted for both versions, coverage passed through
+    from run_meta, comparison produced, `python -m analysis.analyze <dir>` works.
+  - Output is JSON-serialisable without `default=str`; identical across two full runs
+    (findings, summaries and comparison all deterministic).
+  - Severity spot-checks against the frozen tables: flip at clean confidence 0.93 -> 56.5
+    Medium; stack-trace leak -> 85.0 Critical; health failure -> 100 Critical; 4.2s slow
+    response -> 24.4 Low; oversized_10mb timeout -> 60.0 High (size adjustment +0).
+  - The oversized_10mb timeout appears once on V1 and once on V2 and is classified as a
+    timeout with no cause attributed, matching the brief's required handling.
+  - Resolution semantics confirmed against synthetic rows (real schema, not real data):
+    a V1 case that changed failure mode on V2 resolved on its own terms and produced a
+    separate newly-appearing finding.
+  - A `transport_error:` no-response row landed in `unevaluable`, not `pass`, confirming
+    the structural connection-failure fix.
+  - A realistic Pydantic v2 422 (with the `errors.pydantic.dev` url field) was not
+    flagged as a leak, confirming that fix.
+  - Architectural rules re-checked: `analysis/` imports only stdlib, `contract`, and
+    same-package `analysis.*` -- no `attacks/`, `runner/`, `endpoint/` imports. Files
+    touched remain only `analysis/`, `tests/test_analysis.py`, `HANDOFF.md`.
+  - 121 tests pass (`tests/test_analysis.py` + `tests/test_baseline.py`); whole-repo
+    collection clean at 225; `git diff --check` clean.
+- Brief-compliance pass (same session, final round). A line-by-line audit against the
+  ClickUp brief found eight required outputs that were computed but never surfaced, or
+  missing entirely. All are now implemented and tested:
+  1. `drift.baseline_confidence_census()` added, plus `analyze.build_drift_block()`, so
+     the reduced baseline denominator ("36 of 42 baselines eligible for flip scoring")
+     is emitted next to every flip rate, in both the per-version summary and the
+     comparison. This number is NOT derivable downstream: derived-attack counts per
+     baseline are not uniform (truncation/boundary cases depend on sentence length), so
+     it had to come from analysis.
+  2. That same census is the "check the moment the real run lands" deliverable -- it
+     reports total baselines, how many cleared 0.6, which fell below (with their
+     confidences), and any with no prediction. The threshold stays 0.6; if too few
+     clear it the response is to discuss expanding the baseline, never to lower it.
+  3. Confidence change is now surfaced (`confidence_change`: per-flip clean/attacked/
+     delta plus the mean); previously it lived only on `DriftRecord` and never reached
+     the summary, though the brief lists it as required.
+  4. `LIMITATION_NOTES` added and emitted unconditionally in both the version summary and
+     the comparison, covering the three the brief names: no model-accuracy claim rests on
+     baselines that miss their intended label; V2 is application-layer only with no
+     retraining, so persistent perturbation findings are honest non-improvements; and a
+     failed health check is observed unavailability, not process death.
+  5. Per-finding `affected_cases` recorded as reproducibility information, explicitly
+     separate from severity, with the finding description stating that the count
+     indicates reproducibility and not impact.
+  6. `invalid_input_accepted` added to the operational counts, so "error-handling gaps"
+     are directly comparable between versions as the brief's compare list requires.
+  7. Comparison now carries qualifying-flip counts and eligible-comparison counts (not
+     just rates), and lists unmatched evidence (`v1_only`, `v2_only`, `unavailable`)
+     rather than only counting it.
+  8. `validity_tier_census` added so the report can state how much evidence is GOLD vs
+     SILVER, per the brief's instruction to be honest that most of the suite is SILVER.
+  Also tightened the service-unavailability wording to "observed service unavailability
+  ... not evidence of process death", and the word "crash" appears nowhere in emitted
+  finding text. A test asserts all three.
+  Verification after this round: 134 tests pass (`tests/test_analysis.py` +
+  `tests/test_baseline.py`), repo-wide collection clean at 238, dry run still green with
+  the suite composition still reproducing 21/11/377/973/252/252, output still
+  deterministic and JSON-serialisable, `git diff --check` clean, `analysis/` still imports
+  nothing from `attacks/`.
+- REAL-RUN VALIDATION DONE (same session). Rather than wait for Amin's folder, we ran the
+  suite ourselves: local uvicorn V1 on :8000 and V2 on :8001 (Rayyan's endpoints, executed
+  not edited), model already cached, `python -m runner.run` per version into
+  `results/khalid_validation/` (gitignored; NOT `results/` root, so Amin's incoming folder
+  cannot be clobbered). Both versions: 1,928/1,928, coverage 1.0000,
+  `termination_reason: completed`, matching planned fingerprint and manifest hash. V1 took
+  44s, V2 50s. Runs were done sequentially, never in parallel, so CPU contention could not
+  inflate latency and corrupt the 2s `slow` band that severity depends on.
+  Both servers have since been shut down; no stray python processes remain.
+  This substantially closes the "validated against real runner output" DoD item. It is our
+  run, not Amin's artifacts, so his benchmark folder is still what the report must be
+  written against.
+- What the real run corroborated:
+  - The six sub-0.6 baselines reproduce Amin's reported figures EXACTLY to four decimals:
+    handwritten-neutral-4 0.4655, handwritten-neutral-0 0.4688, dataset-surprise-0 0.4906,
+    handwritten-disgust-4 0.5072, handwritten-disgust-2 0.5228, dataset-surprise-5 0.5481.
+    "36 of 42 baselines eligible" reproduces exactly. Amin's numbers are independently
+    confirmed, not taken on trust.
+  - 84 of V1's unhandled 500s are exactly two truncation subfamilies at 42 evidence ids
+    each (`signal_end_over_limit`, `signal_start_over_limit`), precisely the concentration
+    the brief warned would overstate a single defect under an unweighted rate. Grouping
+    collapses them to 2 findings, not 84.
+  - Health never failed on either version (`service_unavailable: 0` both), as the brief says.
+  - Category rates reproduce the brief's stated trap: on V1 encoding has the highest RAW
+    failure count (104) but only an 11.17% rate, while truncation is 52.38% and whitespace
+    32.38%. Ranking by raw count would have named the wrong worst category.
+  - The strongest before/after results: whitespace 32.38% -> 0.00%, truncation 52.38% ->
+    2.38%, boundary 9.09% -> 0.00%. V2's NFKC + whitespace cleanup and length limit work.
+  - The honest non-improvement is visible and preserved: perturbation is 45/377 = 11.94% on
+    BOTH versions, identical, because no retraining was done. Homoglyph and homoglyph_greek
+    flips also remain on V2, matching Lamei's `v2_passes_through` expectation.
+  - Flip severities landed at 50.5-59.8 (Medium) on real confidences -- approaching but not
+    reaching the 60 High boundary, which needs clean confidence of exactly 1.00.
+- One genuine difference from Amin's reported run, stated plainly: our V1 returned a 500 on
+  `malformed.oversized_10mb` where his timed out. That exactly reconciles the counts --
+  ours shows V1 unhandled_5xx 91 / timeouts 0, his shows 90 / 1.
+  **Correction to an earlier draft of this note: on our V2 the case did NOT time out.**
+  The recorded row is `status_code 422`, `latency_band "slow"`, 4,013.8 ms, no error --
+  V2 reached its length check and rejected cleanly. Our V1 row is `status_code 500`,
+  `slow`, 2,487.7 ms. Neither version timed out on this hardware. See the
+  "Real-run validation" section above for what that implies for the team.
+  This case is timing- and machine-sensitive, which reinforces the brief's decision to
+  record it as measured and treat its cause as out of scope. It is also why our run cannot
+  substitute for his artifacts in the report.
+- Next: (1) push `khalid/analysis` and open the PR for Ahsan (three commits: `a068b7d`,
+  `c7c7d71`, plus this checkpoint). (2) When Amin's `results/full_20260909_135157/`
+  artifacts arrive, run `analysis.analyze.run_analysis(...)` over them -- the report must
+  be written against his benchmark run, not ours. Expect his oversized_10mb row to be a
+  timeout on both versions, which the code already handles generically.
+- Processes: none running. Both local uvicorn endpoints were shut down and ports 8000/8001
+  confirmed released.
+
+## Historical upstream checkpoint (origin/main 67034fc)
 
 - Updated: 2026-09-09 13:52 +04:00 (Asia/Dubai), Claude Code.
 - Active request: Ahsan authorized, on 2026-09-09, exactly this scope: correct the two
@@ -309,7 +615,7 @@ Python: root `.venv`, Python 3.11.9. No new dependencies or model downloads.
 | baseline/ | Khalid | 42 committed sentences and loader |
 | attacks/ | Lamei | Six categories; 1,886 attacks, 33 standalone and 1,853 derived |
 | runner/ | Amin | Implemented; six verified fixes merged and pushed to main in PR #5 |
-| analysis/ | Khalid | Stubs; downstream file integration unverified |
+| analysis/ | Khalid | Implemented + unit-tested against synthetic fixtures; real-data integration unverified |
 | report/ | Ahsan | Renderer/template stubs |
 
 Component tests and smoke runs do not establish complete analysis or report generation.
@@ -369,14 +675,16 @@ These are now verified implementation facts, not claims about whether a ClickUp 
 
 ## Open Questions and Parked Work
 
-- Ahsan's supplied Khalid task now specifies the six unchanged top-level categories, rates with
+- Ahsan's supplied Khalid task specifies the six unchanged top-level categories, rates with
   explicit eligible denominators, exclusion of unresolved review/diagnostic cases, grouping by
   category/subfamily/failure mode, and maximum supporting-instance severity rather than sums.
-  This resolves the original mapping/raw-count concern at the specification level. It is not
-  yet implemented or validated; descriptive rates remain dependent on the suite composition.
+  This is now implemented in `analysis/` and unit-tested against synthetic fixtures (91 tests
+  passing); not yet validated against a real run. See Current Checkpoint above.
 - Apply the manifest's per-case oracle and validity tier. `REVIEW` and `DIAGNOSTIC` cases must
-  not be automatically counted as vulnerabilities; see `attacks/INTEGRATION_NOTES.md`.
-  Claude proposed qualified language for `SILVER` cases; report implementation remains pending.
+  not be automatically counted as vulnerabilities; see `attacks/INTEGRATION_NOTES.md`. Now
+  implemented as an explicit lookup in `analysis/analyze.py::evaluate_case`, covering all six
+  oracle values; `SILVER`/`GOLD`/`REVIEW`/`DIAGNOSTIC` tiers are preserved per finding in
+  `finding_meta`. Report-side rendering of qualified `SILVER` language remains Ahsan's.
 - Measure handwritten baseline confidence in the clean run; do not silently rewrite committed
   baseline sentences to improve scores. Claude raised this as a limitation to assess.
 - Permanent endpoint tests for over-length rejection/non-truncation and Unicode cleanup remain
@@ -393,8 +701,7 @@ These are now verified implementation facts, not claims about whether a ClickUp 
 
 Runner remediation and PR #5 merge are complete. Khalid owns analysis and its input-file
 integration; Ahsan owns report implementation. Those components remain parked unless the
-current user assigns them. The proposed documentation corrections and full-run validation above
-are prepared for the user's next instructions to Claude; they have not been executed.
+current user assigns them.
 
 For a takeover, read `AGENTS.md` and this file, inspect Git state, and resume only the latest
 user-authorized task. Update this checkpoint whenever progress or scope changes.

@@ -665,13 +665,29 @@ def load_manifest(path) -> dict[str, dict]:
 
 
 def load_results(path) -> list[RunResult]:
+    """Read one version's JSONL result rows.
+
+    A malformed line is raised, never skipped. Silently dropping a row would quietly
+    shrink the evidence base and desynchronise the results file from the coverage lists
+    in run_meta, which is exactly the "absence of evidence read as evidence of a fix"
+    failure the comparison is built to prevent. The error names the file, the line and
+    the offending text, because a bare JSONDecodeError gives the reader nothing to act on
+    -- a truncated or half-written results file is the realistic cause.
+    """
     results = []
     with open(path, encoding="utf-8") as handle:
         for line_number, line in enumerate(handle, start=1):
             line = line.strip()
             if not line:
                 continue
-            row = json.loads(line)
+            try:
+                row = json.loads(line)
+            except ValueError as exc:
+                raise ValueError(
+                    f"{path} line {line_number} is not valid JSON ({exc}). "
+                    f"Offending text: {line[:120]!r}. The results file looks truncated or "
+                    "partially written; re-run that version rather than analysing it."
+                ) from exc
             try:
                 results.append(RunResult(**row))
             except TypeError as exc:

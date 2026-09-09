@@ -6,6 +6,7 @@ runner output is required. Owner: Khalid.
 """
 
 import dataclasses
+import json
 
 import pytest
 
@@ -989,6 +990,49 @@ class TestRequiredOutputSections:
         )
         summary = analyze.build_version_summary(analysis_obj, make_run_meta())
         assert summary["validity_tier_census"].get("GOLD") == 1
+
+
+class TestResultFileLoading:
+    """A corrupt or truncated results file must fail loudly and informatively, never be
+    silently skipped -- dropping rows would desynchronise the results from run_meta's
+    coverage lists. Regression test for a real truncated file seen in a live run."""
+
+    def _write(self, tmp_path, text):
+        path = tmp_path / "results_v1.jsonl"
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def _valid_row(self):
+        return json.dumps(dataclasses.asdict(make_result()))
+
+    def test_valid_file_loads(self, tmp_path):
+        path = self._write(tmp_path, self._valid_row() + "\n")
+        assert len(analyze.load_results(path)) == 1
+
+    def test_blank_lines_are_tolerated(self, tmp_path):
+        path = self._write(tmp_path, self._valid_row() + "\n\n\n")
+        assert len(analyze.load_results(path)) == 1
+
+    def test_trailing_fragment_raises_naming_file_and_line(self, tmp_path):
+        # Exactly the shape seen live: complete rows followed by a stray fragment.
+        path = self._write(tmp_path, self._valid_row() + "\ne}\n")
+        with pytest.raises(ValueError) as excinfo:
+            analyze.load_results(path)
+        message = str(excinfo.value)
+        assert "line 2" in message
+        assert "e}" in message
+        assert "truncated" in message
+
+    def test_malformed_line_is_never_silently_skipped(self, tmp_path):
+        path = self._write(tmp_path, self._valid_row() + "\nnot json\n" + self._valid_row() + "\n")
+        with pytest.raises(ValueError):
+            analyze.load_results(path)
+
+    def test_row_not_matching_runresult_raises(self, tmp_path):
+        path = self._write(tmp_path, json.dumps({"unexpected": 1}) + "\n")
+        with pytest.raises(ValueError) as excinfo:
+            analyze.load_results(path)
+        assert "RunResult" in str(excinfo.value)
 
 
 class TestComparisonWithholdsOnFingerprintMismatch:

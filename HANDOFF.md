@@ -1,4 +1,556 @@
-## Current implementation checkpoint - Codex
+## System V4 Docker validation + pre-Hugging-Face freeze checkpoint - Claude
+
+- Updated: 2026-09-10T03:35:00+04:00, Claude Code; branch `ahsan/report`, observed HEAD
+  `c507033` (unchanged prior to this session's commit; see the commit recorded below).
+- Ahsan manually completed the first real Docker verification (build + run + full manual
+  walkthrough of the welcome page, live demo, generated report, source JSON/PDF, and the
+  verified full report -- all confirmed by Ahsan). This session's task: reorder the
+  Dockerfile for build-cache efficiency, re-validate with Docker Desktop (now installed
+  and running), scan the repo for secrets/machine paths before any Hugging Face upload,
+  check Git remotes, and produce one clean local commit of the validated V3+V4 state.
+  Explicitly not authorized to push anywhere (GitHub or Hugging Face) this session.
+- Dockerfile reordered (smallest change, no logic/dependency/model changes): `COPY . .`
+  moved to AFTER the pinned-model download step, so the order is now
+  apt packages -> `COPY requirements.txt .` -> `pip install` -> ENV -> pinned model/
+  tokenizer download -> `COPY . .` -> non-root user/chown -> healthcheck/CMD. The
+  `useradd`/`mkdir /app/results`/`chown -R` step, previously before `COPY . .`, now runs
+  after it (chowns the freshly copied source too) -- the only other change, needed
+  because reordering the copy changes what needs chowning. Model name/revision, pinned
+  dependency versions, V1/V2 semantics, attack/runner/analysis/report code and
+  `contract.py` are all untouched.
+- Docker Desktop discovered at a non-standard, per-user install path (`C:\Users\ahsan\
+  AppData\Local\Programs\DockerDesktop\resources\bin\`), not on this shell's PATH by
+  default; `docker-credential-desktop.exe` (needed for registry auth) lives in the same
+  directory. Both `docker.exe` and that directory had to be referenced/added to PATH
+  explicitly for this session's PowerShell commands to work -- worth knowing for any future
+  session on this machine.
+- Full test suite re-run before the rebuild:
+  `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .venv/Scripts/python.exe -m pytest -q`:
+  **445 passed** (unchanged from the V4 session), 1 pre-existing Starlette/AnyIO warning.
+- Real `docker build -t team-checkmate-v4 .` against the reordered Dockerfile: succeeded
+  (exit 0). Confirmed from the build's own step-by-step output (not inferred): steps
+  2-5 (apt packages, `WORKDIR`, `COPY requirements.txt .`, `pip install`) all hit
+  `CACHED` against Ahsan's own prior manual build, since those layers are unchanged;
+  step 6 (pinned model/tokenizer download) ran for real (468.2s, ending with the expected
+  `model cached at pinned revision` line) because its position in the layer graph changed;
+  step 7 (`COPY . .`) then completed in 0.1s; step 8 (`useradd`/chown) in 1.2s. This is
+  direct evidence the reorder achieves its goal: an ordinary source-only change would now
+  invalidate only steps 7-8, never the expensive dependency-install or model-download
+  layers.
+- Ran the freshly built image as a detached container
+  (`docker run -d --name team-checkmate-v4-test -p 7860:7860 team-checkmate-v4`) and
+  smoke-tested it for real, inside the container, not mocked: `GET /` 200 with the real
+  logo `data:` URI and "Run Live Attack Test" present; `GET /healthz` 200; `GET
+  /verified-full/report.html` 200 (the existing V3 verified artifact, unmodified);
+  `GET /static/app.css` 200; one real `POST /api/run` demo experiment -- genuine V1/V2
+  uvicorn processes started inside the container, the curated attack subset sent, real
+  analysis and report generation -- completed in ~19s with the documented stage sequence
+  observed live via `/api/status` polling; the resulting `report.html`, `analysis.json`,
+  `report.pdf`, and the copied `detailed/report.html` (verified full report) all returned
+  200 through the container's `/results/...` mount, and the served report.html contains
+  the "View Detailed Report" link. Checked for V1/V2 cleanup via `docker exec ... cat
+  /proc/net/tcp` (no `ps` binary in the slim image): only one `LISTEN` (0x1EB4 = 7860, the
+  web app) and `TIME_WAIT` remnants on 0x1F40/0x1F41 (8000/8001) -- no lingering V1/V2
+  listener after the run, matching the host-level verification from the prior session.
+  Did **not** run the full 1,928-case benchmark (per instruction). Container then stopped
+  and removed (`docker stop`/`docker rm team-checkmate-v4-test`, confirmed gone via
+  `docker ps -a`); the throwaway `results/hf_demo_20260909_232412_2fef5e/` directory this
+  produced was deleted (nothing else under `results/` touched). The `team-checkmate-v4`
+  image itself was left in the local Docker image cache (not requested to be removed).
+- Repository-state and secret/path scan before commit: `git status --short`, `git diff
+  --stat`, and `git diff --check` all match the expected V3+V4 file set with only
+  pre-existing LF/CRLF warnings (no whitespace errors). Scanned every tracked-or-untracked-
+  non-ignored file (`git ls-files --cached --others --exclude-standard`) for HF-token-
+  shaped strings (`hf_[A-Za-z0-9]{20,}`), AWS-key-shaped strings, PEM private-key headers,
+  and generic `api_key=`/`secret=`/`password=` patterns: zero matches. No `.env` file
+  anywhere in that same file set. Grepped the new/changed deployment files (`Dockerfile`,
+  `.dockerignore`, `web/`, `run_all.py`, `README.md`, `HANDOFF.md`) for Windows absolute
+  paths (`C:\Users`/`C:/Users`): the only hits were inside `web/__pycache__/*.pyc`
+  (compiled bytecode embedding this machine's build path), confirmed gitignored via
+  `git check-ignore -v` and absent from `git status` -- they will never be committed.
+  Confirmed present and untouched: `contract.py` (no diff), `Team Checkmate Logo.png`
+  (167,449 bytes), and all four files under `artifacts/verified_full_report/` (the
+  existing verified full report from the V3 session, not regenerated). Confirmed
+  `results/` remains fully gitignored (`git check-ignore -v results/`), so no run output
+  from any of this session's live demo runs was ever a candidate for committing.
+- Git remotes: only `origin` exists, pointing to
+  `https://github.com/AminMaleh03/adversarial-redteam-toolkit-team-checkmate.git` (both
+  fetch and push). No Hugging Face remote was added this session -- Ahsan's instruction
+  was to prepare the repo (Dockerfile + README Space front matter, already done in the V4
+  session) and stop before pushing anywhere. The existing GitHub remote was not touched.
+- Committed (not pushed): all of this session's V4 changes plus the still-uncommitted V3
+  session's work, together, as one commit -- see the commit hash recorded in the final
+  report given to Ahsan in chat. No `--no-verify`, no amend of history predating this
+  session.
+- Not done / explicitly out of scope per this task: no push to GitHub or Hugging Face
+  (stopped as instructed), no V5 work, no redesign, no new branding. No fresh 1,928-case
+  full benchmark was run. Docker Desktop's discovered non-standard install path (above)
+  may need to be added to this machine's persistent PATH if a future session should not
+  have to rediscover it.
+- Next: Ahsan reviews the commit, decides when to push to GitHub `origin`, and separately
+  creates/authenticates the Hugging Face Space remote (`ahsan-141117/team-checkmate-
+  adversarial-redteam-toolkit`, a protected Docker Space) using their own credentials --
+  this session deliberately did not request, store, or handle any Hugging Face token. See
+  the final report in chat for the exact recommended command sequence for that push.
+
+## System V4 checkpoint - Claude
+
+- Updated: 2026-09-10T02:35:00+04:00, Claude Code; branch `ahsan/report`, observed HEAD
+  `c507033` (unchanged; nothing committed this session).
+- Ahsan (the user) assigned System V4: Hugging Face Docker deployment as a thin web layer
+  around the existing, validated V1-V3 pipeline. Explicit constraints: reuse
+  `run_experiment()` in-process (never shell out to `run_all.py`), no Gradio/Streamlit/
+  React/Node/Redis/Celery/database, single uvicorn worker with an in-process job lock, no
+  fresh 1,928-case benchmark. Not authorized to commit/push.
+- New `web/` package (not owned by any existing component folder per AGENTS.md's
+  ownership table -- root-level orchestration/deployment, same status as `run_all.py`):
+  `web/app.py` (FastAPI app), `web/templates/index.html` (welcome page), `web/static/
+  app.css`, `web/static/app.js`. No attack/runner/analysis/report logic duplicated --
+  `web/app.py` imports `run_all` and calls `run_all.run_experiment(mode="demo", ...)`
+  directly from a background `threading.Thread`.
+- `run_all.py` changes (smallest reasonable, per the brief): added `_emit_progress(callback,
+  stage, message)` and an optional `progress_callback=None` parameter on both
+  `run_experiment()` and `run_analysis_and_report()`. Emits exactly the eight required
+  real-transition stages (`initializing, starting_v1, attacking_v1, starting_v2,
+  attacking_v2, analyzing, generating_results, complete`) at the locations the brief
+  specified -- verified by reading each call site, not just by test. Every existing caller
+  (the CLI, prior tests) omits the callback and is unaffected; confirmed by running the
+  pre-existing `tests/test_run_all.py` suite unchanged in behavior plus new tests added
+  alongside it.
+- Job manager (`web/app.py`): module-level dict guarded by one `threading.Lock`.
+  `POST /api/run` returns the *current* active job (202, same `run_name`) if one is
+  already `running` instead of starting a second `run_experiment()` -- verified with a
+  real concurrent double-POST against a live background run (see below), not just mocks.
+  Run names are server-generated only (`hf_demo_<UTC timestamp>_<6 hex chars>`); the
+  public API accepts no path, mode, or run-name input from the client anywhere. A failed
+  job (`_run_job`'s broad `except Exception`) is logged server-side via
+  `logging.exception` and exposes only a fixed public message, never a traceback or
+  exception text, to `/api/status`.
+- Result serving: `/results` is mounted as `StaticFiles(directory=run_all.RESULTS_ROOT)`
+  (created if missing at import time); on completion the job stores
+  `result_url = "/results/<relative report.html path>"`, computed via
+  `Path.relative_to`, so it is portable inside Docker/Hugging Face with no absolute or
+  Windows path ever exposed. `/verified-full` is mounted from
+  `run_all.VERIFIED_FULL_REPORT_DIR` (`artifacts/verified_full_report/`, already
+  untracked-but-present from the V3 session) only if that directory exists, matching the
+  existing "View Detailed Report" guard pattern in the demo template -- no new full
+  1,928-case run was executed to produce it; the already-verified V3 artifact is reused
+  as-is. `/healthz` only returns a static liveness payload; it never starts V1/V2.
+- Welcome page (`web/templates/index.html` + `web/static/app.css`): real logo via a
+  same-pattern `_logo_data_uri()` in `web/app.py` (reads `Team Checkmate Logo.png` at the
+  repo root directly, not importing report/generate.py's private helper), rendered at
+  64px (vs the report masthead's 30px) using the same CSS custom-property palette as
+  `report/style.css` (`--ink/--muted/--paper/--line/--teal/--coral`) for visual
+  consistency, with its own responsive stylesheet (not shared with the report bundle).
+  Hero copy matches V3: "Robustness, live." Nav has a single secondary "View Detailed
+  Report" link (hidden if the verified artifact is absent). `/api/status` is polled once
+  on page load specifically so a second visitor arriving mid-run sees live progress
+  instead of the idle welcome state -- confirmed structurally (`web/static/app.js`'s
+  initial fetch) and live (see below).
+- Progress UI: real stage list + a progress bar mapped to the brief's suggested
+  stage-boundary percentages (5/15/30/50/65/82/92/100), advanced only on actual
+  `/api/status` stage changes via 1.5s polling -- no fake continuous animation. On
+  `status: complete`, the client redirects to `result_url` (the real generated demo
+  report, not a separately rebuilt JS results view).
+- Dockerfile (root): `python:3.11-slim-bookworm`, installs only `libpango-1.0-0`,
+  `libpangoft2-1.0-0`, `libharfbuzz-subset0` (no GTK/desktop set) for WeasyPrint, installs
+  `requirements.txt` unmodified/unpinned-upgraded, pre-downloads the pinned model/tokenizer
+  revision (`j-hartmann/emotion-english-distilroberta-base` @
+  `0e1cd914e3d46199ed785853e12b57304e04178b`, same constants as `endpoint/model.py`) at
+  build time while network is available, then sets `HF_HUB_OFFLINE=1`/
+  `TRANSFORMERS_OFFLINE=1` for runtime so the container never depends on network access to
+  load the model. Creates uid-1000 `user`, chowns `/app` after the model download, runs as
+  that non-root user. `HEALTHCHECK` uses `urllib.request` (no `curl` dependency) against
+  `/healthz`. Final `CMD` is exactly `uvicorn web.app:app --host 0.0.0.0 --port 7860` with
+  no `--workers` flag (defaults to one). `.dockerignore` excludes `.git/.venv/__pycache__/
+  results/` etc. but does not touch `artifacts/`, the logo, `contract.py`, or any
+  component folder.
+- README.md: added Hugging Face Space YAML front matter (`sdk: docker`, `app_port: 7860`,
+  the project title/emoji) at the very top, ahead of the existing substantive README
+  content (not replaced), plus a new "Deployment (System V4)" section with the local-
+  uvicorn and Docker-build/run commands. No other README content removed.
+- Tests: `tests/test_run_all.py` gained 3 tests (existing callers unaffected by the new
+  optional parameter; the full 8-stage sequence emitted by `run_experiment()` in the
+  documented order; `run_analysis_and_report()` itself emits exactly `analyzing` then
+  `generating_results`, verified against the real function with only its analysis/report
+  collaborators mocked, not the function itself). New `tests/test_web.py` (9 tests, all
+  mocking `run_all.run_experiment` -- no real ML experiment runs in the unit suite):
+  branded welcome page incl. the real logo `data:` URI, `/healthz`, idle initial status,
+  202 running state on start, a second concurrent POST returning the *same* job (asserted
+  via a call-count of 1 against a real background thread blocked on a `threading.Event`,
+  not just state inspection), real progress-callback stages reaching `/api/status`,
+  successful completion exposing a portable `result_url`, a failed job exposing a safe
+  message with the original exception text/paths asserted absent, and a fresh run being
+  allowed after the previous one completes. Full suite:
+  `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .venv/Scripts/python.exe -m pytest -q`:
+  **445 passed** (433 before this session + 12 new), 1 pre-existing Starlette/AnyIO
+  warning, unrelated to this change.
+- Live verification without Docker (Docker Desktop/CLI is not installed on this machine --
+  confirmed via both the Bash tool and PowerShell; `docker`/`docker version` resolve to
+  "command not found" in both, so the Docker-specific steps below could not be run here):
+  started `uvicorn web.app:app` locally on `127.0.0.1:7860` against this checkout
+  (no container). Verified live, for real, not mocked: `GET /` 200 with the real logo
+  `data:` URI and "Run Live Attack Test" present; `GET /healthz` 200; `GET /static/app.css`
+  200; `GET /verified-full/report.html` 200 (the existing V3 artifact, unmodified); two
+  full real `POST /api/run` demo experiments end to end -- each a genuine `run_experiment
+  (mode="demo")` starting real V1/V2 uvicorn processes, sending the real curated attack
+  subset, analyzing, and generating a report -- both completed in ~18-23s with the exact
+  documented stage sequence observed live via repeated `/api/status` polls
+  (`initializing -> starting_v1 -> attacking_v1 -> starting_v2 -> attacking_v2 -> analyzing
+  -> generating_results -> complete`, percents 5/15/.../100 matching `STAGE_PERCENT`); the
+  second POST fired 1s after the first, live, while the first was still `attacking_v1`/
+  `starting_v1`, returned the *same* `run_name`, proving the single-active-run lock holds
+  against real concurrency, not only mocks; after the second run finished, a fresh POST
+  was accepted again (new job allowed post-completion). After the first run's completion,
+  `GET` on the served `result_url`, its `analysis.json`, its `detailed/report.html`
+  (the copied verified full report), and its `report.pdf` all returned 200; the served
+  report.html itself contains the sticky `.masthead` and the real "View Detailed Report"
+  link, confirming the V3 report experience travels through the web layer unchanged.
+  After each run, confirmed via `netstat` that ports 8000/8001 had no LISTENING socket
+  (only expected `TIME_WAIT` remnants) while 7860 remained up -- endpoint cleanup held
+  under real concurrency exactly as `run_experiment()`'s existing `try/finally` already
+  guaranteed. The local `uvicorn` process was then stopped and confirmed off port 7860;
+  the two throwaway `results/hf_demo_*` directories this produced were deleted (nothing
+  else under `results/` was touched). `git diff --check`: clean (only pre-existing
+  LF/CRLF warnings, no whitespace errors).
+- Not done / explicitly out of scope or blocked: **the actual `docker build`/`docker run`
+  steps (System V4 section 21) were not performed -- Docker is not installed on this
+  machine.** Everything Docker-independent was verified as above (same code path the
+  container would run, since `web/app.py` and `run_all.py` have no Docker-specific
+  branching), but the Dockerfile itself (apt package availability on `python:3.11-slim-
+  bookworm`, the build succeeding, the image's non-root user/permissions, the
+  `HEALTHCHECK` actually passing under Docker) is unverified and is the single biggest
+  remaining risk before an actual Hugging Face Space upload. No fresh 1,928-case full
+  benchmark was run (per instruction). Nothing committed or pushed. Working tree now also
+  has `Dockerfile`, `.dockerignore`, `web/` (new) and this file plus `README.md` modified,
+  on top of the prior V3 session's uncommitted work (`run_all.py`, `report/*`,
+  `artifacts/verified_full_report/`, `Team Checkmate Logo.png`, etc. -- all still
+  uncommitted, still pending Ahsan's review per the V3 checkpoint below).
+- Next: Ahsan reviews the diff; if a Docker Desktop/Engine is available on some machine,
+  run `docker build -t team-checkmate-v4 .` then `docker run --rm -p 7860:7860
+  team-checkmate-v4` and repeat the section-21 checklist against `http://localhost:7860`
+  to close the one unverified item above, then decide when to commit/push and whether to
+  proceed to an actual Hugging Face Space upload.
+
+## System V3 checkpoint - Claude
+
+- Updated: 2026-09-10T00:10:00+04:00, Claude Code; branch `main`, observed HEAD `c507033`
+  (unchanged; nothing committed this session).
+- Ahsan (the user) assigned System V3: real logo, sticky navbar, de-emphasized crash-gap
+  warning, demo-only exclusion of `malformed.oversized_10mb` (hardware-timing-sensitive at
+  the 10s deadline), a stable "View Detailed Report" link to a canonical verified full
+  benchmark, and hero copy fix ("Robustness, live." replacing the unverified "in one minute"
+  promise). Not authorized to commit/push. Per explicit instruction, the two 1,928-case full
+  reproducibility benchmarks were **not** rerun for this template/CLI-only change.
+- Logo: the real `Team Checkmate Logo.png` at the repo root (1024x1024 PNG) is read once and
+  embedded as a base64 `data:` URI by `report/generate.py::_logo_data_uri()` (lru-cached),
+  used in the masthead of both templates via `<img class="brand-logo">`, replacing the old
+  "C." placeholder mark entirely. Verified WeasyPrint's custom `deny_resource` url_fetcher
+  (which unconditionally rejects any other fetch -- the report's long-standing "no external
+  resources" invariant) does not get invoked for `data:` URIs, so PDF rendering needed no
+  changes to that security boundary; only added `img-src data:;` to each template's CSP meta
+  tag. This makes the logo travel inside every generated report.html/report.pdf with zero
+  relative-path or asset-folder dependency -- confirmed by grepping the actual generated
+  `results/v3_demo_check/report/report.html` and its copied `detailed/report.html` for the
+  embedded data URI and for the absence of any absolute Windows path. If the source PNG is
+  ever missing, `_logo_data_uri()` raises `RuntimeError` naming the expected path rather than
+  falling back to a placeholder (verified by test).
+- Demo-only exclusion: `run_all.py` gained `DEMO_EXCLUDED_ATTACK_IDS =
+  ("malformed.oversized_10mb",)`, passed to the runner as `--skip` (already a supported,
+  unrelated-to-scoring runner flag) only when `mode == "demo"`; full mode always passes an
+  empty skip list. The attack itself, its registration, its manifest entry, and its presence
+  in `--mode full` are untouched -- verified live: `malformed.oversized_10mb` is present in
+  the demo run's `manifest.json` and its `run_meta_v1.json` skipped-case list, but absent from
+  `results_v1.jsonl`/`results_v2.jsonl`. Demo coverage dropped from 163 to **162** planned
+  cases as a direct, fully dynamic consequence (never hardcoded anywhere).
+- Crash-gap de-emphasis: `run_all.py::build_demo_evidence` now splits what was one `notes`
+  list into `crash_status_note` (the expected, calm "no service unavailability observed"
+  explanation -- present every run where `literal_crash_case_available` is false) and
+  `notes` (reserved for genuine anomalies: no failure/flip example found). The demo template
+  renders `crash_status_note` as a small `<p class="caption crash-note">` folded into the
+  featured-failure card, not the large `.notice.warning` box the old "Literal crash/
+  unavailability demonstrated: NO" line used. `literal_crash_case_available` itself, and the
+  crash/unavailability distinction in the Method section, are unchanged.
+- Sticky navbar: `.masthead` is `position: sticky; top: 0; z-index: 20;` with an explicit
+  `background: var(--paper)` (shared `report/style.css`, so both templates get it for free);
+  `html { scroll-padding-top: 100px; }` (was 24px) keeps every anchor target clear of the bar;
+  `@media print { .masthead { position: static; ... } }` neutralizes it for PDF/print, where
+  paged media has no persistent viewport anyway.
+- Verified full-report artifact: inspected `results/repro_1/` and `results/repro_2/` (both
+  already-verified 1928/1928-both-versions, `planned_match`/`manifest_match`/
+  `whole_suite_comparable` all true, from the prior session) and picked `repro_1` as the
+  canonical source -- both were equally valid, `repro_1` chosen as the first of the two.
+  **No new benchmark was run.** Re-rendered (not re-analyzed) its already-validated
+  `analysis.json` through the current `report.generate.generate_report(..., mode="full")`
+  into a new stable location, `artifacts/verified_full_report/{report.html, report.pdf,
+  analysis.json, export_meta.json}` -- this picks up the current template (logo, sticky nav,
+  no Demo Highlights) without touching the underlying RunResult/analysis data at all.
+- Portable "View Detailed Report" link: `run_all.py::run_analysis_and_report` checks whether
+  `artifacts/verified_full_report/report.html` exists *before* rendering (to decide the link's
+  visibility/href), embeds `{"available": bool, "relative_href": "detailed/report.html"}` as a
+  `detailed_report` key in the report JSON (sibling to `demo_evidence`), then -- only after
+  `report.generate.generate_report` has created the fresh `report_dir` (which must not
+  pre-exist) -- copies the whole artifact tree into `report_dir / "detailed"`. The demo
+  masthead's old "Download PDF" action is now "View Detailed Report" (`target="_blank"
+  rel="noopener"`, href `detailed/report.html`); it simply doesn't render if the artifact
+  doesn't exist yet on a fresh checkout. The demo's own short PDF still exists at
+  `report/report.pdf` (5 pages, unchanged) and Source JSON is untouched.
+- Full mode (`report/template.html`): removed the entire "Demo Highlights" section and its
+  nav link that the prior session had added there -- per this task's explicit instruction 12,
+  full mode is now audit-only again (Results/Findings/Method/Appendix), demo mode owns the
+  concrete-example story. `render_html` still receives `demo_evidence` in its context (unused
+  by the full template, harmless with Jinja `StrictUndefined`, which only errors on access).
+  No page-count number is mentioned anywhere in the UI (per instruction 10); it moved around
+  only as a side effect of removing that section (47 pages for the freshly rendered artifact
+  vs 49 before, not surfaced to users).
+- Verified live, end to end, both runs also confirming reproducible determinism against each
+  other: `python run_all.py --mode demo --run-name v3_demo_check` and `--run-name
+  v3_demo_noopen --no-open` (both exit 0, identical real results: featured failure
+  `malformed.oversized_100kb` V1 500 -> V2 422; featured flip fear 0.618 -> anger 0.842 via
+  `homoglyph_greek`, same as the prior session's runs -- oversized_10mb's absence doesn't
+  change which example gets featured). Checked directly against the generated files (not
+  eyeballed): logo data-URI present exactly once per page including the copied `detailed/`
+  copy; old `.mark` placeholder gone from markup; hero reads "Robustness, live." with "in one
+  minute" absent; sticky CSS present with print override; nav is Demo/Results/Method with no
+  Findings link; downloads show "View Detailed Report" (not "Download PDF") linking to
+  `detailed/report.html` with `target="_blank"`; `detailed/report.html` has 43 finding cards,
+  the Findings nav link, and no absolute paths; demo PDF 5 pages vs detailed PDF 47 pages
+  (WeasyPrint `len(HTML(...).render().pages)`); the real Cyrillic/Greek homoglyph correctly
+  wrapped in `<mark class="demo-mark">`; crash-status note renders as a caption, not inside a
+  `.notice.warning` box, and the old prominent line is gone; coverage banner reads "162 of
+  1,928 planned cases executed" (dynamic, matching the actual reduced count). Could not
+  visually confirm the OS actually opened a browser window (no display in this session) --
+  verified structurally instead (see the `test_cli_opens_browser_by_default_but_not_with_no_
+  open` test and the live `--no-open` run's clean exit with no fallback message).
+- Added tests: `tests/test_run_all.py` (new file, 6 tests) covering `run_suite`'s `--skip`/
+  `--limit` argv construction, and `run_experiment()` wiring for both modes (mocking the
+  endpoint lifecycle and report generation) proving demo mode's skip list is exactly
+  `DEMO_EXCLUDED_ATTACK_IDS` and full mode's is empty, and that `run_experiment()` itself
+  never calls `webbrowser.open` regardless of mode -- plus a CLI-level test proving `main()`
+  calls it exactly when `--no-open` is absent. `tests/test_report.py` gained 8 more V3 tests
+  (real logo embedded + placeholder gone in both modes, missing-logo asset raises and is
+  restored via `cache_clear()`, sticky/print CSS assertions, hero wording, crash-note
+  presentation, genuine-anomaly notes still render as warnings, detailed-report link present/
+  absent). One pre-existing test (`test_xss_and_template_syntax_are_plain_text`) needed
+  updating: it used to assert zero `<img>` tags anywhere as an XSS-safety check, which the
+  new legitimate logo `<img>` now trips; changed to assert exactly one `<img>` tag, that its
+  `src` is the trusted `data:image/png;base64,` prefix, and that the injected `file:` payload
+  never became a second image. Full suite:
+  `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .venv/Scripts/python.exe -m pytest -q`:
+  **433 passed** (419 before this session + 14 new), 1 pre-existing Starlette/AnyIO warning.
+- Processes: both endpoints started/stopped correctly for `v3_demo_check` and
+  `v3_demo_noopen`; confirmed after each run that ports 8000/8001 have no LISTENING socket and
+  no stray `python.exe`/`uvicorn` process remains.
+- Not done / explicitly out of scope: Docker, Hugging Face, web UI, deployment config. No
+  fresh full 1,928-case benchmark was run this session (by instruction). Nothing committed or
+  pushed. Working tree now also has `artifacts/verified_full_report/` (new, untracked --
+  contains a rendered report/PDF, a decision on whether to commit this is left to Ahsan),
+  `report/demo_template.html`, `run_all.py`, `report/generate.py`, `report/style.css`,
+  `tests/test_report.py`, `tests/test_run_all.py`, and this file modified/added on top of the
+  prior two sessions' uncommitted work. `Team Checkmate Logo.png` itself is also untracked
+  (the user added it directly; not touched or modified by this session, only read).
+- Next: Ahsan reviews the diff, opens `results/v3_demo_check/report/report.html` in an actual
+  browser to visually confirm the sticky nav, logo, and "View Detailed Report" flow, decides
+  whether `artifacts/verified_full_report/` and `Team Checkmate Logo.png` should be committed,
+  and authorizes commit/push when ready.
+
+## Demo-report polish checkpoint - Claude
+
+- Updated: 2026-09-09T23:30:00+04:00, Claude Code; branch `main`, observed HEAD `c507033`
+  (unchanged; nothing committed this session).
+- Ahsan (the user) assigned follow-up polish: demo mode's report was structurally the same
+  large forensic document as full mode. This task separates presentation by mode while
+  reusing the same runner/analysis/report infrastructure and design system, adds CLI browser
+  auto-open (CLI-only, never in `run_experiment()`), and `--no-open`. Not authorized to
+  commit/push; explicitly told not to rerun the two 1,928-case full experiments for a
+  template/CLI-only change, so full mode was verified by regenerating a report from the
+  existing real `results/repro_1/report/analysis.json` rather than a fresh benchmark run.
+- New `report/demo_template.html`: a single-page judge-facing report. Nav is
+  Demo/Results/Method only (no Findings link); downloads keep Source JSON + Download PDF.
+  Sections: a coral "LIVE DEMO RUN -- PARTIAL SUITE" banner (actual `X of Y planned cases
+  executed` from `versions[0].coverage`, never hardcoded), Demo Highlights (same featured
+  failure/flip cards as before, now with the Unicode change visually marked -- see below),
+  a compact Demo-subset comparison (resolved/remaining/new tiles, a small operational table,
+  the existing compact category table, and "Excluded by demo limit: N cases" sourced from
+  `coverage.limit_excluded` with unmatched/unavailable counts shown as numbers only, never
+  enumerated), a short Method/Limitations panel, and a condensed Source JSON provenance block.
+  No finding-register loop, no audit appendix, no per-case ID listings anywhere in this
+  template. `report/generate.py` gained `TEMPLATE_BY_MODE = {"full": "template.html", "demo":
+  "demo_template.html"}` and a `mode="full"` parameter on `render_html`/`generate_report`/the
+  CLI (`--mode`); both templates read the identical schema-v2 JSON, so no analysis/scoring
+  code changed. `report/style.css` (shared by both templates) gained `.partial-banner`,
+  `.metrics-row`/`.metric-tile`, and `mark.demo-mark`; nothing existing was renamed or removed.
+- Unicode highlight (real data, not fabricated): `run_all.py` gained `highlight_diff_html()`,
+  which HTML-escapes both strings via `difflib.SequenceMatcher` opcodes and wraps only the
+  differing span(s) in `<mark class="demo-mark">`, once, in Python -- the template renders the
+  two resulting fields (`original_html`/`attacked_html`) with Jinja's `safe` filter. Verified
+  against a real live demo run: the actual differing pair was `'o'` (U+006F) -> `'ο'` (U+03BF
+  GREEK SMALL LETTER OMICRON), both correctly wrapped in the rendered HTML.
+- Browser auto-open is CLI-only, per the explicit separation the task required:
+  `run_experiment()` in `run_all.py` still only returns a structured result (now including
+  `report_html`/`report_pdf` path keys); `webbrowser.open(...)` is called exclusively inside
+  `main()`, after `run_experiment()` returns, guarded by a new `--no-open` flag (default:
+  open). A failed/unavailable browser controller prints a fallback message and still exits 0;
+  it never fails the run. Verified structurally (code path, not a visual screenshot -- this
+  session cannot observe an actual window): `--no-open` runs never reach the `webbrowser.open`
+  call at all (confirmed by reading the guarded branch), and the without-flag runs hit it with
+  no exception and no fallback message printed, meaning `webbrowser.open()` returned truthy.
+- Verified live, end to end: `python run_all.py --mode demo --run-name final_demo_check`
+  (163/1928 cases both versions, 1,765 limit-excluded, real featured failure
+  `malformed.oversized_100kb` V1 500 -> V2 422, real featured flip fear 0.618 -> anger 0.842
+  via `homoglyph_greek`) and `--run-name final_demo_noopen --no-open` (exit code 0, identical
+  real results, no browser call reached). Both demo reports: nav has exactly Demo/Results/
+  Method (no Findings), zero `<article class="finding">` elements, zero `id-list`/
+  `audit-details` elements in the document body (those class names exist only in the shared,
+  otherwise-unused CSS -- confirmed by checking content after `</style>`), the real Cyrillic/
+  Greek homoglyph correctly wrapped in `<mark class="demo-mark">`, "Excluded by demo limit:
+  1,765 cases" with no enumerated IDs. Demo PDF: **5 pages** (WeasyPrint `len(HTML(...)
+  .render().pages)`, both the live run and a synthetic fixture agree). Full mode, regenerated
+  from `results/repro_1/report/analysis.json` (no fresh benchmark run): nav still has
+  Findings, 43 finding cards render, 49 pages (was ~46 before this session; the extra pages
+  are the Demo Highlights section added in the prior session, unchanged here, not a
+  regression -- full mode is otherwise exactly as before).
+- Added 7 tests to `tests/test_report.py` (`demo_data` fixture + `demo_evidence_fixture()`)
+  covering: demo mode omits the finding register and the id-list, demo nav omits Findings,
+  the Unicode `<mark>` renders unescaped while enumerated hidden IDs never appear, full mode
+  still renders its finding register/Findings nav link, `render_html` rejects an unknown
+  `mode`, and a real-PDF test asserting `demo_pages < full_pages <= 6` (skipped automatically
+  where WeasyPrint/GTK is unavailable, same pattern as the existing PDF tests). Full suite:
+  `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .venv/Scripts/python.exe -m pytest -q`:
+  **419 passed** (413 before this session + 7 new, minus 1 double-counted by a `-k` filter
+  quirk during a targeted run -- the full-suite total is what matters and is exact), 1
+  pre-existing Starlette/AnyIO warning.
+- Processes: both endpoints started/stopped correctly for `final_demo_check` and
+  `final_demo_noopen`; confirmed after each that ports 8000/8001 have no LISTENING socket and
+  no stray `python.exe`/`uvicorn` process remains. `results/final_demo_check/`,
+  `results/final_demo_noopen/` were generated this session (gitignored, not committed).
+  Template smoke-test scratch directories (`results/demo_tpl_check2*`,
+  `results/full_mode_regen_check/`) were generated then deleted; none left on disk.
+- Not done / explicitly out of scope: Docker, Hugging Face, web UI, `check_reproducibility.py`.
+  No fresh full 1,928-case benchmark was run this session (per the task's explicit
+  instruction); full mode's correctness rests on the regenerated-from-existing-data check
+  above plus the unchanged `analysis`/`compare`/`severity`/runner code paths. Nothing was
+  committed or pushed. Working tree now also has `report/demo_template.html` (new),
+  `run_all.py`, `report/generate.py`, `report/style.css`, `tests/test_report.py`, and this
+  file modified/added on top of the prior session's uncommitted work, pending Ahsan's review.
+- Next: Ahsan reviews the diff, opens `results/final_demo_check/report/report.html` and
+  `results/final_demo_check/report/report.pdf` to confirm the demo experience visually, and
+  authorizes commit/push when ready.
+
+## Pre-deployment orchestration checkpoint - Claude
+
+- Updated: 2026-09-09T23:00:00+04:00, Claude Code; branch `main`, observed HEAD `c507033`
+  (unchanged; nothing committed this session).
+- Ahsan (the user, working directly) assigned the final pre-deployment task: a single-command
+  full/demo orchestrator, featured demo evidence surfaced in the report, model revision
+  pinning, and a two-run reproducibility check. Explicitly out of scope: Docker, Hugging Face
+  deployment code, a web UI, `check_reproducibility.py`. Not authorized to commit/push; nothing
+  was committed.
+- New root file `run_all.py`: orchestrates existing components only (`baseline.load`,
+  `attacks.library`, `runner.run.main`, `analysis.analyze.run_analysis_from_dir`,
+  `report.generate.generate_report`) -- no attack/runner/analysis/report logic duplicated.
+  Starts/stops uvicorn for V1 then V2 (no `--reload`), waits on `/health`, runs the shared
+  suite via the runner's existing CLI entry point called in-process, then analysis and report.
+  Exposes `run_experiment(mode, run_name=None) -> dict` as the reusable, prompt-free, path-
+  relative entry point for a future deployment UI. `--mode demo` sends every standalone attack
+  plus every derived attack for the first 2 baselines -- the count is computed from the real
+  built suite at run time (`compute_demo_attack_limit`), not a hardcoded case number, so it
+  cannot silently drift from `attacks/`. `--run-name` isolates output under `results/<name>/`;
+  omitted defaults to a UTC timestamp. Confirmed demo mode finishes in well under a minute.
+- Demo evidence is real data only, never fabricated: `run_all.py` rebuilds the full attack
+  suite in-process (same deterministic call the runner makes) to recover `AttackCase`
+  original/attacked text that `RunResult` does not persist, cross-references it with the
+  actual `RunResult` rows and the analysis JSON's finding groups, and writes
+  `results/<run>/demo_evidence.json`. Selection is ranked, not hand-picked: featured failure
+  prefers `service_unavailable` > `unhandled_5xx` > `timeout` > `connection_failure` (only ever
+  literal-crash-labeled when a `service_unavailable` group actually exists); featured flip
+  prefers a `homoglyph`/`homoglyph_greek` subfamily, else the largest confidence swing. An
+  HTTP 5xx with the service still healthy afterward is always labeled "unhandled server error,"
+  never "crash" -- verified in the rendered HTML both times.
+- Report changes (`report/generate.py`, `report/template.html`, `report/style.css`): a "Demo
+  Highlights" section renders near the top of the report (right after the hero, before the
+  verdict) when `analysis.json` carries a `demo_evidence` key; absent for old bundles without
+  it. Extra top-level JSON key does not break `validate_report`'s strict schema (checked: it
+  requires listed fields present, never rejects additional keys). Verified by injecting a
+  synthetic `demo_evidence` block into the existing accepted `results/checkmate-final/
+  analysis.json` and rendering both HTML-only and full PDF (WeasyPrint) without template
+  errors (Jinja `StrictUndefined`), then again against two live runs' real output.
+- `endpoint/model.py`: pinned `MODEL_REVISION = "0e1cd914e3d46199ed785853e12b57304e04178b"`
+  for both the tokenizer and model `from_pretrained` calls. Verified against the actual local
+  Hugging Face cache with `huggingface_hub.scan_cache_dir()` (not memory/guess): `refs/main`
+  resolves to exactly this commit; the only other cached revision is `refs/pr/3017`, unused.
+  This is Rayyan's file; edited as a task-specific exception the user's brief explicitly called
+  for (pin the exact revision), same pattern as the earlier authorized `truncation=False` fix.
+- Coverage audit against the official required areas (read-only inspection of `attacks/`,
+  `runner/`, `analysis/`, `contract.py`; no attack-library changes made or proposed):
+  malformed/oversized YES (`attacks/malformed.py`), boundary values YES (`attacks/boundary.py`
+  string/length boundaries), **type confusion YES** -- already implemented as
+  `boundary.type_confusion.{null,number,boolean,list,nested_object}` via `_raw_typed_case`,
+  oracle `request_should_be_rejected_cleanly`, so nothing was missing and nothing was added;
+  adversarial perturbations YES (`attacks/perturbation.py`, TextBugger-derived + natural
+  noise); encoding/Unicode YES (`attacks/encoding.py`: homoglyph, homoglyph_greek, zero-width,
+  deletion/backspace, fullwidth/ligature NFKC controls, bidi, null byte); automated runner,
+  response/error/latency capture, severity-ranked findings, and remediation-tied-to-findings
+  all YES (`runner/run.py`, `analysis/severity.py`, `analysis/analyze.py`,
+  `contract.Finding.remediation` required field).
+- Reproducibility: ran `python run_all.py --mode full --run-name repro_1` then, with no source
+  changes, `--run-name repro_2`. Both completed: 1,928/1,928 coverage both versions both runs,
+  identical planned-suite fingerprint and manifest SHA (`0471bccbf293095d...`, matching every
+  prior real run recorded in this file), `whole_suite_comparable: true` both times. Flip rates
+  identical to 16 significant figures (V1 218/1370 = 0.159124..., V2 112/1373 = 0.081573...)
+  and all six category failure rates byte-identical between the two runs. `git diff` on the two
+  runs' `analysis.json` isolates exactly one differing finding-group triple:
+  `(malformed, oversized_10mb, {unhandled_5xx, slow_response, timeout})`. This reproduces,
+  independently and for the third time this project, the hardware-timing sensitivity already
+  documented above (`malformed.oversized_10mb` sits right at the 10s deadline): V1 500s on it
+  consistently in both runs (91 unhandled 5xx, identical, both runs); V2 sometimes completes
+  just under 10s with a non-5xx status (repro_1: resolves the 5xx group, adds a shared
+  slow_response group) and sometimes exceeds it (repro_2: 5xx group becomes `unavailable`/
+  inconclusive since V2 gave no status code to evaluate against, and a new V2-only `timeout`
+  group appears). This is exactly the brief's listed acceptable variance
+  ("machine-load-sensitive timeout behavior"), not a change in conclusions -- resolved count
+  stayed 15/15; only remaining (14 vs 13) and newly-appearing (0 vs 1) moved by exactly this
+  one case. All other 14 finding groups' status is identical across both runs. Verified with a
+  standalone diff script, not eyeballed; see `results/repro_1/` and `results/repro_2/`
+  (gitignored) for the raw evidence.
+- Full test suite: `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .venv/Scripts/python.exe -m pytest
+  -q`: **413 passed**, 1 pre-existing Starlette/AnyIO warning, both before and after the two
+  live runs. No test file was changed this session (no new tests added for `run_all.py` --
+  the two live full runs plus the demo run plus the template smoke tests are the verification
+  evidence; consider adding `tests/test_run_all.py` as a follow-up if the team wants orchestration
+  covered by the suite rather than only by these live runs).
+- Processes: both endpoints were started/stopped correctly by `run_all.py` for every run
+  (demo smoke test, repro_1, repro_2); confirmed after each that ports 8000/8001 have no
+  LISTENING socket and no stray `python.exe`/`uvicorn` process remains. `results/
+  demo_smoke_test/` was generated then deleted (throwaway verification only);
+  `results/repro_1/`, `results/repro_2/`, and `results/demo_tpl_check*/`(deleted) were
+  generated during this session -- all gitignored, none committed.
+- Not done / explicitly out of scope per the brief: Docker, Hugging Face Space config, a web
+  UI, GitHub Actions deployment, cross-run comparison tooling, `check_reproducibility.py`.
+  `run_all.py` has no automated tests of its own yet (see above). Nothing was committed or
+  pushed; working tree has `run_all.py` (new), `endpoint/model.py`, `report/generate.py`,
+  `report/template.html`, `report/style.css`, `README.md`, and this file modified/added,
+  pending Ahsan's review.
+- Next: Ahsan reviews the diff and the two generated reports (`results/repro_1/report/
+  report.html`, `results/repro_2/report/report.html`), decides whether to add
+  `tests/test_run_all.py`, and authorizes commit/push when ready.
+
+## Report implementation checkpoint - Codex
+
+- Updated: 2026-09-09T21:59:00+04:00, Codex; branch ahsan/report, observed HEAD c507033.
+- User authorized developing Ahsan's report component, thorough testing, and showing the final system before committing/pushing to main. Publication follows user review; no commit/push performed.
+- Complete and verified, uncommitted: report/generate.py, report/template.html, report/audit.html, report/style.css, report/README.md, tests/test_report.py, root README.md, requirements.txt and HANDOFF.md. Other owners' source and frozen contract unchanged.
+- Renderer consumes schema v2 without cross-component imports. Includes strict consumed-field/count/evidence validation, comparison withholding, inconclusive/mixed-new evidence, SILVER qualifications, full coverage and denominators, deterministic safe HTML, PDF, preserved source JSON and SHA-256 export metadata. Output must be a new directory; HTML-only avoids the native renderer.
+- Report integration fixed a real dependency incompatibility: installed pydyf 0.12.1 lacked Stream.transform required by WeasyPrint 62.3. Pinned/installed pydyf==0.10.0; no other installed package consumes it. `.\.venv\Scripts\python.exe -m pip check`: no broken requirements. No GTK changes, no WeasyPrint replacement.
+- Final report tests: `.\.venv\Scripts\python.exe -m pytest tests/test_report.py -q --tb=short`: 76 passed in 4.85s (real PDF, full printed details, long-ID page bounds included). Final full suite with HF_HUB_OFFLINE=1 and TRANSFORMERS_OFFLINE=1: `.\.venv\Scripts\python.exe -m pytest -q`: 413 passed, one existing Starlette/AnyIO warning, 22.02s. `git diff --check`: passed. No source changes after those checks; only this checkpoint update.
+- Real saved-data acceptance: `.\.venv\Scripts\python.exe -u results/report_acceptance.py`: passed. Actual analysis CLI over results/full_20260909_135157 equals accepted schema-v2 JSON, then actual report CLI via stdin produces results/checkmate-final/{report.html,report.pdf,analysis.json,export_meta.json}. 46 PDF pages; 42 finding records and remediation plus 478 unique supporting/flip/review/diagnostic IDs verified in extracted PDF text. PDFium line-ending hyphens normalized only for extraction comparison; output unchanged. All six benchmark artifact hashes unchanged. Report remains 14 resolved / 14 remaining; no new endpoint benchmark run.
+- Final visual QA: `.\.venv\Scripts\python.exe -u results/report_visual_check.py results/checkmate-final results/report_visual_final`: passed. Desktop 1440px/mobile 390px, including all 93 details expanded: no overflow or broken anchors; 42 finding cards. PDF all-page character bounds pass, no blank pages. Inspected overview, outcome, finding and appendix pages; widened diagnostic-ID columns and moved detailed confidence evidence after findings. Final screenshots/contact sheet/check JSON in results/report_visual_final.
+- Verified the documented PowerShell UTF-8 analysis-to-report pipeline with --html-only into results/report-powershell-check; parsed JSON equals final source. Root README now contains endpoint/runner/analysis/report commands and explicit Python 3.11 environment creation.
+- Local QA files remain ignored: results/report_acceptance.py + .json, results/report_visual_check.py, results/report_tools (temporary pypdfium2 4.30.0), report_preview*, checkmate-report (earlier draft), report_visual_v*, report-powershell-check. Retain until review; final deliverable is results/checkmate-final and final preview is results/report_visual_final/desktop.png. Generated files must not enter Git.
+- Processes: all validation sessions completed. Stalled owned Chrome PID 22936 was stopped; revised software-rendered Edge checks exit normally and stop their browser. No endpoint servers launched for this task.
+- Next: Ahsan reviews HTML/PDF before the requested later commit/push to main. Implementation and testing are complete; no publication performed. On continuation inspect this branch/diff and preserve all generated evidence.
+
+## Previous analysis implementation checkpoint - Codex
 
 - Updated: 2026-09-09T20:50:11+04:00, Codex; main at 81aa53e.
 - Ahsan explicitly authorized implementing the review recommendations on Khalid's behalf and committing/pushing directly to main. This is the task-specific exception to analysis ownership and the feature-branch/PR rule. No teammate messages requested.

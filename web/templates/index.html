@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Team Checkmate: run a real live adversarial attack test against a hardened and unhardened AI endpoint.">
+  <title>Team Checkmate — Adversarial Input Red-Teaming Toolkit</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="masthead">
+    <a class="brand" href="/">
+      <img src="{{ logo_data_uri }}" alt="Team Checkmate" class="brand-logo">
+      <span>TEAM CHECKMATE</span>
+    </a>
+    {% if verified_full_available %}
+    <a class="button ghost" href="{{ verified_full_href }}" target="_blank" rel="noopener">
+      View Detailed Report <span aria-hidden="true">&#8599;</span>
+    </a>
+    {% endif %}
+  </header>
+
+  <main>
+    <section class="hero" id="welcome">
+      <p class="eyebrow">ADVERSARIAL INPUT RED-TEAMING TOOLKIT</p>
+      <h1>Robustness,<br><span>live.</span></h1>
+      <p class="deck">
+        We fire real adversarial and malformed inputs at the same emotion-classification
+        model twice: once against an unhardened endpoint (V1), once against the same model
+        behind application-layer hardening (V2). Nothing here is prerecorded -- clicking the
+        button below starts two real FastAPI endpoints inside this container and sends a
+        real subset of the attack suite at each of them, live.
+      </p>
+      <p class="model">Model: j-hartmann/emotion-english-distilroberta-base &middot; 7 emotion labels</p>
+      <div class="cta-row">
+        <button id="run-btn" class="button primary" type="button">Run Live Attack Test</button>
+        <p id="cta-note" class="caption">Takes under a minute. Runs entirely inside this container.</p>
+      </div>
+    </section>
+
+    <section id="progress-panel" class="panel progress-panel" hidden aria-live="polite">
+      <p class="eyebrow">LIVE RUN IN PROGRESS</p>
+      <h2 id="progress-message">Initializing toolkit</h2>
+      <div class="progress-bar"><div id="progress-fill" class="progress-fill" style="width: 0%;"></div></div>
+      <ol class="stage-list">
+        {% for stage in stage_order %}
+        <li data-stage="{{ stage }}">{{ stage_labels[stage] }}</li>
+        {% endfor %}
+      </ol>
+      <p id="progress-error" class="notice warning" hidden></p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>Team Checkmate &mdash; Adversarial Input Red-Teaming Toolkit</p>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

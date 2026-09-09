@@ -1,0 +1,666 @@
+"""Report interface, evidence semantics, safe HTML and actual PDF regressions."""
+
+import copy
+import hashlib
+from html.parser import HTMLParser
+import json
+from pathlib import Path
+import subprocess
+import sys
+
+import pytest
+
+from report import generate as report
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture
+def data():
+    summaries = {}
+    for version in ("v1", "v2"):
+        summaries[version] = {
+            "version": version,
+            "coverage": dict(planned=8, selected=8, completed=8, missing=0, skipped=0,
+                             limit_excluded=0, coverage_rate=1.0),
+            "category_stats": {c: dict(failed=0, eligible=1, failure_rate=0.0, review=0,
+                                      diagnostic=0, unevaluable=0) for c in report.CATEGORIES},
+            "operational": dict.fromkeys(report.OPERATIONS, 0),
+            "drift": {
+                "qualifying_flips": 0, "eligible_comparisons": 2, "flip_rate": 0.0,
+                "baseline_denominator": dict(eligible=2, total=2, excluded_below_threshold=0,
+                    excluded_baselines=[], no_prediction=[], statement="2 of 2 baselines eligible for flip scoring", threshold=0.6),
+                "confidence_change": dict(mean_delta_on_flips=None, per_flip=[]),
+                "excluded": {}, "unevaluable": {}, "flip_attack_ids": [],
+            },
+            "findings": [], "validity_tier_census": {}, "diagnostic_observations": [],
+            "review_cases": [], "limitations": ["Fixture limitation: no accuracy claim."],
+        }
+    result = dict(schema_version=2, summary_v1=summaries["v1"], summary_v2=summaries["v2"],
+        comparison=dict(fingerprints=dict(planned_match=True, manifest_match=True, whole_suite_comparable=True),
+                        coverage=dict(matched_count=8, v1_only_count=0, v2_only_count=0, unavailable_count=0,
+                                      v1_only=[], v2_only=[], unavailable=[]),
+                        limitations=["Fixture limitation: no accuracy claim."], finding_comparisons=[],
+                        new_finding_evidence=[], inconclusive_new_findings=[]))
+    sync(result)
+    return result
+
+
+def sync(data):
+    """Keep explicitly repeated schema fields synchronized in synthetic inputs."""
+    c = data["comparison"]
+    c["operational"], c["drift"], c["category_failure_rates"] = {}, {}, {}
+    for v in ("v1", "v2"):
+        s = data[f"summary_{v}"]
+        c["coverage"][v] = copy.deepcopy(s["coverage"])
+        c["operational"][v] = copy.deepcopy(s["operational"])
+        for k in ("qualifying_flips", "eligible_comparisons", "flip_rate"):
+            c["drift"][v + "_" + k] = s["drift"][k]
+        c["drift"][v + "_baseline_denominator"] = s["drift"]["baseline_denominator"]["statement"]
+        for category, stats in s["category_stats"].items():
+            c["category_failure_rates"].setdefault(category, {})[v] = dict(
+                failed=stats["failed"], eligible=stats["eligible"], rate=stats["failure_rate"])
+
+
+def finding(data, version="v1", *, subfamily="oversized", ids=("attack-one",), tiers=("GOLD",), score=70, tier="High"):
+    s = data[f"summary_{version}"]
+    item = dict(finding=dict(finding_id=f"F-{version}-{len(s['findings']) + 1}", title=f"{subfamily}: request failure",
+                            category="malformed", severity_score=score, severity_tier=tier,
+                            description="Measured request failure.", remediation="Validate input before inference.", evidence=list(ids)),
+                subfamily=subfamily, failure_mode="unhandled_5xx", affected_cases=len(ids), validity_tiers=list(tiers))
+    s["findings"].append(item)
+    for t in tiers:
+        s["validity_tier_census"][t] = s["validity_tier_census"].get(t, 0) + 1
+    return item
+
+
+def resolution(data, entry, status="resolved", remaining=(), unavailable=(), improved=None):
+    data["comparison"]["finding_comparisons"].append(dict(key=list(report.group_key(entry)), status=status,
+        remaining_ids=list(remaining), unavailable_ids=list(unavailable),
+        improved_ids=entry["finding"]["evidence"][:] if improved is None else list(improved)))
+
+
+def html(data, **kwargs):
+    return report.render_html(data, source_sha256="a" * 64, **kwargs)
+
+
+class Document(HTMLParser):
+    def __init__(self, text):
+        super().__init__()
+        self.ids, self.links, self.tags, self.text = [], [], [], []
+        self.feed(text)
+
+    def handle_starttag(self, tag, attrs):
+        self.tags.append(tag)
+        values = dict(attrs)
+        if "id" in values:
+            self.ids.append(values["id"])
+        if "href" in values:
+            self.links.append(values["href"])
+
+    def handle_data(self, value):
+        self.text.append(value)
+
+
+def test_report_renders_deterministically_without_mutating_input(data):
+    original = copy.deepcopy(data)
+    assert html(data) == html(data)
+    assert data == original
+    assert "No automatically scored finding groups" in html(data)
+
+
+def test_local_links_and_unique_anchors(data):
+    e = finding(data)
+    resolution(data, e)
+    doc = Document(html(data))
+    assert len(doc.ids) == len(set(doc.ids))
+    assert all(link[1:] in doc.ids for link in doc.links if link.startswith("#"))
+    assert {"report.pdf", "analysis.json", "export_meta.json"} <= set(doc.links)
+    assert not any(link.startswith(("http:", "https:", "file:")) for link in doc.links)
+
+
+def test_xss_and_template_syntax_are_plain_text(data):
+    payload = '<script>alert(1)</script><img src="file:///private">{{7*7}}'
+    e = finding(data, ids=(payload,))
+    e["finding"].update(title=payload, remediation=payload, description=payload, finding_id=payload)
+    resolution(data, e)
+    result = html(data)
+    assert payload not in result
+    assert "&lt;script&gt;" in result
+    assert "{{7*7}}" in result
+    assert "script" not in Document(result).tags
+    # The one legitimate <img> is the trusted, base64-embedded Team Checkmate logo (see
+    # report.generate._logo_data_uri) -- verify the untrusted payload did not inject an
+    # additional image (e.g. an exfiltration src) alongside it.
+    assert result.count("<img") == 1
+    assert 'src="data:image/png;base64,' in result
+    assert 'src="file:' not in result
+
+
+def test_withheld_reason_suppresses_even_stale_comparison_fields(data):
+    e = finding(data)
+    resolution(data, e)
+    data["comparison"]["comparison_withheld_reason"] = "Different input fingerprints."
+    # A stale legacy field cannot cause a comparison claim to appear.
+    data["comparison"]["findings_resolved"] = ["FABRICATED_CLAIM"]
+    output = html(data)
+    assert "Different input fingerprints." in output
+    for absent in ("Resolved groups", "Newly demonstrated groups", "Compatible inputs", "Failure rate by attack category", "FABRICATED_CLAIM"):
+        assert absent not in output
+    assert "V1 observations only" in output and "V2 observations only" in output
+
+
+def test_remaining_group_keeps_improved_and_inconclusive_case_qualifiers(data):
+    e = finding(data, ids=("old-improved", "old-unknown"))
+    finding(data, "v2", ids=("different-persistent-case",))
+    resolution(data, e, "remaining", remaining=("different-persistent-case",), unavailable=("old-unknown",), improved=("old-improved",))
+    output = html(data)
+    assert "1 remaining / 1 improved / 1 inconclusive" in output
+    for value in ("different-persistent-case", "old-unknown", "old-improved"):
+        assert value in output
+
+
+def test_unavailable_is_displayed_as_inconclusive(data):
+    e = finding(data)
+    resolution(data, e, "unavailable", unavailable=("attack-one",), improved=())
+    output = html(data)
+    assert '>Inconclusive</span>' in output
+    assert '>Unavailable</span>' not in output
+
+
+def test_mixed_demonstrated_and_inconclusive_new_group_counted_once(data):
+    e = finding(data, "v2", ids=("regression", "prior-unknown"))
+    data["comparison"]["new_finding_evidence"] = [dict(key=list(report.group_key(e)), regression_ids=["regression"])]
+    data["comparison"]["inconclusive_new_findings"] = [dict(key=list(report.group_key(e)), unavailable_ids=["prior-unknown"])]
+    output = html(data)
+    assert "there are 1 distinct groups" in output
+    assert "Demonstrated regression IDs" in output and "Unknown prior-state IDs" in output
+
+
+def test_mixed_gold_silver_evidence_is_qualified(data):
+    e = finding(data, tiers=("GOLD", "SILVER"))
+    resolution(data, e)
+    output = html(data)
+    assert "SILVER qualification." in output and "also contains GOLD evidence" in output
+    assert "GOLD 1" in output and "SILVER 1" in output
+
+
+@pytest.mark.parametrize("score,tier,display", [(59.999999,"Medium","<60"), (84.999999,"High","<85"),
+    (34.999999,"Low","<35"), (60,"High","60"), (59.8,"Medium","59.8"), (100,"Critical","100")])
+def test_severity_display_does_not_round_across_tier(score, tier, display):
+    assert report.score_display(dict(severity_score=score, severity_tier=tier)) == display
+
+
+def test_findings_sorted_by_supplied_tier_and_unrounded_score(data):
+    low = finding(data, subfamily="minor", score=20, tier="Low")
+    high = finding(data, subfamily="major", score=90, tier="Critical")
+    resolution(data, low)
+    resolution(data, high)
+    output = html(data)
+    assert output.index('major: request failure') < output.index('minor: request failure')
+
+
+def test_na_and_empty_coverage_are_explicit(data):
+    for v in ("v1", "v2"):
+        s = data[f"summary_{v}"]
+        s["coverage"] = dict.fromkeys(s["coverage"], 0)
+        s["category_stats"]["malformed"].update(eligible=0, failure_rate="N/A")
+        s["drift"].update(eligible_comparisons=0, flip_rate="N/A")
+    data["comparison"]["coverage"]["matched_count"] = 0
+    sync(data)
+    output = html(data)
+    assert "N/A" in output and "No cases planned." in output
+
+
+def test_partial_coverage_accepts_runner_six_decimal_rounding(data):
+    for version in ("v1", "v2"):
+        data[f"summary_{version}"]["coverage"].update(planned=9, selected=9, missing=1, coverage_rate=0.888889)
+    data["comparison"]["coverage"].update(unavailable_count=1, unavailable=["attack:missing"])
+    sync(data)
+    assert "Partial coverage." in html(data)
+    assert "8/9 (88.89%)" in html(data)
+
+
+def test_diagnostic_review_tier_mismatch_remains_visible_and_unscored(data):
+    data["summary_v1"]["diagnostic_observations"] = [dict(attack_id="punctuation-case", category="whitespace",
+        subfamily="repeated_punctuation", validity_tier="REVIEW", oracle="diagnostic_no_fixed_oracle", tier_differs_from_diagnostic=True)]
+    output = html(data)
+    assert "punctuation-case" in output and ">REVIEW</td><td>Yes</td>" in output
+    assert "No automatically scored finding groups" in output
+
+
+@pytest.mark.parametrize("raw", [b'{', b'\xff', b'{"schema_version":2,"schema_version":2}',
+                                   b'{"schema_version":NaN}', b'[]', b'null'])
+def test_invalid_json_rejected(raw):
+    with pytest.raises(ValueError):
+        report.parse_report(raw)
+
+
+@pytest.mark.parametrize("version", [1, 3, "2", True, 2.0, None])
+def test_unsupported_schema_rejected(data, version):
+    data["schema_version"] = version
+    with pytest.raises(ValueError, match="schema_version"):
+        html(data)
+
+
+@pytest.mark.parametrize("field", ["coverage", "category_stats", "operational", "drift", "findings", "limitations"])
+def test_missing_summary_fields_fail_clearly(data, field):
+    del data["summary_v1"][field]
+    with pytest.raises(ValueError, match=field):
+        html(data)
+
+
+@pytest.mark.parametrize("value", [True, -1, 1.5, "1", None])
+def test_invalid_counts_rejected(data, value):
+    data["summary_v1"]["operational"]["timeouts"] = value
+    sync(data)
+    with pytest.raises(ValueError, match="nonnegative integer"):
+        html(data)
+
+
+@pytest.mark.parametrize("value", [True, float('nan'), float('inf'), -0.1, 2, "0.0"])
+def test_invalid_rates_rejected(data, value):
+    data["summary_v1"]["category_stats"]["encoding"]["failure_rate"] = value
+    sync(data)
+    with pytest.raises(ValueError):
+        html(data)
+
+
+def test_rate_must_match_explicit_counts(data):
+    data["summary_v1"]["category_stats"]["encoding"]["failure_rate"] = 0.5
+    sync(data)
+    with pytest.raises(ValueError, match="rate does not match counts"):
+        html(data)
+
+
+def test_zero_denominator_cannot_be_reported_as_zero_percent(data):
+    data["summary_v1"]["category_stats"]["encoding"]["eligible"] = 0
+    sync(data)
+    with pytest.raises(ValueError, match="zero denominator"):
+        html(data)
+
+
+def test_incompatible_without_reason_rejected(data):
+    data["comparison"]["fingerprints"]["manifest_match"] = False
+    with pytest.raises(ValueError, match="withheld_reason"):
+        html(data)
+
+
+def test_mismatched_comparison_rates_rejected(data):
+    data["comparison"]["category_failure_rates"]["encoding"]["v2"]["failed"] = 1
+    with pytest.raises(ValueError, match="differs from version summary"):
+        html(data)
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda e: e["finding"].update(remediation=""),
+    lambda e: e.update(affected_cases=2),
+    lambda e: e.update(validity_tiers=["REVIEW"]),
+    lambda e: e["finding"].update(severity_tier="Unknown"),
+    lambda e: e["finding"].update(severity_score=float('nan')),
+    lambda e: e["finding"].update(evidence=["attack-one", "attack-one"]),
+])
+def test_invalid_findings_rejected(data, mutate):
+    e = finding(data)
+    resolution(data, e)
+    mutate(e)
+    with pytest.raises(ValueError):
+        html(data)
+
+
+def test_missing_structured_comparison_not_replaced_with_legacy_list(data):
+    finding(data)
+    data["comparison"]["findings_resolved"] = [["malformed", "oversized", "unhandled_5xx"]]
+    with pytest.raises(ValueError, match="missing V1 finding groups"):
+        html(data)
+
+
+def test_resolved_with_persistent_evidence_rejected(data):
+    e = finding(data)
+    finding(data, "v2")
+    resolution(data, e)
+    with pytest.raises(ValueError, match="evidence does not join"):
+        html(data)
+
+
+def test_overlapping_new_and_inconclusive_ids_rejected(data):
+    e = finding(data, "v2")
+    key = list(report.group_key(e))
+    data["comparison"].update(new_finding_evidence=[dict(key=key, regression_ids=["attack-one"])],
+                              inconclusive_new_findings=[dict(key=key, unavailable_ids=["attack-one"])])
+    with pytest.raises(ValueError, match="overlapping"):
+        html(data)
+
+
+def test_html_only_bundle_preserves_source_bytes_and_hashes(data, tmp_path, monkeypatch):
+    monkeypatch.setattr(report, "render_pdf", lambda _: pytest.fail("HTML-only attempted PDF generation"))
+    raw = b'\xef\xbb\xbf' + json.dumps(data, indent=4).encode()
+    out = tmp_path / "bundle"
+    report.generate_report(raw, out, html_only=True)
+    assert (out / "analysis.json").read_bytes() == raw
+    metadata = json.loads((out / "export_meta.json").read_text())
+    assert metadata["source_sha256"] == hashlib.sha256(raw).hexdigest()
+    for name, digest in metadata["files"].items():
+        assert hashlib.sha256((out / name).read_bytes()).hexdigest() == digest
+    assert "report.pdf" not in Document((out / "report.html").read_text(encoding="utf-8")).links
+
+
+def test_invalid_input_writes_nothing(tmp_path):
+    out = tmp_path / "new"
+    with pytest.raises(ValueError):
+        report.generate_report(b"{}", out)
+    assert not out.exists()
+
+
+def test_pdf_failure_writes_nothing(data, tmp_path, monkeypatch):
+    def fail(_):
+        raise RuntimeError("PDF failure")
+    monkeypatch.setattr(report, "render_pdf", fail)
+    out = tmp_path / "new"
+    with pytest.raises(RuntimeError):
+        report.generate_report(json.dumps(data).encode(), out)
+    assert not out.exists()
+
+
+def test_existing_output_preserved(data, tmp_path):
+    marker = tmp_path / "report.html"
+    marker.write_text("earlier evidence")
+    with pytest.raises(ValueError, match="already exists"):
+        report.generate_report(json.dumps(data).encode(), tmp_path)
+    assert marker.read_text() == "earlier evidence"
+
+
+def test_external_resource_fetch_blocked():
+    for url in ("https://example.com/font", "file:///private", "data:text/plain,abc"):
+        with pytest.raises(ValueError, match="disabled"):
+            report.deny_resource(url)
+
+
+def test_cli_file_and_stdin(data, tmp_path):
+    raw = json.dumps(data).encode()
+    source = tmp_path / "source.json"
+    source.write_bytes(raw)
+    for name, inp in (("file", str(source)), ("stdin", "-")):
+        cmd = [sys.executable, "-m", "report.generate", "--input", inp, "--out", str(tmp_path / name), "--html-only"]
+        result = subprocess.run(cmd, input=raw, capture_output=True, cwd=ROOT, timeout=30)
+        assert result.returncode == 0, result.stderr.decode()
+        assert (tmp_path / name / "report.html").exists()
+
+
+def test_cli_error_is_actionable_without_traceback(tmp_path):
+    cmd = [sys.executable, "-m", "report.generate", "--input", "-", "--out", str(tmp_path / "new")]
+    result = subprocess.run(cmd, input=b"{}", capture_output=True, cwd=ROOT, timeout=30)
+    assert result.returncode == 1
+    assert b"Report generation failed:" in result.stderr and b"Traceback" not in result.stderr
+
+
+def test_real_pdf_bundle_and_printed_evidence(data, tmp_path):
+    try:
+        from weasyprint import HTML
+    except (ImportError, OSError):
+        pytest.skip("Native PDF renderer unavailable on this machine")
+    e = finding(data, tiers=("SILVER",), ids=("unique-print-evidence-123",))
+    resolution(data, e)
+    result = html(data)
+    document = HTML(string=result, url_fetcher=report.deny_resource).render()
+    text = " ".join(box.text for page in document.pages for box in page._page_box.descendants() if hasattr(box, "text"))
+    assert "unique-print-evidence-123" in text  # Closed HTML details must print in full.
+    assert "SILVER qualification." in text and "Validate input before inference." in text
+    assert "2 of 2 baselines eligible" in text
+    out = tmp_path / "pdf"
+    report.generate_report(json.dumps(data).encode(), out)
+    assert (out / "report.pdf").read_bytes().startswith(b"%PDF-")
+    assert (out / "report.pdf").stat().st_size > 5000
+
+
+def test_renderer_has_no_cross_component_imports():
+    import ast
+    tree = ast.parse(ROOT.joinpath("report/generate.py").read_text(encoding="utf-8"))
+    forbidden = {"attacks", "analysis", "baseline", "runner", "endpoint"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            assert not any(a.name.split(".")[0] in forbidden for a in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            assert (node.module or "").split(".")[0] not in forbidden
+
+
+# --------------------------------------------------------------------------------------
+# demo mode: short single-page judge-facing report, presentation only (see run_all.py
+# for how demo_evidence and mode are actually produced from a live run).
+# --------------------------------------------------------------------------------------
+
+
+def demo_evidence_fixture():
+    return {
+        "literal_crash_case_available": False,
+        "crash_status_note": "No request in this run caused observed service unavailability.",
+        "notes": [],
+        "featured_failure": {
+            "attack_id": "malformed.oversized_100kb", "category": "malformed", "subfamily": "oversized_100kb",
+            "failure_mode": "unhandled_5xx", "failure_label": "unhandled server error",
+            "input_description": "malformed/oversized_100kb", "payload_bytes": 102400, "preview": "A" * 50,
+            "v1": dict(status_code=500, outcome="Unhandled server error", error=None, latency_ms=53.9,
+                      latency_band="normal", endpoint_alive_after=True),
+            "v2": dict(status_code=422, outcome="Rejected safely", error=None, latency_ms=59.1,
+                      latency_band="normal", endpoint_alive_after=True),
+            "technical_interpretation": "Unhandled 5xx but the service stayed available; not a process crash.",
+            "remediation": "Reject requests above a defined body/input size limit before inference begins.",
+        },
+        "featured_prediction_flip": {
+            "attack_id": "dataset-sadness-3.encoding.homoglyph.leading.d1", "baseline_id": "dataset-sadness-3",
+            "category": "encoding", "subfamily": "homoglyph", "validity_tiers": ["SILVER"],
+            "original_text": "i feel depressed", "attacked_text": "і feel depressed",
+            "original_html": 'i feel depressed',
+            "attacked_html": '<mark class="demo-mark">і</mark> feel depressed',
+            "modification": "position 0: 'i' (U+0069 LATIN SMALL LETTER I) -> 'і' (U+0456 CYRILLIC SMALL LETTER I)",
+            "original_label": "sadness", "original_confidence": 0.99, "attacked_label": "fear",
+            "attacked_confidence": 0.28, "confidence_change": -0.71, "v2_still_flipped": True,
+            "v1": dict(status_code=200, outcome="Accepted", error=None, latency_ms=20.2,
+                      latency_band="normal", endpoint_alive_after=True),
+            "v2": dict(status_code=200, outcome="Accepted", error=None, latency_ms=16.7,
+                      latency_band="normal", endpoint_alive_after=True),
+            "remediation": "Model-level robustness gap; needs adversarial training data augmentation.",
+        },
+    }
+
+
+@pytest.fixture
+def demo_data(data):
+    # Round numbers, not the real 163/1928 -- schema validation requires the unavailable
+    # list to be fully enumerated (len == count), and the point here is testing that the
+    # demo template shows the COUNT without enumerating it, not reproducing a real run.
+    for version in ("v1", "v2"):
+        s = data[f"summary_{version}"]
+        s["coverage"].update(planned=20, completed=15, selected=15, limit_excluded=5, coverage_rate=0.75)
+    data["comparison"]["coverage"]["v1"] = copy.deepcopy(data["summary_v1"]["coverage"])
+    data["comparison"]["coverage"]["v2"] = copy.deepcopy(data["summary_v2"]["coverage"])
+    hidden_ids = [f"hidden-excluded-attack-{i}" for i in range(5)]
+    data["comparison"]["coverage"].update(matched_count=15, unavailable=hidden_ids, unavailable_count=5)
+    data["demo_evidence"] = demo_evidence_fixture()
+    return data
+
+
+def test_demo_mode_is_a_single_page_without_finding_register(demo_data):
+    e = finding(demo_data, tiers=("SILVER",), ids=("attack-one",))
+    resolution(demo_data, e)
+    result = html(demo_data, mode="demo")
+    assert "<article class=\"finding\"" not in result
+    assert 'class="finding-index"' not in result
+    assert 'id="findings"' not in result
+    assert "LIVE DEMO RUN" in result
+    assert "15 of 20 planned cases executed" in result  # actual fixture values, not hardcoded in the template
+
+
+def test_demo_mode_nav_omits_findings_link(demo_data):
+    result = html(demo_data, mode="demo")
+    doc = Document(result)
+    nav_start = result.index("<nav")
+    nav_html = result[nav_start:result.index("</nav>", nav_start)]
+    assert "Findings" not in nav_html
+    assert "Demo" in nav_html and "Results" in nav_html and "Method" in nav_html
+
+
+def test_demo_mode_highlights_unicode_change_and_omits_id_listing(demo_data):
+    result = html(demo_data, mode="demo")
+    assert '<mark class="demo-mark">і</mark>' in result  # pre-escaped by run_all.py, rendered via |safe
+    assert "Excluded by demo limit: 5 cases" in result
+    assert "hidden-excluded-attack-0" not in result  # counts only, never the enumerated ID list in demo mode
+
+
+def test_full_mode_still_renders_finding_register(demo_data):
+    e = finding(demo_data, tiers=("SILVER",), ids=("attack-one",))
+    resolution(demo_data, e)
+    result = html(demo_data, mode="full")
+    assert "<article class=\"finding\"" in result
+    assert "Findings" in result[result.index("<nav"):result.index("</nav>")]
+
+
+def test_render_html_rejects_unknown_mode(demo_data):
+    with pytest.raises(ValueError, match="mode"):
+        html(demo_data, mode="ultra")
+
+
+def test_generate_report_demo_pdf_substantially_shorter_than_full(demo_data, tmp_path):
+    try:
+        from weasyprint import HTML
+    except (ImportError, OSError):
+        pytest.skip("Native PDF renderer unavailable on this machine")
+    e = finding(demo_data, tiers=("SILVER",), ids=("attack-one",))
+    resolution(demo_data, e)
+    raw = json.dumps(demo_data).encode()
+    report.generate_report(raw, tmp_path / "full", mode="full")
+    report.generate_report(raw, tmp_path / "demo", mode="demo")
+    full_pages = len(HTML(string=(tmp_path / "full" / "report.html").read_text(encoding="utf-8")).render().pages)
+    demo_pages = len(HTML(string=(tmp_path / "demo" / "report.html").read_text(encoding="utf-8")).render().pages)
+    assert demo_pages < full_pages
+    assert demo_pages <= 6
+
+
+# --------------------------------------------------------------------------------------
+# V3: real logo, sticky navbar, de-emphasized crash note, portable detailed-report link.
+# --------------------------------------------------------------------------------------
+
+
+def test_real_logo_is_embedded_and_placeholder_removed(demo_data):
+    for mode in ("full", "demo"):
+        result = html(demo_data, mode=mode)
+        assert 'src="data:image/png;base64,' in result
+        assert 'class="brand-logo"' in result
+        assert 'class="mark"' not in result  # old "C." placeholder no longer used as branding
+
+
+def test_missing_logo_asset_stops_report_generation(demo_data, monkeypatch, tmp_path):
+    fake_path = tmp_path / "does-not-exist.png"
+    monkeypatch.setattr(report, "LOGO_PATH", fake_path)
+    report._logo_data_uri.cache_clear()
+    try:
+        with pytest.raises(RuntimeError, match="logo"):
+            html(demo_data)
+    finally:
+        report._logo_data_uri.cache_clear()  # restore the real logo for every other test
+
+
+def test_masthead_is_sticky_with_scroll_offset_and_static_in_print():
+    css = report.HERE.joinpath("style.css").read_text(encoding="utf-8")
+    assert "position: sticky" in css and "top: 0" in css
+    assert "scroll-padding-top:" in css.split("@media print", 1)[0]
+    print_css = css.split("@media print", 1)[1]
+    assert ".masthead { position: static" in print_css
+
+
+def test_demo_hero_wording_removes_unverified_timing_promise(demo_data):
+    result = html(demo_data, mode="demo")
+    assert "live.</span>" in result
+    assert "in one minute" not in result
+    assert "real run against the actual endpoints" in result
+
+
+def test_demo_crash_note_is_a_small_caption_not_a_warning_box(demo_data):
+    result = html(demo_data, mode="demo")
+    assert "Literal crash/unavailability demonstrated" not in result
+    assert '<p class="caption crash-note">No request in this run caused observed service unavailability.</p>' in result
+    # It renders as a caption, not inside a prominent .notice.warning box.
+    note_start = result.index('<p class="caption crash-note">')
+    assert '<p class="notice warning">' not in result[max(0, note_start - 200):note_start]
+
+
+def test_demo_missing_examples_still_render_as_prominent_warnings(demo_data):
+    demo_data["demo_evidence"]["featured_failure"] = None
+    demo_data["demo_evidence"]["notes"] = ["No unhandled server error, timeout, connection failure, "
+                                           "or service-unavailability finding was found in this run."]
+    result = html(demo_data, mode="demo")
+    assert '<p class="notice warning">No unhandled server error' in result
+
+
+def test_demo_view_detailed_report_link_when_available(demo_data):
+    demo_data["detailed_report"] = {"available": True, "relative_href": "detailed/report.html"}
+    result = html(demo_data, mode="demo")
+    downloads = result[result.index('class="downloads"'):result.index("</header>")]
+    assert 'href="detailed/report.html"' in downloads
+    assert 'target="_blank"' in downloads
+    assert "View Detailed Report" in downloads
+    assert "Download PDF" not in downloads
+
+
+def test_demo_omits_detailed_report_link_when_unavailable(demo_data):
+    demo_data["detailed_report"] = {"available": False, "relative_href": ""}
+    result = html(demo_data, mode="demo")
+    downloads = result[result.index('class="downloads"'):result.index("</header>")]
+    assert "View Detailed Report" not in downloads
+    assert "Source JSON" in downloads  # still available regardless
+
+
+def test_group_key_allows_equal_category_and_subfamily(data):
+    e = finding(data, subfamily="malformed")
+    resolution(data, e)
+    assert "malformed: request failure" in html(data)
+
+
+def test_all_positive_v2_evidence_must_be_preserved(data):
+    e = finding(data)
+    finding(data, "v2", ids=("attack-one", "new-persistent-case"))
+    resolution(data, e, "remaining", remaining=("attack-one",), improved=())
+    with pytest.raises(ValueError, match="evidence does not join"):
+        html(data)
+
+
+def test_comparison_coverage_cannot_invent_matched_cases(data):
+    data["comparison"]["coverage"]["matched_count"] = 9
+    with pytest.raises(ValueError, match="completed coverage"):
+        html(data)
+
+
+def test_document_stylesheet_is_not_html_escaped(data):
+    text = html(data)
+    css = text.split("<style>", 1)[1].split("</style>", 1)[0]
+    assert '"Segoe UI"' in css and ".two-up > .panel" in css
+    assert "&#34;" not in css and "&gt;" not in css
+
+
+def test_appendix_follows_findings_in_reading_order(data):
+    text = html(data)
+    assert text.index('id="findings"') < text.index('id="appendix"') < text.index('id="v1-audit"')
+
+
+def test_operational_categories_preserve_error_health_separation(data):
+    for v in ("v1", "v2"):
+        data[f"summary_{v}"]["operational"].update(unhandled_5xx=2, timeouts=3, connection_failures=4, service_unavailable=5)
+    sync(data)
+    text = html(data)
+    for label, n in (("Unhandled HTTP 5xx", 2), ("Request timeouts", 3), ("Connection failures", 4), ("Failed health checks", 5)):
+        assert f'{label}</th><td>{n}</td><td>{n}</td>' in text
+
+
+def test_long_unbroken_evidence_stays_on_pdf_page(data):
+    try:
+        from weasyprint import HTML
+    except (ImportError, OSError):
+        pytest.skip("Native PDF renderer unavailable on this machine")
+    e = finding(data, ids=("case-" + "X" * 300,))
+    resolution(data, e)
+    document = HTML(string=html(data), url_fetcher=report.deny_resource).render()
+    for page in document.pages:
+        for box in page._page_box.descendants():
+            if hasattr(box, "text") and box.text.strip():
+                assert box.position_x >= 0
+                assert box.position_x + box.width <= page.width + 1, box.text

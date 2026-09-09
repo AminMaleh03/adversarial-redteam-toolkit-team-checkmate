@@ -1,0 +1,22 @@
+<h4>Category eligibility</h4>
+<table class="compact"><thead><tr><th>Category</th><th>Failed / eligible</th><th>Rate</th><th>Review</th><th>Diagnostic</th><th>Unevaluable</th></tr></thead><tbody>
+{% for category in categories %}{% set r = s.category_stats[category] %}<tr><th scope="row">{{ category|capitalize }}</th><td>{{ r.failed }} / {{ r.eligible }}</td><td>{{ r.failure_rate|percent }}</td><td>{{ r.review }}</td><td>{{ r.diagnostic }}</td><td>{{ r.unevaluable }}</td></tr>{% endfor %}
+</tbody></table>
+<h4>Baselines below the confidence threshold</h4>
+{% if s.drift.baseline_denominator.excluded_baselines %}
+<table class="compact baseline-table"><thead><tr><th>Baseline ID</th><th>Clean confidence</th></tr></thead><tbody>
+{% for b in s.drift.baseline_denominator.excluded_baselines %}<tr><td><code>{{ b.baseline_id }}</code></td><td>{{ '%.4f'|format(b.clean_confidence) }}</td></tr>{% endfor %}
+</tbody></table>
+{% else %}<p>None recorded.</p>{% endif %}
+{{ ids('Baselines without usable predictions', s.drift.baseline_denominator.no_prediction) }}
+<h4>Drift exclusions and unavailable evidence</h4>
+<dl class="facts">
+{% for key, value in s.drift.excluded.items() %}<div><dt>Excluded · {{ key|label }}</dt><dd>{{ value }}</dd></div>{% endfor %}
+{% for key, value in s.drift.unevaluable.items() %}<div><dt>Unevaluable · {{ key|label }}</dt><dd>{{ value }}</dd></div>{% endfor %}
+</dl>
+{% if s.drift.confidence_change.per_flip %}
+<details class="evidence"><summary>Per-flip confidence evidence · {{ s.drift.confidence_change.per_flip|length }} cases</summary>
+<table class="compact confidence-table"><thead><tr><th>Attack ID</th><th>Clean</th><th>Attacked</th><th>Delta</th></tr></thead><tbody>
+{% for item in s.drift.confidence_change.per_flip %}<tr><td><code>{{ item.attack_id }}</code></td><td>{{ '%.4f'|format(item.clean_confidence) }}</td><td>{{ '%.4f'|format(item.attacked_confidence) }}</td><td>{{ item.delta|delta }}</td></tr>{% endfor %}
+</tbody></table></details>
+{% endif %}

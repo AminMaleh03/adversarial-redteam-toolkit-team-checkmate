@@ -1,2 +1,145 @@
-<!-- Jinja2 template for the robustness report: summary, findings by severity, V1 vs V2 comparison. -->
-<!-- TODO(Ahsan): build the report template. -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+  <meta name="description" content="Team Checkmate: evidence-led comparison of V1 and V2 inference endpoint robustness.">
+  <title>Robustness report | Team Checkmate</title>
+  {# Only the repository-owned stylesheet is trusted; all analysis values stay escaped. #}
+  <style>{{ css|safe }}</style>
+</head>
+<body>
+{% macro ids(label, values) -%}
+  {% if values %}<details class="evidence"><summary>{{ label }} · {{ values|length }} case{% if values|length != 1 %}s{% endif %}</summary>
+  <div class="id-list">{% for value in values %}<code>{{ value }}</code>{% endfor %}</div></details>{% endif %}
+{%- endmacro %}
+{% macro coverage_line() -%}
+<p class="coverage-line">Recorded coverage · {% for s in versions %}{{ s.version|upper }} {{ s.coverage.completed }}/{{ s.coverage.planned }} ({{ s.coverage.coverage_rate|percent }}){% if not loop.last %} · {% endif %}{% endfor %}</p>
+{%- endmacro %}
+<header class="masthead">
+  <a class="brand" href="#overview"><img src="{{ logo_data_uri }}" alt="Team Checkmate" class="brand-logo"> TEAM CHECKMATE</a>
+  <nav aria-label="Report sections"><a href="#results">Results</a><a href="#findings">Findings</a><a href="#method">Method</a></nav>
+  <div class="downloads"><a href="analysis.json" download>Source JSON</a>{% if include_pdf %}<a class="button" href="report.pdf" download>Download PDF <span aria-hidden="true">↓</span></a>{% endif %}</div>
+</header>
+<main>
+  <section class="hero" id="overview">
+    <p class="eyebrow">ADVERSARIAL RED-TEAMING TOOLKIT / ROBUSTNESS REPORT</p>
+    <h1>Robustness<br><span>under pressure.</span></h1>
+    <p class="deck">A measured assessment of an emotion classifier before and after application-layer hardening.</p>
+    <div class="hero-meta"><span>V1 / Unhardened</span><span>V2 / Four defenses</span><span>Analysis schema 2</span></div>
+    <p class="model">Model: j-hartmann/emotion-english-distilroberta-base · 7 emotion labels</p>
+  </section>
+
+  {% if withheld %}
+  <aside class="notice warning" role="note"><p class="eyebrow">COMPARISON WITHHELD</p><h2>These runs cannot support a before/after conclusion.</h2><p>{{ withheld }}</p>
+  <p>Each version's observations are reported independently below. No resolution or regression conclusions are displayed.</p>{{ coverage_line() }}</aside>
+  {% else %}
+  <section class="verdict" aria-label="Finding comparison summary">
+    <div class="verdict-heading"><div><p class="eyebrow">THE COMPARISON</p><h2>What changed after hardening?</h2></div><span class="badge compatible">Compatible inputs</span></div>
+    {{ coverage_line() }}
+    <div class="metrics">
+      <div class="metric"><strong>{{ counts.resolved }}</strong><span>Resolved groups</span><small>Original evidence no longer shows that failure mode.</small></div>
+      <div class="metric"><strong>{{ counts.remaining }}</strong><span>Remaining groups</span><small>Positive evidence of the same weakness in V2.</small></div>
+      <div class="metric"><strong>{{ counts.unavailable }}</strong><span>Inconclusive V1 groups</span><small>Insufficient evidence to establish resolution.</small></div>
+      <div class="metric"><strong>{{ counts.new }}</strong><span>Newly demonstrated groups</span><small>Usable V1 evidence establishes a V2 regression.</small></div>
+    </div>
+    {% if counts.inconclusive_new %}<p class="notice warning">{{ counts.inconclusive_new }} V2 group(s) also have evidence with an unknown prior state. Across demonstrated and inconclusive new evidence there are {{ counts.new_groups }} distinct groups; these counts can overlap.</p>{% endif %}
+    <p class="caption">Groups are category × subfamily × failure mode. Counts describe weaknesses, not individual requests or overall security.</p>
+  </section>
+  {% endif %}
+
+  <section id="results" class="report-section">
+    <div class="section-heading"><span class="section-number">01</span><div><p class="eyebrow">MEASURED OUTCOMES</p><h2>Where the pressure landed.</h2></div></div>
+    {% if not withheld %}
+    {{ coverage_line() }}
+    <div class="panel"><div class="panel-heading"><h3>Failure rate by attack category</h3><div class="legend"><span class="v1-dot">V1</span><span class="v2-dot">V2</span></div></div>
+      <p class="caption">Failed / eligible automatically scored attacks. Each attack counts once per category, even if it triggers several failure modes. Rates reflect this suite's composition.</p>
+      <table class="category-table"><caption class="sr-only">V1 and V2 category failure rates</caption><thead><tr><th scope="col">Category</th><th scope="col">V1 · Unhardened</th><th scope="col">V2 · Hardened</th></tr></thead><tbody>
+      {% for category in categories %}<tr><th scope="row">{{ category|capitalize }}</th>{% for v in ['v1', 'v2'] %}{% set r = comparison.category_failure_rates[category][v] %}
+        <td><div class="rate-label"><strong>{{ r.rate|percent }}</strong><span>{{ r.failed }} / {{ r.eligible }}</span></div><div class="bar-track" aria-hidden="true"><div class="bar {{ v }}" style="width: {{ 0 if r.rate == 'N/A' else r.rate * 100 }}%"></div></div></td>{% endfor %}</tr>{% endfor %}
+      </tbody></table>
+    </div>
+    <div class="panel"><h3>Operational observations</h3><p class="caption">Scored attacks only. A request error, timeout, and failed health check are separate observations and can overlap.</p>
+      <table><caption class="sr-only">Operational observations by version</caption><thead><tr><th scope="col">Outcome</th><th scope="col">V1</th><th scope="col">V2</th></tr></thead><tbody>
+      {% for key, label in operations.items() %}<tr><th scope="row">{{ label }}</th><td>{{ comparison.operational.v1[key] }}</td><td>{{ comparison.operational.v2[key] }}</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+    {% endif %}
+
+    {% for s in versions %}
+    <article class="version-section" id="{{ s.version }}-observations">
+      <h3><span class="badge {{ s.version }}">{{ s.version|upper }}</span> {{ 'Unhardened endpoint' if s.version == 'v1' else 'Hardened endpoint' }}</h3>
+      <div class="two-up">
+      <div class="panel coverage-panel"><p class="eyebrow">RECORDED COVERAGE</p><p class="big-stat">{{ s.coverage.completed }}<span> / {{ s.coverage.planned }}</span></p><p>{{ s.coverage.coverage_rate|percent }} of planned cases recorded</p>
+        <dl class="facts"><div><dt>Selected</dt><dd>{{ s.coverage.selected }}</dd></div><div><dt>Missing selected cases</dt><dd>{{ s.coverage.missing }}</dd></div><div><dt>Skipped</dt><dd>{{ s.coverage.skipped }}</dd></div><div><dt>Excluded by limit</dt><dd>{{ s.coverage.limit_excluded }}</dd></div></dl>
+        {% if s.coverage.completed != s.coverage.planned or s.coverage.planned == 0 %}<p class="notice warning">{% if s.coverage.planned == 0 %}No cases planned.{% else %}Partial coverage.{% endif %} An unobserved case cannot demonstrate a fix.</p>{% endif %}
+      </div>
+      <div class="panel drift-panel"><p class="eyebrow">QUALIFYING PREDICTION FLIPS</p><p class="big-stat">{{ s.drift.flip_rate|percent }}</p><p>{{ s.drift.qualifying_flips }} / {{ s.drift.eligible_comparisons }} eligible prediction pairs</p>
+        <p class="denominator">{{ s.drift.baseline_denominator.eligible }} of {{ s.drift.baseline_denominator.total }} baselines eligible for flip scoring</p>
+        <p class="caption">Top label changed and clean confidence ≥ {{ s.drift.baseline_denominator.threshold }}. Each version uses its own clean prediction.</p>
+        <p class="caption">Mean confidence change on qualifying flips: {{ s.drift.confidence_change.mean_delta_on_flips|delta }} (probability units; not accuracy).</p>
+      </div></div>
+      {% if withheld %}<div class="panel"><h4>{{ s.version|upper }} observations only</h4><table><thead><tr><th scope="col">Outcome</th><th scope="col">Count</th></tr></thead><tbody>{% for key, label in operations.items() %}<tr><th scope="row">{{ label }}</th><td>{{ s.operational[key] }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+      <p class="caption"><a href="#{{ s.version }}-audit">View {{ s.version|upper }} denominators, exclusions and per-flip evidence in the appendix ↓</a></p>
+    </article>
+    {% endfor %}
+    <details class="audit-details"><summary>Unmatched case coverage</summary><p>{{ comparison.coverage.matched_count }} matched recorded cases. {{ comparison.coverage.v1_only_count }} V1-only; {{ comparison.coverage.v2_only_count }} V2-only; {{ comparison.coverage.unavailable_count }} unavailable.</p>
+    {{ ids('V1-only case IDs', comparison.coverage.v1_only) }}{{ ids('V2-only case IDs', comparison.coverage.v2_only) }}{{ ids('Unavailable case IDs', comparison.coverage.unavailable) }}</details>
+  </section>
+
+  <section id="findings" class="report-section">
+    <div class="section-heading"><span class="section-number">02</span><div><p class="eyebrow">FINDINGS & REMEDIATION</p><h2>The evidence behind each weakness.</h2></div></div>
+    {% if not withheld %}{{ coverage_line() }}{% endif %}
+    <p class="section-intro">Findings are ordered by the supplied severity tier and score. Severity uses the strongest supporting instance; affected-case counts describe reproducibility. A resolved group concerns one failure mode only.</p>
+    {% for s in versions %}
+    <h3 class="version-title">{{ s.version|upper }} finding register <span>{{ s.entries|length }} groups</span></h3>
+    <nav class="finding-index" aria-label="{{ s.version|upper }} finding index">{% for e in s.entries %}<a href="#{{ e.anchor }}">{{ e.finding.finding_id }} · {{ e.finding.category }}/{{ e.subfamily }} · {{ e.failure_mode|label }}</a>{% endfor %}</nav>
+    {% if not s.entries %}<p class="notice">No automatically scored finding groups were emitted for {{ s.version|upper }}. Interpret this with the coverage and exclusions above.</p>{% endif %}
+    {% for e in s.entries %}{% set f = e.finding %}
+    <article class="finding" id="{{ e.anchor }}">
+      <div class="finding-top"><span class="finding-id">{{ f.finding_id }}</span><span class="badge severity-{{ f.severity_tier|lower }}">{{ f.severity_tier }} · {{ f|score }}/100</span>
+      {% if e.comparison %}<span class="badge status-{{ e.comparison.status }}">{{ 'Inconclusive' if e.comparison.status == 'unavailable' else e.comparison.status|capitalize }}</span>{% endif %}
+      {% if e.new %}<span class="badge status-new">Newly demonstrated</span>{% endif %}{% if e.inconclusive_new %}<span class="badge status-unavailable">Prior state inconclusive</span>{% endif %}</div>
+      <h4>{{ f.title }}</h4><p class="finding-tags">{{ f.category|capitalize }} / {{ e.subfamily }} · {{ e.failure_mode|label }} · {{ e.affected_cases }} affected case{% if e.affected_cases != 1 %}s{% endif %} · {{ e.validity_tiers|join(' + ') }}</p>
+      <p>{{ f.description }}</p>
+      {% if 'SILVER' in e.validity_tiers %}<p class="qualification"><strong>SILVER qualification.</strong> Mechanically justified evidence; semantic equivalence has not been individually hand-verified. Treat meaning-preservation claims with this limitation{% if 'GOLD' in e.validity_tiers %}; this group also contains GOLD evidence{% endif %}.</p>{% endif %}
+      <div class="remediation"><h5>Recommended remediation</h5><p>{{ f.remediation }}</p></div>
+      {{ ids('Supporting attack IDs · ' ~ s.version|upper, f.evidence) }}
+      {% if e.comparison %}<div class="case-comparison"><p class="caption">V1 → V2 evidence · {{ e.comparison.remaining_ids|length }} remaining / {{ e.comparison.improved_ids|length }} improved / {{ e.comparison.unavailable_ids|length }} inconclusive. Improved cases concern this failure mode only.</p>
+      {{ ids('Remaining on V2', e.comparison.remaining_ids) }}{{ ids('Improved original cases', e.comparison.improved_ids) }}{{ ids('Inconclusive original cases', e.comparison.unavailable_ids) }}</div>{% endif %}
+      {% if e.new %}{{ ids('Demonstrated regression IDs', e.new.regression_ids) }}{% endif %}
+      {% if e.inconclusive_new %}{{ ids('Unknown prior-state IDs', e.inconclusive_new.unavailable_ids) }}{% endif %}
+    </article>{% endfor %}{% endfor %}
+  </section>
+
+  <section id="method" class="report-section">
+    <div class="section-heading"><span class="section-number">03</span><div><p class="eyebrow">METHOD & LIMITS</p><h2>Read the result in context.</h2></div></div>
+    <div class="pipeline" aria-label="System data flow"><span>Clean baseline</span><span>Attack library</span><span>V1 / V2 runner</span><span>Manifest + results</span><span>Analysis</span><span>This report</span></div>
+    <div class="panel"><h3>Four defenses, one shared model</h3><ol class="defenses"><li><strong>Length validation.</strong> Reject sequences over the model's limit before inference.</li><li><strong>Strict request types.</strong> Reject wrong types and unexpected fields.</li><li><strong>Scoped exception handling.</strong> Contain unexpected errors while preserving validation responses.</li><li><strong>Unicode and whitespace cleanup.</strong> Normalize text before inference.</li></ol><p>No model retraining; no silent truncation. Prediction timeout: 10 seconds. Latency bands: under 2 seconds normal, 2 seconds up to the deadline slow, deadline reached timeout.</p></div>
+    <div class="panel"><h3>Interpretation limits</h3><ul class="limitations">{% for note in limitations %}<li>{{ note }}</li>{% endfor %}
+      <li>Category failure rates and prediction-flip rates use different eligible denominators. A zero denominator is displayed as N/A.</li>
+      <li>Manifest and suite compatibility are supplied by analysis. The report validates the JSON interface; it does not independently replay requests or prove when the manifest was registered.</li>
+      <li>Timeouts establish that the request deadline was reached. These artifacts do not identify which server processing stage caused the delay.</li>
+      <li>Leak detection is based on signatures and does not establish the absence of all possible information leaks.</li></ul></div>
+  </section>
+  <section id="appendix" class="report-section">
+    <div class="section-heading"><span class="section-number">04</span><div><p class="eyebrow">AUDIT APPENDIX</p><h2>Trace every qualification.</h2></div></div>
+    <p class="section-intro">Expand sections in the browser to inspect case-level evidence. The PDF prints the complete appendix.</p>
+    {% for s in versions %}
+    <details class="audit-details" id="{{ s.version }}-audit"><summary>{{ s.version|upper }} denominators, exclusions and confidence evidence</summary>
+      {% include 'audit.html' %}
+    </details>
+    <details class="audit-details"><summary>{{ s.version|upper }} evidence validity and unscored observations</summary>
+      <p>Finding groups by validity tier: {% for tier, n in s.validity_tier_census.items() %}{{ tier }} {{ n }}{% if not loop.last %} · {% endif %}{% else %}none{% endfor %}. Mixed-tier groups contribute to each applicable tier; these are group counts.</p>
+      <h4>Review queue · {{ s.review_cases|length }} cases</h4><p>Unresolved REVIEW cases are excluded from automatic vulnerability scoring.</p>
+      {% if s.review_cases %}<div class="id-list">{% for item in s.review_cases %}<code>{{ item.attack_id }}</code>{% endfor %}</div>{% endif %}
+      <h4>Diagnostic observations · {{ s.diagnostic_observations|length }} cases</h4><p>Diagnostic oracles are unscored regardless of their recognized validity tier. Tier differences are preserved below.</p>
+      {% if s.diagnostic_observations %}<table class="compact diagnostic-table"><thead><tr><th>Attack ID</th><th>Tier</th><th>Tier differs from diagnostic</th></tr></thead><tbody>{% for item in s.diagnostic_observations %}<tr><td><code>{{ item.attack_id }}</code></td><td>{{ item.validity_tier }}</td><td>{{ 'Yes' if item.tier_differs_from_diagnostic else 'No' }}</td></tr>{% endfor %}</tbody></table>{% endif %}
+    </details>{% endfor %}
+    <div class="provenance"><h3>Evidence bundle</h3><p>This report is a view of the preserved <a href="analysis.json">analysis.json</a>. The <a href="export_meta.json">export metadata</a> records SHA-256 hashes of the source and generated files. Keep the original benchmark results, manifests and run metadata with your project evidence.</p><p class="caption">Source SHA-256</p><code class="hash">{{ source_sha256 }}</code><p class="caption">Analysis schema 2 · Report format 1 · Team Checkmate</p></div>
+  </section>
+</main>
+<footer><span>TEAM CHECKMATE / ADVERSARIAL RED-TEAMING TOOLKIT</span><a href="#overview">Back to overview ↑</a></footer>
+</body>
+</html>

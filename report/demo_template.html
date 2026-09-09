@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+  <meta name="description" content="Team Checkmate: live demo run -- one concrete failure and one concrete prediction flip.">
+  <title>Demo report | Team Checkmate</title>
+  {# Only the repository-owned stylesheet is trusted; all analysis values stay escaped
+     except demo_evidence.*_html, which run_all.py pre-escapes itself (see highlight_diff_html). #}
+  <style>{{ css|safe }}</style>
+</head>
+<body>
+{% macro demo_coverage_line() -%}
+<p class="coverage-line">{% for s in versions %}{{ s.version|upper }} {{ s.coverage.completed }}/{{ s.coverage.planned }} ({{ s.coverage.coverage_rate|percent }}){% if not loop.last %} · {% endif %}{% endfor %}</p>
+{%- endmacro %}
+<header class="masthead">
+  <a class="brand" href="#top"><img src="{{ logo_data_uri }}" alt="Team Checkmate" class="brand-logo"> TEAM CHECKMATE / DEMO</a>
+  <nav aria-label="Demo report sections"><a href="#demo-highlights">Demo</a><a href="#results">Results</a><a href="#method">Method</a></nav>
+  <div class="downloads"><a href="analysis.json" download>Source JSON</a>{% if detailed_report and detailed_report.available %}<a class="button" href="{{ detailed_report.relative_href }}" target="_blank" rel="noopener">View Detailed Report <span aria-hidden="true">↗</span></a>{% endif %}</div>
+</header>
+<main>
+  <section class="hero" id="top">
+    <p class="eyebrow">ADVERSARIAL RED-TEAMING TOOLKIT / LIVE DEMO RUN</p>
+    <h1>Robustness,<br><span>live.</span></h1>
+    <p class="deck">One concrete failure and one concrete prediction flip, from a real run against the actual endpoints.</p>
+    <p class="model">Model: j-hartmann/emotion-english-distilroberta-base · 7 emotion labels</p>
+  </section>
+
+  <aside class="partial-banner" role="note" aria-label="Partial suite notice">
+    <p class="eyebrow">LIVE DEMO RUN &mdash; PARTIAL SUITE</p>
+    <h2>{{ '{:,}'.format(versions[0].coverage.completed) }} of {{ '{:,}'.format(versions[0].coverage.planned) }} planned cases executed</h2>
+    <p>This live run demonstrates toolkit behavior using a curated subset of the full attack suite. The
+    numbers on this page describe <strong>this demo subset only</strong> and must not be read as the
+    authoritative aggregate result. For the complete 1,928-case benchmark, run
+    <code>python run_all.py --mode full</code> and open its report.</p>
+    {{ demo_coverage_line() }}
+  </aside>
+
+  <section class="panel demo-highlights" id="demo-highlights" aria-label="Demo highlights">
+    <p class="eyebrow">DEMO HIGHLIGHTS</p>
+    <h2>Two concrete cases from this run</h2>
+    {% for note in demo_evidence.notes %}<p class="notice warning">{{ note }}</p>{% endfor %}
+    <div class="two-up">
+      <div class="panel demo-card">
+        <p class="eyebrow">FEATURED FAILURE</p>
+        {% if demo_evidence.featured_failure %}{% set f = demo_evidence.featured_failure %}
+        <h3>{{ f.category|capitalize }} / {{ f.subfamily }}</h3>
+        <p class="caption">{{ f.failure_label }} · attack ID <code>{{ f.attack_id }}</code>{% if f.payload_bytes is not none %} · {{ '{:,}'.format(f.payload_bytes) }} bytes{% endif %}</p>
+        {% if f.preview %}<pre class="demo-preview">{{ f.preview }}</pre>{% endif %}
+        <table class="compact"><caption class="sr-only">Featured failure outcomes by version</caption><thead><tr><th scope="col">Version</th><th scope="col">Outcome</th><th scope="col">Latency</th><th scope="col">Health after</th></tr></thead><tbody>
+        {% for v, outcome in (('V1', f.v1), ('V2', f.v2)) %}{% if outcome %}<tr><th scope="row">{{ v }}</th><td>{{ 'HTTP ' ~ outcome.status_code if outcome.status_code else 'no response' }} · {{ outcome.outcome }}</td><td>{{ '%.0f'|format(outcome.latency_ms) }} ms ({{ outcome.latency_band }})</td><td>{{ 'alive' if outcome.endpoint_alive_after else 'not answering' }}</td></tr>{% endif %}{% endfor %}
+        </tbody></table>
+        <p>{{ f.technical_interpretation }}</p>
+        <div class="remediation"><h5>Recommended remediation</h5><p>{{ f.remediation }}</p></div>
+        {% if demo_evidence.crash_status_note %}<p class="caption crash-note">{{ demo_evidence.crash_status_note }}</p>{% endif %}
+        {% else %}<p class="notice">No failure example available in this run.</p>{% endif %}
+      </div>
+      <div class="panel demo-card">
+        <p class="eyebrow">FEATURED PREDICTION FLIP</p>
+        {% if demo_evidence.featured_prediction_flip %}{% set p = demo_evidence.featured_prediction_flip %}
+        <h3>{{ p.category|capitalize }} / {{ p.subfamily }}</h3>
+        <p class="caption">attack ID <code>{{ p.attack_id }}</code> · validity {{ p.validity_tiers|join(' + ') }}</p>
+        <p class="demo-text"><strong>Original:</strong> <span class="demo-original">{{ p.original_html|safe }}</span></p>
+        <p class="demo-text"><strong>Perturbed:</strong> <span class="demo-attacked">{{ p.attacked_html|safe }}</span></p>
+        <p class="caption">Highlighted character(s): {{ p.modification }}</p>
+        <p class="demo-transition"><strong>{{ p.original_label }}</strong> ({{ '%.3f'|format(p.original_confidence) }}) &rarr; <strong>{{ p.attacked_label }}</strong> ({{ '%.3f'|format(p.attacked_confidence) }})</p>
+        <p class="caption">Confidence change: {{ p.confidence_change|delta }}{% if p.v2_still_flipped %} · weakness still present on V2{% else %} · not reproduced on V2{% endif %}</p>
+        <div class="remediation"><h5>Recommended remediation</h5><p>{{ p.remediation }}</p></div>
+        {% else %}<p class="notice">No prediction-flip example available in this run.</p>{% endif %}
+      </div>
+    </div>
+  </section>
+
+  <section id="results" class="report-section">
+    <div class="section-heading"><span class="section-number">01</span><div><p class="eyebrow">DEMO-SUBSET COMPARISON</p><h2>What changed in this live demo?</h2></div></div>
+    <p class="section-intro">Figures below describe only the cases this demo run actually sent. They are a live
+    illustration of the toolkit, not the authoritative robustness measurement -- see the full report for that.</p>
+
+    {% if withheld %}
+    <aside class="notice warning" role="note"><p class="eyebrow">COMPARISON WITHHELD</p><p>{{ withheld }}</p></aside>
+    {% else %}
+    {{ demo_coverage_line() }}
+    <div class="metrics-row">
+      <div class="metric-tile"><strong>{{ counts.resolved }}</strong><span>Resolved groups</span></div>
+      <div class="metric-tile"><strong>{{ counts.remaining }}</strong><span>Remaining groups</span></div>
+      <div class="metric-tile"><strong>{{ counts.new }}</strong><span>Newly demonstrated</span></div>
+    </div>
+    <div class="panel">
+      <h3>Unhandled server errors, this subset</h3>
+      <table class="compact"><thead><tr><th scope="col">Outcome</th><th scope="col">V1</th><th scope="col">V2</th></tr></thead><tbody>
+      {% for key in ('unhandled_5xx', 'timeouts', 'connection_failures', 'service_unavailable') %}<tr><th scope="row">{{ operations[key] }}</th><td>{{ comparison.operational.v1[key] }}</td><td>{{ comparison.operational.v2[key] }}</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+    <div class="panel">
+      <h3>Failure rate by attack category (this subset)</h3>
+      <table class="category-table"><caption class="sr-only">V1 and V2 category failure rates, demo subset</caption><thead><tr><th scope="col">Category</th><th scope="col">V1</th><th scope="col">V2</th></tr></thead><tbody>
+      {% for category in categories %}<tr><th scope="row">{{ category|capitalize }}</th>{% for v in ['v1', 'v2'] %}{% set r = comparison.category_failure_rates[category][v] %}
+        <td><div class="rate-label"><strong>{{ r.rate|percent }}</strong><span>{{ r.failed }} / {{ r.eligible }}</span></div></td>{% endfor %}</tr>{% endfor %}
+      </tbody></table>
+    </div>
+    <p class="caption">Excluded by demo limit: {{ '{:,}'.format(versions[0].coverage.limit_excluded) }} cases.
+    The live demonstration intentionally executes a curated subset of the full suite; the complete suite is
+    exercised in full mode. ({{ comparison.coverage.v1_only_count }} V1-only, {{ comparison.coverage.v2_only_count }}
+    V2-only, {{ comparison.coverage.unavailable_count }} unavailable case ID(s) omitted from this demo view --
+    see the full report for the complete list.)</p>
+    {% endif %}
+  </section>
+
+  <section id="method" class="report-section">
+    <div class="section-heading"><span class="section-number">02</span><div><p class="eyebrow">METHOD & LIMITS</p><h2>Read this demo in context.</h2></div></div>
+    <div class="panel"><h3>Four defenses, one shared model</h3><ol class="defenses"><li><strong>Length validation.</strong> Reject sequences over the model's limit before inference.</li><li><strong>Strict request types.</strong> Reject wrong types and unexpected fields.</li><li><strong>Scoped exception handling.</strong> Contain unexpected errors while preserving validation responses.</li><li><strong>Unicode and whitespace cleanup.</strong> Normalize text before inference.</li></ol>
+    <p>V1 and V2 run the identical model; only V2 adds these four application-layer defenses. No retraining, no silent truncation.</p></div>
+    <div class="panel"><h3>What this demo does and does not show</h3><ul class="limitations">
+      <li>This demo mode runs a curated subset of the full attack suite so it finishes quickly for a live audience -- the same runner, same attack definitions, same real inference and analysis as full mode, just fewer cases.</li>
+      <li>V2's defenses are application-layer only; a persisting prediction-flip weakness on V2 is an honest non-improvement, not a gap in the hardening -- fixing it needs model-level work, not endpoint code.</li>
+      <li>A failed post-request health check is observed unavailability only. It is not proof that the underlying operating-system process terminated.</li>
+      <li>The complete technical evidence -- full finding register, audit appendix, and case-level detail -- exists in the full benchmark report (<code>python run_all.py --mode full</code>), not in this demo page.</li>
+    </ul></div>
+  </section>
+
+  <section id="source" class="report-section">
+    <div class="section-heading"><span class="section-number">03</span><div><p class="eyebrow">SOURCE</p><h2>Evidence bundle</h2></div></div>
+    <div class="provenance"><p>This page is a short view of the preserved <a href="analysis.json">analysis.json</a>, the same
+    machine-readable evidence the full report reads. The <a href="export_meta.json">export metadata</a> records
+    SHA-256 hashes of the source and generated files.</p><p class="caption">Source SHA-256</p><code class="hash">{{ source_sha256 }}</code>
+    <p class="caption">Analysis schema 2 · Demo report · Team Checkmate</p></div>
+  </section>
+</main>
+<footer><span>TEAM CHECKMATE / ADVERSARIAL RED-TEAMING TOOLKIT / DEMO</span><a href="#top">Back to top ↑</a></footer>
+</body>
+</html>

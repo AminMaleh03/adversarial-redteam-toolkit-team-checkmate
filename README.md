@@ -13,6 +13,15 @@ header: mini
 
 Toolkit for automated robustness testing of AI inference endpoints.
 
+> **In development: System V5 ("Red Lab").** The public web app and generated reports are
+> being rebranded from Team Checkmate's internal toolkit name to **Red Lab** ("Adversarial
+> Testing Redefined"), with a shared design system, responsive navigation and consistent page
+> identity (V5.1, current). Team Checkmate remains the creator/team credit throughout. Later
+> V5 phases (full-screen live-demo UX, a restructured technical report, a custom-input engine,
+> final hardening, Hugging Face deployment) are tracked but not yet implemented -- see
+> `HANDOFF.md` for exact scope and status. This does not change any of the validated attack/
+> analysis/scoring behavior documented below.
+
 ## What This Project Does
 
 This toolkit fires adversarial and malformed inputs at an AI inference endpoint and produces a

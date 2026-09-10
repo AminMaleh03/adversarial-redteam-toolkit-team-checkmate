@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="description" content="Team Checkmate: live demo run -- one concrete failure and one concrete prediction flip.">
-  <title>Demo report | Team Checkmate</title>
+  <title>Live Demo Results | Red Lab</title>
   {# Only the repository-owned stylesheet is trusted; all analysis values stay escaped
      except demo_evidence.*_html, which run_all.py pre-escapes itself (see highlight_diff_html). #}
   <style>{{ css|safe }}</style>
@@ -16,14 +16,18 @@
 {%- endmacro %}
 <header class="masthead">
   <a class="brand" href="#top"><img src="{{ logo_data_uri }}" alt="Team Checkmate" class="brand-logo"> TEAM CHECKMATE / DEMO</a>
-  <nav aria-label="Demo report sections"><a href="#demo-highlights">Demo</a><a href="#results">Results</a><a href="#method">Method</a></nav>
-  <div class="downloads"><a href="analysis.json" download>Source JSON</a>{% if detailed_report and detailed_report.available %}<a class="button" href="{{ detailed_report.relative_href }}" target="_blank" rel="noopener">View Detailed Report <span aria-hidden="true">↗</span></a>{% endif %}</div>
+  <nav aria-label="Demo report sections"><a class="home-link" href="/">&larr; Back to Red Lab</a><a href="#demo-highlights">Demo</a><a href="#results">Results</a><a href="#method">Method</a></nav>
+  <div class="downloads"><a href="analysis.json" target="_blank" rel="noopener">Source JSON</a>{% if detailed_report and detailed_report.available %}<a class="button" href="{{ detailed_report.relative_href }}" target="_blank" rel="noopener">View Detailed Report <span aria-hidden="true">↗</span></a>{% endif %}</div>
 </header>
 <main>
   <section class="hero" id="top">
-    <p class="eyebrow">ADVERSARIAL RED-TEAMING TOOLKIT / LIVE DEMO RUN</p>
-    <h1>Robustness,<br><span>live.</span></h1>
-    <p class="deck">One concrete failure and one concrete prediction flip, from a real run against the actual endpoints.</p>
+    <p class="page-identity"><span>{{ creator_name }}</span><span class="sep">/</span><span>{{ product_version_label }}</span></p>
+    <h1 class="page-title">LIVE DEMO RESULTS</h1>
+    <p class="deck">Same model. Two endpoint configurations. One controlled attack suite.</p>
+    <div class="version-id-row">
+      <span class="version-id v1">V1 &mdash; Unhardened Endpoint</span>
+      <span class="version-id v2">V2 &mdash; Hardened Endpoint</span>
+    </div>
     <p class="model">Model: j-hartmann/emotion-english-distilroberta-base · 7 emotion labels</p>
   </section>
 
@@ -93,10 +97,10 @@
       </tbody></table>
     </div>
     <div class="panel">
-      <h3>Failure rate by attack category (this subset)</h3>
-      <table class="category-table"><caption class="sr-only">V1 and V2 category failure rates, demo subset</caption><thead><tr><th scope="col">Category</th><th scope="col">V1</th><th scope="col">V2</th></tr></thead><tbody>
+      <div class="panel-heading"><h3>Failure rate by attack category (this subset)</h3><div class="legend"><span class="v1-dot">V1</span><span class="v2-dot">V2</span></div></div>
+      <table class="category-table"><caption class="sr-only">V1 and V2 category failure rates, demo subset</caption><thead><tr><th scope="col">Category</th><th scope="col">V1 &middot; Unhardened</th><th scope="col">V2 &middot; Hardened</th></tr></thead><tbody>
       {% for category in categories %}<tr><th scope="row">{{ category|capitalize }}</th>{% for v in ['v1', 'v2'] %}{% set r = comparison.category_failure_rates[category][v] %}
-        <td><div class="rate-label"><strong>{{ r.rate|percent }}</strong><span>{{ r.failed }} / {{ r.eligible }}</span></div></td>{% endfor %}</tr>{% endfor %}
+        <td><div class="rate-label"><strong>{{ r.rate|percent }}</strong><span>{{ r.failed }} / {{ r.eligible }}</span></div><div class="bar-track" aria-hidden="true"><div class="bar {{ v }}" style="width: {{ 0 if r.rate == 'N/A' else r.rate * 100 }}%"></div></div></td>{% endfor %}</tr>{% endfor %}
       </tbody></table>
     </div>
     <p class="caption">Excluded by demo limit: {{ '{:,}'.format(versions[0].coverage.limit_excluded) }} cases.
@@ -121,12 +125,12 @@
 
   <section id="source" class="report-section">
     <div class="section-heading"><span class="section-number">03</span><div><p class="eyebrow">SOURCE</p><h2>Evidence bundle</h2></div></div>
-    <div class="provenance"><p>This page is a short view of the preserved <a href="analysis.json">analysis.json</a>, the same
-    machine-readable evidence the full report reads. The <a href="export_meta.json">export metadata</a> records
+    <div class="provenance"><p>This page is a short view of the preserved <a href="analysis.json" target="_blank" rel="noopener">analysis.json</a>, the same
+    machine-readable evidence the full report reads. The <a href="export_meta.json" target="_blank" rel="noopener">export metadata</a> records
     SHA-256 hashes of the source and generated files.</p><p class="caption">Source SHA-256</p><code class="hash">{{ source_sha256 }}</code>
     <p class="caption">Analysis schema 2 · Demo report · Team Checkmate</p></div>
   </section>
 </main>
-<footer><span>TEAM CHECKMATE / ADVERSARIAL RED-TEAMING TOOLKIT / DEMO</span><a href="#top">Back to top ↑</a></footer>
+<footer><span>{{ creator_name }} / {{ product_version_label }} / LIVE DEMO</span><a class="home-link" href="/">&larr; Back to Red Lab</a><a href="#top">Back to top ↑</a></footer>
 </body>
 </html>

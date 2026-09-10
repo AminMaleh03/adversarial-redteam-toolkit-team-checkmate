@@ -8,8 +8,25 @@
   var progressFill = document.getElementById("progress-fill");
   var progressError = document.getElementById("progress-error");
   var stageItems = document.querySelectorAll(".stage-list li");
+  var navToggle = document.getElementById("nav-toggle");
+  var primaryNav = document.getElementById("primary-nav");
   var POLL_MS = 1500;
   var polling = false;
+
+  // Mobile compact/collapsible menu -- keeps navigation reachable on narrow screens
+  // instead of letting the header wrap into an awkward multi-line block.
+  if (navToggle && primaryNav) {
+    navToggle.addEventListener("click", function () {
+      var open = primaryNav.classList.toggle("open");
+      navToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    primaryNav.querySelectorAll("a").forEach(function (link) {
+      link.addEventListener("click", function () {
+        primaryNav.classList.remove("open");
+        navToggle.setAttribute("aria-expanded", "false");
+      });
+    });
+  }
 
   function setStageClasses(currentIndex) {
     stageItems.forEach(function (li, idx) {
@@ -46,7 +63,7 @@
       progressError.textContent = state.error || "The live run failed. Please try again.";
       if (runBtn) {
         runBtn.disabled = false;
-        runBtn.textContent = "Run Live Attack Test";
+        runBtn.textContent = "Run Live Demo";
       }
     }
   }
@@ -83,7 +100,7 @@
       })
       .catch(function () {
         runBtn.disabled = false;
-        runBtn.textContent = "Run Live Attack Test";
+        runBtn.textContent = "Run Live Demo";
       });
   }
 

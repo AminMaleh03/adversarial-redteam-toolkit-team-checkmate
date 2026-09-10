@@ -1,3 +1,302 @@
+## System V5.1 CLOSED - final polish - Claude
+
+- Updated: 2026-09-10T05:55:00+04:00, Claude Code; branch `ahsan/v5-redlab`, observed HEAD
+  `54e428a` at session start (the prior V5.1 checkpoint commit below, local-only, not pushed
+  anywhere). This session's changes are folded into that same commit via `git commit --amend`
+  once verified (explicit instruction: keep V5.1 as one clean logical commit; do not amend if
+  it turns out to already be pushed -- confirmed not pushed to `origin` or the `space` HF
+  remote before amending, see below).
+- Ahsan manually reviewed V5.1 in a real browser and found presentation/behavior issues to close
+  out before V5.1 is done. Scope was explicitly presentation/serving only: no attack, runner,
+  analysis, severity, remediation, or `contract.py` changes; no re-run of the 1,928-case
+  benchmark; V5.2 (full-screen live-demo UX), V5.3 (report restructuring/sidebar), V5.4 (custom
+  input), V5.5, V5.6 explicitly deferred and not touched.
+- **Color-scheme consistency**: removed the entire `@media (prefers-color-scheme: dark)` block
+  from `web/static/app.css` (the only file that had one -- `report/style.css` never had one).
+  Red Lab now renders with one deterministic warm-paper/charcoal/red identity regardless of the
+  viewer's OS theme; `color-scheme: light` was already set and is kept. No theme selector was
+  added (out of scope, explicitly deferred).
+- **Mustard partial-suite banner**: `.partial-banner` in `report/style.css` no longer fills the
+  whole panel with `var(--rl-warning)`. It's now `var(--rl-surface)` with a `var(--rl-border)`
+  border and a 4px `var(--rl-red)` left accent; heading/body text use the charcoal/muted tokens;
+  only the small eyebrow label ("LIVE DEMO RUN -- PARTIAL SUITE") keeps the amber warning color
+  as a small status accent, per the brief's "amber as accent, not the whole panel" instruction.
+  The partial-suite disclaimer copy itself is unchanged.
+- **Demo failure-rate table**: `report/demo_template.html`'s category-comparison table now
+  reuses the full report's exact proven markup instead of a thinner one-off: a `.panel-heading`
+  with a `.legend` (V1/V2 color dots), "V1 · Unhardened"/"V2 · Hardened" column headers, and a
+  `.bar-track`/`.bar` element per V1/V2 cell (same classes `report/style.css` already styles and
+  makes responsive at 760px for the full report). No CSS was duplicated; no percentages/counts
+  changed -- confirmed by a new test asserting a modified fixture's rate still renders as
+  `25.00%` / `1 / 4` / `width: 25.0%` together.
+- **Source JSON real HTTP bug -- root cause found, not just markup-inspected**: a real local
+  `POST /api/run` demo run followed by `curl -D -` on the generated `analysis.json` showed the
+  *live* demo report already served clean headers (`content-type: application/json`, no
+  `content-disposition`) even before this session's changes -- the actual reproducible bug was
+  in `artifacts/verified_full_report/report.html` (the preserved V3/V4-era Technical Report
+  artifact), whose Source JSON anchor still had `<a href="analysis.json" download>`, a leftover
+  from before the V3 session dropped that attribute on the live templates. That stale artifact
+  is exactly what `/verified-full/report.html` serves (see the next item), so "Technical
+  Report -> Source JSON" was the one real path that forced a download in a browser.
+  Independent of that root cause, `web/app.py` also gained two small, explicitly path-restricted
+  routes (`GET /results/{run_name}/report/analysis.json`, `GET /verified-full/analysis.json`)
+  registered *before* their corresponding `StaticFiles` mounts, so they take routing priority
+  for exactly that one filename. Each reads the file directly and returns
+  `Content-Type: application/json; charset=utf-8` with no `Content-Disposition` header ever,
+  independent of the host OS's `mimetypes` registry (Starlette's default `StaticFiles` never set
+  an attachment header here either -- verified by reading `starlette/staticfiles.py`/
+  `responses.py` -- but the dedicated route makes the guarantee explicit and testable rather
+  than incidental). `run_name` path traversal is blocked via `Path.resolve()` +
+  `is_relative_to(RESULTS_ROOT)`; this is not a generic arbitrary-file endpoint -- it only ever
+  serves a file literally named `analysis.json` under the existing results/verified-full
+  locations. JSON bytes are read and returned unmodified. Verified live via `curl -D -` against
+  both routes after rebuilding and restarting the app: `content-type: application/json;
+  charset=utf-8`, no `content-disposition`, correct byte counts.
+- **Technical Report target -- investigated, not guessed**: confirmed by grepping the served
+  artifact that `/verified-full/report.html` (linked from the home page and from every
+  generated report's "View Detailed Report") is **the preserved static verified artifact**,
+  not a freshly rendered page -- it still said `<title>Robustness report | Team Checkmate</title>`
+  and had zero `home-link` occurrences, meaning it predated even the V3 session's nav/title
+  changes, despite `HANDOFF.md` recording it as regenerated in V4. Per the brief: did not
+  re-run the benchmark, did not touch `analysis.json`'s data, and did not alter the original
+  `report.pdf`. Instead, re-rendered *only* `report.html` from the exact same, byte-verified
+  `artifacts/verified_full_report/analysis.json` (SHA-256 confirmed identical to
+  `results/repro_1/report/analysis.json`, the original verified run) through the *current*
+  `report.generate.render_html(mode="full")`, then updated only the `report.html` entry in
+  `export_meta.json` to the new file's hash (confirmed: `analysis.json` and `report.pdf`
+  hashes in that file are unchanged, and `report.pdf`'s actual SHA-256 was verified unchanged
+  before and after). The regenerated page now shows the current Red Lab identity (compact
+  identity line, `page-title`, V1/V2 pills, Home link, current partial-banner/category-table
+  CSS) and has zero occurrences of "Robustness" or a `download`-attributed Source JSON link.
+  This is a "smallest safe adjustment," per the brief's explicit allowance to re-render a view
+  from preserved verified evidence without touching the evidence itself. V5.3's full
+  restructuring (sidebar, book navigation) was explicitly not done here.
+- **Timing promise removed**: `web/templates/index.html`'s CTA caption changed from "Takes
+  under a minute. Runs entirely inside this container." to "Executes a real curated attack
+  subset inside this container." No duration claim anywhere on the page now.
+- **Red Lab identity cleanup (review)**: grepped `web/static/app.css` and `report/style.css`
+  for decorative teal/green remnants. `web/static/app.css` has none (confirmed clean before
+  this session, from V5.1's first pass). `report/style.css` keeps the `--teal`/`--coral`
+  variable *names* (a deliberate V5.1 decision to avoid a risky full rewrite of a heavily-tuned
+  stylesheet) but every remaining usage found (`.v1-dot`/`.v2-dot`, `.bar.v1`/`.bar.v2`,
+  `.badge.v1`/`.badge.v2`, `.drift-panel .big-stat`, `.denominator`) is semantically tied to
+  V1 (danger/red) or V2 (success/green), not decorative branding -- no further changes made,
+  since the brief explicitly says not to blindly replace every green value.
+- **Mobile responsiveness**: reviewed after the above changes; the new demo category-table
+  markup reuses the exact classes (`.rate-label`, `.bar-track`, `.category-table`) the existing
+  760px media query in `report/style.css` already makes responsive for the full report, so no
+  new mobile CSS was needed. `web/static/app.css`'s hamburger nav, `aria-expanded` toggling, and
+  responsive hero were not touched by this session's changes (only color values changed, via
+  the dark-mode-block removal) and were not re-broken -- existing mobile-menu tests still pass.
+- **Tests**: added 3 tests to `tests/test_report.py` (partial-banner is no longer a mustard
+  panel with only a CSS-token check, not a screenshot; demo category table has the V1/V2
+  legend + header text + one `bar-track` per V1/V2 cell; a modified fixture proves the bar
+  width and displayed percent/count stay in sync and data-derived) and 7 to `tests/test_web.py`
+  (no timing promise on the home page; `/static/app.css` has no
+  `prefers-color-scheme` media query; the Red Lab CSS tokens are still served; the new
+  `/results/.../analysis.json` route returns `application/json; charset=utf-8` with no
+  `content-disposition`; the same route blocks a `..` path-traversal attempt and returns 404
+  without leaking a sibling file's content; a missing run returns 404 without a
+  content-disposition header; `/verified-full/analysis.json` returns the same clean headers).
+  Full suite: `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .venv/Scripts/python.exe -m pytest -q`:
+  **463 passed** (453 at session start + 10 new), 1 pre-existing Starlette/AnyIO warning.
+- **Real local acceptance test** (not mocked): started `uvicorn web.app:app` on `127.0.0.1:7860`
+  against this checkout, ran one real demo experiment via `POST /api/run` (`run_all.run_experiment
+  (mode="demo", ...)`, genuine V1/V2 uvicorn processes, completed in ~22s), then verified over
+  real HTTP with `curl`: `GET /` 200 with the timing promise absent and the new CTA copy
+  present; `GET /healthz` 200; `GET .../report.html` 200 `text/html; charset=utf-8`;
+  `GET .../analysis.json` 200 `application/json; charset=utf-8`, no `content-disposition`
+  (both via the new dedicated route); `GET .../report.pdf` 200 `application/pdf`; the served
+  report's "View Detailed Report" link and its target both returned 200; `GET
+  /verified-full/report.html` has zero occurrences of "Robustness" or a downloadable Source
+  JSON link; `GET /verified-full/analysis.json` 200 with the same clean headers. Confirmed via
+  `netstat` that ports 8000/8001 had no `LISTENING` socket after the run finished, matching
+  every prior session's verification; the throwaway `results/hf_demo_*` directories this
+  produced were deleted afterward (gitignored regardless). The web app process itself was
+  stopped after verification (`taskkill`), confirmed off port 7860.
+- **Docker**: rebuilt `team-checkmate-v5-redlab:latest` from the same `Dockerfile` (untouched
+  this session). All four expensive layers (`apt-get`, `COPY requirements.txt .`,
+  `pip install`, the pinned-model-revision pre-download) reported `CACHED`; only `COPY . .`
+  and the final `useradd`/`chown` layer re-ran, as expected for a source-only change. Ran the
+  freshly built image (`docker run -d -p 7862:7860 ...`), confirmed `/healthz` and `/` both
+  return 200, then removed the container (`docker rm -f`). Did not run a second full live-demo
+  smoke test through the container this session (the local, non-Docker real demo run above plus
+  the full test suite were judged sufficient per the brief's "optional" wording for this step);
+  the image itself was left built. The pre-existing `team-checkmate-v4:latest` image was not
+  touched.
+- **Files changed this session** (on top of the prior V5.1 checkpoint below, same branch, still
+  entirely local): `web/static/app.css`, `report/style.css`, `report/demo_template.html`,
+  `web/templates/index.html`, `web/app.py`, `tests/test_report.py`, `tests/test_web.py`,
+  `artifacts/verified_full_report/report.html` (re-rendered view only),
+  `artifacts/verified_full_report/export_meta.json` (one hash field updated to match). No
+  change to `contract.py`, attack/runner/analysis code, `endpoint/v1.py` or `endpoint/v2.py`,
+  severity/remediation logic, or `results/repro_1`'s original `analysis.json`
+  (byte-for-byte confirmed unchanged; `artifacts/verified_full_report/analysis.json` and
+  `report.pdf` likewise confirmed byte-for-byte unchanged by hash before/after).
+  `git diff --check`: clean (only pre-existing LF/CRLF warnings).
+- **Not done / explicitly out of scope**: V5.2 (full-screen live-demo execution UX), V5.3
+  (technical-report restructuring, dedicated V1-left/V2-right layout, interactive-book sidebar),
+  V5.4 (Try Your Own Input), V5.5 (final integration/hardening/responsive acceptance pass),
+  V5.6 (Hugging Face deployment/public visibility). No push to GitHub `origin` or the `space`
+  Hugging Face remote (both remotes were only inspected via `git remote -v`/`git branch -vv`,
+  never written to). No merge to `main`.
+- **Commit**: confirmed `ahsan/v5-redlab` at `54e428a` has no upstream tracking ref (unlike
+  `ahsan/report`/`main`/`runner-amin`, which do) -- i.e. not pushed anywhere -- before amending
+  this checkpoint's changes into that same commit. New HEAD hash is recorded in this session's
+  final chat report to Ahsan (not duplicated here to avoid this file going stale the moment a
+  future session amends again).
+- Next: Ahsan re-reviews in a real browser (including the regenerated Technical Report and the
+  demo category-comparison table on both desktop and mobile widths), then decides whether to
+  push `ahsan/v5-redlab` to `origin` and/or proceed to V5.2.
+
+## System V5.1 checkpoint - Claude (Red Lab brand + design system + nav foundation)
+
+- Updated: 2026-09-10T05:25:00+04:00, Claude Code; branch `ahsan/v5-redlab`, observed HEAD
+  `bba3a7b` at session start (System V4, tagged `v4.0.0` -- untouched, unmoved this session).
+  A local commit is created at the end of this checkpoint; it is **not** pushed anywhere.
+- Scope: this is V5.1 only -- Red Lab branding, a shared design-token system, responsive
+  navigation, naming cleanup ("Run Live Attack Test" -> "Run Live Demo"), and consistent page
+  identity across the web app and both generated reports. Explicitly deferred: the V5
+  custom-input engine, the full-screen live-demo UX (V5.2), the technical report's collapsible
+  sidebar restructuring (V5.3), "Try Your Own Input" (V5.4), final responsive/hardening pass
+  (V5.5), and Hugging Face deployment / Space visibility (V5.6) -- none of that was touched.
+  No push to Hugging Face, no merge to `main`, no edits to `contract.py`, attack definitions,
+  runner semantics, analysis thresholds, severity logic, the model, or its pinned revision.
+- Real Red Lab logo: `Red Lab Adversarial Testing Redefined.png` (1254x1254 PNG, supplied by
+  Ahsan directly into the repo root before this session) is read verbatim and embedded as a
+  `data:` URI on the home page, the same pattern already used for the Team Checkmate logo --
+  neither logo was recreated, redrawn, or resized destructively (both keep their real aspect
+  ratio; display size is controlled by CSS `height`/`width`/`object-fit: contain` only).
+  `web/app.py` gained `_red_lab_logo_data_uri()` (a `_data_uri(path, label)` helper shared with
+  the existing Team Checkmate one) which raises `RuntimeError` naming the expected path if the
+  asset is ever missing, matching the existing "stop and report, never substitute a
+  placeholder" convention. The old "C." placeholder mark is gone from both report templates
+  (replaced by the real embedded Team Checkmate logo `<img>`, done in the prior V3 session) and
+  was never used on the web app at all.
+- Design tokens: added the exact token set the brief specified (`--rl-red #b4232f`,
+  `--rl-charcoal #17191d`, `--rl-paper #f5f2ea`, `--rl-surface #fffdfc`, `--rl-muted #667078`,
+  `--rl-border #d8d2c8`, plus `--rl-success #2e7d4f`, `--rl-warning #9a6b12`, `--rl-danger`
+  same value as `--rl-red`) to **both** `report/style.css` and `web/static/app.css`, defined
+  identically so the web app and generated reports read as one product. `web/static/app.css`
+  was rewritten directly onto the new tokens (it is small and entirely owned by V4/V5, so no
+  legacy names were worth preserving). `report/style.css` is large and has been tuned across
+  several prior sessions (print pagination, exact severity-badge colors, etc.), so there
+  `--ink`/`--muted`/`--paper`/`--line` became straight aliases to the new tokens (each only
+  ever meant one thing) and the old `--teal`/`--coral` variables -- which used to do double
+  duty as both "general brand accent" and "V1-vs-V2 semantic color" -- were kept as names but
+  repointed (`--teal` -> `--rl-success`, `--coral` -> `--rl-danger`) with the handful of
+  general-brand-accent usages (links, the hero accent word, button hover, the audit-appendix
+  expand links) individually overridden to `--rl-red` directly so they don't turn green under
+  the new mapping. Net effect verified by grep: `web/static/app.css` now has zero occurrences
+  of "teal"; `report/style.css` keeps the variable *names* `--teal`/`--coral` (avoiding a large
+  risky rewrite of a heavily-tuned stylesheet) but the literal teal hex color is gone from
+  everywhere it renders -- V1/V2 dots, bars and badges now read danger-red/success-green
+  (matching their actual meaning: V1 unhardened = at-risk, V2 hardened = mitigated), and the
+  demo report's partial-suite banner moved from a repurposed "V1-danger" red to
+  `--rl-warning` amber, which is the actually-correct semantic for a "partial suite, read with
+  caution" notice.
+- Single source of truth for product strings: `report/generate.py` gained
+  `CREATOR_NAME = "Team Checkmate"`, `PRODUCT_NAME = "RED LAB"`,
+  `PRODUCT_TAGLINE = "Adversarial Testing Redefined"`, `PRODUCT_VERSION_LABEL = "Red Lab
+  v5.0"`; `web/app.py` imports these same four constants rather than redeclaring them, so the
+  version label can never drift between the web app and the two report templates.
+- Home page (`web/templates/index.html` + `web/static/app.css`): full redesign. Masthead now
+  shows Team Checkmate (logo + name) and "Red Lab v5.0" plus a responsive nav
+  (Home -> `/`, Live Demo -> `#run` anchor on the CTA row, Technical Report -> the verified
+  full report, `target="_blank"`) that collapses into a compact toggle button below 760px
+  (`web/static/app.js` toggles a `.open` class and `aria-expanded`, closing on link click).
+  Hero shows the brand hierarchy the brief specified (Team Checkmate small/above, RED LAB as
+  the large wordmark, tagline below) next to the large, responsive Red Lab logo (120px desktop,
+  76px mobile -- deliberately not a tiny icon), the concise explanation paragraph from the
+  brief (used near-verbatim), and both CTAs: primary "Run Live Demo" (renamed from "Run Live
+  Attack Test" everywhere user-facing, including the JS failure/reset fallback text -- internal
+  `run_experiment(mode="demo", ...)` naming was not touched, per the brief's explicit
+  instruction not to rename internal functionality for presentation), secondary "View Technical
+  Report" next to it. The CTA row is a plain flex container so a third button (V5.4's "Try Your
+  Own Input") can be added later without restructuring the hero -- no non-functional button was
+  added now. "Try Your Own Input" is not exposed anywhere.
+- Page identity on internal pages: both report templates (`report/demo_template.html`,
+  `report/template.html`) had their large marketing hero replaced with the compact pattern the
+  brief specified -- a small `Team Checkmate / Red Lab v5.0` identity line, then a functional
+  `<h1 class="page-title">` ("LIVE DEMO RESULTS" / "TECHNICAL REPORT", ~40px, not 76px), then
+  V1/V2 identified explicitly as colored pills ("V1 -- Unhardened Endpoint" danger-red,
+  "V2 -- Hardened Endpoint" success-green). The demo report's old "Robustness, live." and the
+  full report's old "Robustness under pressure." are both gone; neither template contains the
+  word "Robustness" anymore (verified by test and by grepping a real generated report). The
+  tagline itself ("Adversarial Testing Redefined") was deliberately NOT repeated on these pages,
+  per the brief's "only the home page heavily features the tagline" instruction -- it appears
+  in the footer's small provenance line as part of the product name, not as hero copy.
+- Global navigation: both report templates gained a `.home-link` nav item ("&larr; Back to Red
+  Lab", `href="/"`) in their existing masthead nav, alongside the demo report's existing
+  Demo/Results/Method anchors and the full report's existing Results/Findings/Method anchors
+  (neither set of section anchors was removed or restructured -- V5.3 owns that). The same link
+  (plus a second copy) was added to each template's footer. This link is root-relative (`/`):
+  it resolves correctly when the report is served through the web app's `/results/...` mount
+  (the primary distribution path now) and is a graceful no-op rather than a crash when a report
+  is opened as a standalone local file with no server behind `/` -- documented as a known,
+  accepted limitation of the dual offline-file/web-served distribution model, not something
+  V5.1 was asked to solve.
+- Source JSON: both templates' masthead "Source JSON" link, and the equivalent inline
+  `analysis.json`/`export_meta.json` links in each report's Source/provenance section, dropped
+  the `download` attribute and gained `target="_blank" rel="noopener"` -- opens the JSON in a
+  new tab instead of forcing a save-as dialog. The JSON content/bytes themselves are completely
+  unchanged (this is a rendering-attribute change only, nothing in `report/generate.py`'s
+  actual JSON serialization was touched). No custom JSON viewer was added (out of scope, not
+  justified as trivial).
+- Crash-gap warning de-emphasis carried over correctly: `demo_evidence.crash_status_note` (a
+  V3-era field) still renders as a small `<p class="caption crash-note">` inside the featured
+  failure card, not a prominent banner; `literal_crash_case_available` is untouched in the
+  underlying JSON; the featured-failure interpretation text and the Method section's explicit
+  crash/unavailability caveat are both unchanged. Verified again this session against a real
+  generated report (see below).
+- Full test suite: `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .venv/Scripts/python.exe -m pytest
+  -q`: **453 passed** (445 at session start + 8 new: 4 in `tests/test_report.py` covering
+  Home-link/Source-JSON-new-tab/Team-Checkmate-credit-and-Red-Lab-version, one existing test
+  rewritten for the new demo hero copy; 5 in `tests/test_web.py` covering the Red Lab version
+  label, nav links, mobile-menu toggle markup, technical-report new-tab attributes, and the
+  rewritten branded-welcome-page test asserting the OLD wording is gone, not just that new
+  wording is present). No test in `tests/test_run_all.py`, `tests/test_analysis.py`,
+  `tests/test_runner.py`, `tests/test_endpoint.py`, `tests/test_attacks.py`, or
+  `tests/test_baseline.py` was touched -- none of that code changed.
+- Live verification (real run, not synthetic fixtures): started the actual web app locally
+  (`uvicorn web.app:app`, outside Docker) and drove a real `POST /api/run` -> a genuine
+  `run_experiment(mode="demo", ...)` against real local V1/V2 endpoints, completed in ~29s.
+  Fetched the actual generated `report.html` over HTTP and grep-verified, against the real
+  file (not a template render in isolation): the embedded logo, "LIVE DEMO RESULTS" heading,
+  both V1/V2 endpoint-identity pills, the Home-link back to Red Lab, "Red Lab v5.0", the
+  complete absence of "Robustness" and "in one minute", Source JSON's new-tab attributes, the
+  sticky-masthead CSS rule, and the de-emphasized crash note -- all eleven checks passed
+  against real output. Both endpoints' ports (8000/8001) and the web app's port (7860) were
+  confirmed free again afterward; the throwaway `results/hf_demo_*` run directory was deleted
+  (gitignored, not committed regardless).
+- Docker: rebuilt with `docker build -t team-checkmate-v5-redlab:latest .` (tagged separately
+  from the existing `team-checkmate-v4:latest` image, which was left untouched). **All four
+  expensive layers reported `CACHED`**: apt-get (Pango/Harfbuzz), `pip install`, and the
+  pinned-model-revision pre-download -- only `COPY . .` (0.1s) and the final `useradd`/`chown`
+  layer re-ran, exactly the caching behavior the Dockerfile's layer ordering is designed for.
+  Ran a real container (`docker run -d -p 7861:7860 team-checkmate-v5-redlab:latest`), waited
+  for `/healthz`, then drove one real live demo run through it end-to-end via `POST /api/run`
+  (completed in ~19s, `status: complete` with a real `result_url`) -- a short smoke test, not
+  the full 1,928-case benchmark. Container removed afterward (`docker rm -f`); the image itself
+  was left built. Docker Desktop had to be started fresh this session (it was not running); no
+  other Docker state on the machine was touched.
+- Not done / explicitly out of scope this session: V5.2 (full-screen live-demo UX transition),
+  V5.3 (technical-report restructuring + the complete collapsible interactive-book sidebar --
+  V5.1 only added a single Home nav link, not a sidebar), V5.4 (the custom-input engine / "Try
+  Your Own Input"), V5.5 (final integration/hardening pass), V5.6 (Hugging Face deployment /
+  flipping the Space to Public). The Hugging Face Space itself was not touched or pushed to.
+- Files changed (all on `ahsan/v5-redlab`, nothing on `main`, nothing pushed): `report/
+  generate.py`, `report/style.css`, `report/template.html`, `report/demo_template.html`,
+  `web/app.py`, `web/static/app.css`, `web/static/app.js`, `web/templates/index.html`,
+  `tests/test_report.py`, `tests/test_web.py`. `Red Lab Adversarial Testing Redefined.png`
+  (new, supplied by Ahsan) is untracked in git, same status as `Team Checkmate Logo.png` has
+  had since V3/V4 -- neither logo has been `git add`ed by any session; that decision is left
+  to Ahsan. A local commit for this checkpoint follows immediately after this entry, per the
+  explicit instruction to commit locally but not push.
+- Next: Ahsan reviews the diff and the live app (desktop + mobile viewport) before deciding on
+  V5.2. `git log` on `ahsan/v5-redlab` will show this commit ahead of `bba3a7b`; `v4.0.0`
+  remains recoverable and unmoved at `bba3a7b` for comparison/rollback.
+
 ## System V4 Docker validation + pre-Hugging-Face freeze checkpoint - Claude
 
 - Updated: 2026-09-10T03:35:00+04:00, Claude Code; branch `ahsan/report`, observed HEAD

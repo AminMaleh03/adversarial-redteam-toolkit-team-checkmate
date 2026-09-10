@@ -1,10 +1,10 @@
-"""Public FastAPI web layer for Team Checkmate (System V4).
+"""Public FastAPI web layer for Team Checkmate's Red Lab product (System V4, V5.1 UI polish).
 
 Thin deployment layer only -- no attack/runner/analysis/report logic lives here. The
-"Run Live Attack Test" button ultimately calls ``run_all.run_experiment(mode="demo", ...)``
+"Run Live Demo" button ultimately calls ``run_all.run_experiment(mode="demo", ...)``
 directly, in-process, never by shelling out to ``python run_all.py``. See AGENTS.md and
 HANDOFF.md for the project's architecture and ownership rules; this file and the rest of
-``web/`` are the V4-specific deployment layer, not owned by any existing component folder.
+``web/`` are the deployment layer, not owned by any existing component folder.
 
 Runtime shape: one uvicorn worker serving :7860 publicly. A single background thread runs
 at most one ``run_experiment()`` at a time, guarded by a process-local lock -- there is no
@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -32,10 +32,16 @@ ROOT = HERE.parent
 sys.path.insert(0, str(ROOT))
 
 import run_all  # noqa: E402
+from report.generate import (  # noqa: E402
+    CREATOR_NAME, PRODUCT_NAME, PRODUCT_TAGLINE, PRODUCT_VERSION_LABEL,
+)
 
 logger = logging.getLogger("team_checkmate.web")
 
 LOGO_PATH = ROOT / "Team Checkmate Logo.png"
+# The real, approved Red Lab logo (System V5.1). Not recreated or modified here -- read
+# verbatim from the repository root, same embedding pattern as the Team Checkmate logo.
+RED_LAB_LOGO_PATH = ROOT / "Red Lab Adversarial Testing Redefined.png"
 
 RESULTS_MOUNT = "/results"
 VERIFIED_MOUNT = "/verified-full"
@@ -61,10 +67,18 @@ STAGE_LABELS = {
 STAGE_PERCENT = dict(zip(STAGE_ORDER, (5, 15, 30, 50, 65, 82, 92, 100)))
 
 
+def _data_uri(path: Path, label: str) -> str:
+    if not path.exists():
+        raise RuntimeError(f"Required {label} asset not found: {path}")
+    return "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+
+
 def _logo_data_uri() -> str:
-    if not LOGO_PATH.exists():
-        raise RuntimeError(f"Required logo asset not found: {LOGO_PATH}")
-    return "data:image/png;base64," + base64.b64encode(LOGO_PATH.read_bytes()).decode("ascii")
+    return _data_uri(LOGO_PATH, "Team Checkmate logo")
+
+
+def _red_lab_logo_data_uri() -> str:
+    return _data_uri(RED_LAB_LOGO_PATH, "Red Lab logo")
 
 
 def _idle_state() -> dict:
@@ -130,6 +144,33 @@ def _run_job(run_name: str) -> None:
 
 app = FastAPI(title="Team Checkmate", docs_url=None, redoc_url=None)
 
+
+def _inline_json_response(path: Path) -> Response:
+    # Source JSON must always open inline, never download (System V5.1 fix). The generic
+    # StaticFiles mounts below are fine for report.html/report.pdf, but analysis.json gets
+    # its own tiny, path-restricted route so its Content-Type (with charset) and the
+    # absence of Content-Disposition are guaranteed, independent of the host OS's
+    # mimetypes registry. This only ever serves the one filename at controlled, pre-existing
+    # Red Lab result/report locations -- it accepts no caller-supplied filesystem path.
+    if not path.is_file():
+        return JSONResponse({"detail": "Not Found"}, status_code=404)
+    return Response(content=path.read_bytes(), media_type="application/json; charset=utf-8")
+
+
+@app.get("/results/{run_name}/report/analysis.json")
+def results_analysis_json(run_name: str) -> Response:
+    root = Path(run_all.RESULTS_ROOT).resolve()
+    candidate = (root / run_name / "report" / "analysis.json").resolve()
+    if not candidate.is_relative_to(root):
+        return JSONResponse({"detail": "Not Found"}, status_code=404)
+    return _inline_json_response(candidate)
+
+
+@app.get("/verified-full/analysis.json")
+def verified_full_analysis_json() -> Response:
+    return _inline_json_response(run_all.VERIFIED_FULL_REPORT_DIR / "analysis.json")
+
+
 Path(run_all.RESULTS_ROOT).mkdir(parents=True, exist_ok=True)
 app.mount(RESULTS_MOUNT, StaticFiles(directory=str(run_all.RESULTS_ROOT)), name="results")
 
@@ -148,6 +189,11 @@ def index(request: Request) -> HTMLResponse:
     # own /api/status poll on load, not by this route.
     context = {
         "logo_data_uri": _logo_data_uri(),
+        "red_lab_logo_data_uri": _red_lab_logo_data_uri(),
+        "creator_name": CREATOR_NAME,
+        "product_name": PRODUCT_NAME,
+        "product_tagline": PRODUCT_TAGLINE,
+        "product_version_label": PRODUCT_VERSION_LABEL,
         "verified_full_available": run_all.VERIFIED_FULL_REPORT_DIR.exists(),
         "verified_full_href": f"{VERIFIED_MOUNT}/report.html",
         "stage_labels": STAGE_LABELS,

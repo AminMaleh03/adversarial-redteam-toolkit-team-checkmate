@@ -3,39 +3,58 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Team Checkmate: run a real live adversarial attack test against a hardened and unhardened AI endpoint.">
-  <title>Team Checkmate — Adversarial Input Red-Teaming Toolkit</title>
+  <meta name="description" content="Red Lab by Team Checkmate: run a real live adversarial attack test against a hardened and unhardened AI endpoint.">
+  <title>{{ product_name }} &mdash; {{ product_tagline }}</title>
   <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
   <header class="masthead">
-    <a class="brand" href="/">
-      <img src="{{ logo_data_uri }}" alt="Team Checkmate" class="brand-logo">
-      <span>TEAM CHECKMATE</span>
-    </a>
-    {% if verified_full_available %}
-    <a class="button ghost" href="{{ verified_full_href }}" target="_blank" rel="noopener">
-      View Detailed Report <span aria-hidden="true">&#8599;</span>
-    </a>
-    {% endif %}
+    <div class="masthead-inner">
+      <a class="brand" href="/">
+        <img src="{{ logo_data_uri }}" alt="{{ creator_name }}" class="brand-logo">
+        <span class="brand-text">
+          <span class="brand-creator">{{ creator_name }}</span>
+          <span class="brand-product">{{ product_version_label }}</span>
+        </span>
+      </a>
+      <button id="nav-toggle" class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav">
+        <span class="sr-only">Menu</span>
+        <span class="nav-toggle-bar" aria-hidden="true"></span>
+      </button>
+      <nav id="primary-nav" class="primary-nav" aria-label="Primary">
+        <a href="/">Home</a>
+        <a href="#run">Live Demo</a>
+        {% if verified_full_available %}
+        <a href="{{ verified_full_href }}" target="_blank" rel="noopener">Technical Report</a>
+        {% endif %}
+      </nav>
+    </div>
   </header>
 
   <main>
     <section class="hero" id="welcome">
-      <p class="eyebrow">ADVERSARIAL INPUT RED-TEAMING TOOLKIT</p>
-      <h1>Robustness,<br><span>live.</span></h1>
+      <div class="rl-hero-brand">
+        <img src="{{ red_lab_logo_data_uri }}" alt="{{ product_name }} logo" class="rl-logo">
+        <div class="rl-hero-text">
+          <p class="rl-creator">{{ creator_name }}</p>
+          <h1 class="rl-wordmark">{{ product_name }}</h1>
+          <p class="rl-tagline">{{ product_tagline }}</p>
+        </div>
+      </div>
       <p class="deck">
-        We fire real adversarial and malformed inputs at the same emotion-classification
-        model twice: once against an unhardened endpoint (V1), once against the same model
-        behind application-layer hardening (V2). Nothing here is prerecorded -- clicking the
-        button below starts two real FastAPI endpoints inside this container and sends a
-        real subset of the attack suite at each of them, live.
+        An automated adversarial testing environment for AI inference endpoints. Red Lab
+        executes controlled malformed, boundary, encoding and adversarial inputs against the
+        same model before and after application-layer hardening, then measures how the
+        system responds.
       </p>
       <p class="model">Model: j-hartmann/emotion-english-distilroberta-base &middot; 7 emotion labels</p>
-      <div class="cta-row">
-        <button id="run-btn" class="button primary" type="button">Run Live Attack Test</button>
-        <p id="cta-note" class="caption">Takes under a minute. Runs entirely inside this container.</p>
+      <div class="cta-row" id="run">
+        <button id="run-btn" class="button primary" type="button">Run Live Demo</button>
+        {% if verified_full_available %}
+        <a class="button secondary" href="{{ verified_full_href }}" target="_blank" rel="noopener">View Technical Report</a>
+        {% endif %}
       </div>
+      <p id="cta-note" class="caption">Executes a real curated attack subset inside this container.</p>
     </section>
 
     <section id="progress-panel" class="panel progress-panel" hidden aria-live="polite">
@@ -52,7 +71,7 @@
   </main>
 
   <footer class="site-footer">
-    <p>Team Checkmate &mdash; Adversarial Input Red-Teaming Toolkit</p>
+    <p>{{ creator_name }} &mdash; {{ product_name }}, {{ product_tagline }}</p>
   </footer>
 
   <script src="/static/app.js"></script>

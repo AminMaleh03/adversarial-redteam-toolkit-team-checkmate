@@ -568,11 +568,14 @@ def test_masthead_is_sticky_with_scroll_offset_and_static_in_print():
     assert ".masthead { position: static" in print_css
 
 
-def test_demo_hero_wording_removes_unverified_timing_promise(demo_data):
+def test_demo_hero_uses_functional_identity_not_marketing_copy(demo_data):
     result = html(demo_data, mode="demo")
-    assert "live.</span>" in result
+    assert "LIVE DEMO RESULTS" in result
+    assert "Robustness" not in result
     assert "in one minute" not in result
-    assert "real run against the actual endpoints" in result
+    assert "V1" in result and "Unhardened Endpoint" in result
+    assert "V2" in result and "Hardened Endpoint" in result
+    assert "Red Lab v5.0" in result and "Team Checkmate" in result
 
 
 def test_demo_crash_note_is_a_small_caption_not_a_warning_box(demo_data):
@@ -608,6 +611,70 @@ def test_demo_omits_detailed_report_link_when_unavailable(demo_data):
     downloads = result[result.index('class="downloads"'):result.index("</header>")]
     assert "View Detailed Report" not in downloads
     assert "Source JSON" in downloads  # still available regardless
+
+
+# --------------------------------------------------------------------------------------
+# V5.1: Red Lab identity, Home navigation, Source JSON new-tab (no forced download).
+# --------------------------------------------------------------------------------------
+
+
+def test_demo_and_full_reports_link_home_to_red_lab(demo_data):
+    for mode in ("demo", "full"):
+        result = html(demo_data, mode=mode)
+        assert 'class="home-link" href="/"' in result
+        assert "Back to Red Lab" in result
+
+
+def test_source_json_opens_new_tab_without_forcing_download(demo_data):
+    for mode in ("demo", "full"):
+        result = html(demo_data, mode=mode)
+        downloads = result[result.index('class="downloads"'):result.index("</header>")]
+        idx = downloads.index('href="analysis.json"')
+        tag = downloads[downloads.rindex("<a", 0, idx):downloads.index(">", idx) + 1]
+        assert 'target="_blank"' in tag
+        assert 'rel="noopener"' in tag
+        assert "download" not in tag
+
+
+def test_reports_credit_team_checkmate_and_show_red_lab_version(demo_data):
+    for mode in ("demo", "full"):
+        result = html(demo_data, mode=mode)
+        assert "Team Checkmate" in result
+        assert "Red Lab v5.0" in result
+
+
+# ----------------------------------------------------------------------------------------
+# V5.1 closure: partial-banner mustard removal, demo category comparison visual grammar.
+# ----------------------------------------------------------------------------------------
+
+
+def test_partial_banner_is_not_a_large_mustard_panel(demo_data):
+    result = html(demo_data, mode="demo")
+    css_block = result[result.index("<style>"):result.index("</style>")]
+    # The whole banner must no longer be filled with the warning/amber token -- only a
+    # small eyebrow accent may still use it (see AGENTS.md-adjacent System V5.1 brief).
+    assert ".partial-banner { background: var(--rl-warning)" not in css_block
+    assert "border-left: 4px solid var(--rl-red)" in css_block
+    assert ".partial-banner .eyebrow { color: var(--rl-warning)" in css_block
+
+
+def test_demo_category_comparison_shows_v1_v2_structure_with_bars(demo_data):
+    result = html(demo_data, mode="demo")
+    section = result[result.index('id="results"'):result.index('id="method"')]
+    assert "V1 &middot; Unhardened" in section
+    assert "V2 &middot; Hardened" in section
+    assert section.count('class="bar-track"') == len(report.CATEGORIES) * 2  # one per V1/V2 cell
+    assert 'class="v1-dot"' in section and 'class="v2-dot"' in section
+
+
+def test_demo_category_bar_width_and_percent_remain_data_derived(demo_data):
+    demo_data["summary_v1"]["category_stats"]["malformed"].update(failed=1, eligible=4, failure_rate=0.25)
+    demo_data["comparison"]["category_failure_rates"]["malformed"]["v1"] = dict(failed=1, eligible=4, rate=0.25)
+    result = html(demo_data, mode="demo")
+    section = result[result.index('id="results"'):result.index('id="method"')]
+    assert "25.00%" in section
+    assert "1 / 4" in section
+    assert 'width: 25.0%' in section
 
 
 def test_group_key_allows_equal_category_and_subfamily(data):

@@ -34,6 +34,13 @@ HERE = Path(__file__).resolve().parent
 # where the bundle is copied, with no relative asset path and no external fetch.
 LOGO_PATH = HERE.parent / "Team Checkmate Logo.png"
 
+# Single source of truth for product identity strings (System V5.1), shared with web/app.py
+# so "Red Lab v5.0" etc. never drifts between the web app and generated reports.
+CREATOR_NAME = "Team Checkmate"
+PRODUCT_NAME = "RED LAB"
+PRODUCT_TAGLINE = "Adversarial Testing Redefined"
+PRODUCT_VERSION_LABEL = "Red Lab v5.0"
+
 
 @functools.lru_cache(maxsize=1)
 def _logo_data_uri() -> str:
@@ -387,7 +394,8 @@ def render_html(data, *, source_sha256, include_pdf=True, mode="full"):
         counts=counts, categories=CATEGORIES, operations=OPERATIONS, tiers=TIERS, limitations=limitations,
         source_sha256=source_sha256, include_pdf=include_pdf, css=HERE.joinpath("style.css").read_text(encoding="utf-8"),
         demo_evidence=data.get("demo_evidence"), mode=mode, logo_data_uri=_logo_data_uri(),
-        detailed_report=data.get("detailed_report"))
+        detailed_report=data.get("detailed_report"), creator_name=CREATOR_NAME,
+        product_version_label=PRODUCT_VERSION_LABEL)
 
 
 def deny_resource(url, *args, **kwargs):

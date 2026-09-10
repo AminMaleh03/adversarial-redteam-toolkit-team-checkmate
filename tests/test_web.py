@@ -51,11 +51,50 @@ def test_index_returns_branded_welcome_page(client):
     resp = client.get("/")
     assert resp.status_code == 200
     body = resp.text
-    assert "TEAM CHECKMATE" in body
-    assert "Adversarial Input Red-Teaming Toolkit" in body
-    assert "Run Live Attack Test" in body
-    assert "Robustness," in body
-    assert 'src="data:image/png;base64,' in body  # real logo, not a placeholder
+    assert "Team Checkmate" in body
+    assert "RED LAB" in body
+    assert "Adversarial Testing Redefined" in body
+    assert "Run Live Demo" in body
+    assert "Run Live Attack Test" not in body  # old wording fully retired
+    assert "Robustness," not in body  # marketing hero copy belongs on / only, not repeated
+    assert body.count('src="data:image/png;base64,') == 2  # Team Checkmate logo + Red Lab logo
+
+
+def test_home_shows_red_lab_version_label(client):
+    body = client.get("/").text
+    assert "Red Lab v5.0" in body
+
+
+def test_home_navigation_has_required_links(client):
+    body = client.get("/").text
+    nav = body[body.index('id="primary-nav"'):body.index("</nav>")]
+    assert 'href="/"' in nav  # Home
+    assert 'href="#run"' in nav  # Live Demo
+    assert nav.count("<a ") >= 2
+
+
+def test_home_technical_report_link_targets_new_tab(client):
+    body = client.get("/").text
+    if "Technical Report" not in body:
+        pytest.skip("verified_full_report artifact not present in this checkout")
+    idx = body.index("Technical Report")
+    tag = body[body.rindex("<a", 0, idx):idx]
+    assert 'target="_blank"' in tag
+    assert 'rel="noopener"' in tag
+
+
+def test_home_has_mobile_menu_toggle_markup(client):
+    body = client.get("/").text
+    assert 'id="nav-toggle"' in body
+    assert 'aria-expanded="false"' in body
+    assert 'aria-controls="primary-nav"' in body
+
+
+def test_home_hero_has_secondary_cta_to_technical_report_when_available(client):
+    body = client.get("/").text
+    if "View Technical Report" not in body:
+        pytest.skip("verified_full_report artifact not present in this checkout")
+    assert 'id="run"' in body
 
 
 def test_healthz(client):
@@ -171,6 +210,67 @@ def test_failed_job_exposes_safe_message_not_a_traceback(monkeypatch, client):
     assert "127.0.0.1" not in state["error"]
     assert "Traceback" not in state["error"]
     assert state["error"]  # a concise public message is still present
+
+
+def test_home_page_has_no_unverified_timing_promise(client):
+    body = client.get("/").text
+    assert "Takes under a minute" not in body
+    assert "in one minute" not in body
+
+
+def test_static_css_has_no_automatic_dark_mode_override(client):
+    resp = client.get("/static/app.css")
+    assert resp.status_code == 200
+    assert "prefers-color-scheme" not in resp.text
+
+
+def test_static_css_still_defines_red_lab_tokens(client):
+    body = client.get("/static/app.css").text
+    for token in ("--rl-red", "--rl-charcoal", "--rl-paper", "--rl-surface", "--rl-muted", "--rl-border"):
+        assert token in body
+
+
+def test_results_analysis_json_opens_inline_not_as_attachment(monkeypatch, client, tmp_path):
+    monkeypatch.setattr(run_all, "RESULTS_ROOT", tmp_path)
+    run_dir = tmp_path / "hf_demo_test" / "report"
+    run_dir.mkdir(parents=True)
+    (run_dir / "analysis.json").write_text('{"schema_version": 2}', encoding="utf-8")
+
+    resp = client.get("/results/hf_demo_test/report/analysis.json")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json; charset=utf-8"
+    assert "content-disposition" not in resp.headers
+    assert resp.json() == {"schema_version": 2}
+
+
+def test_results_analysis_json_blocks_path_traversal(monkeypatch, client, tmp_path):
+    results_root = tmp_path / "results"
+    results_root.mkdir()
+    monkeypatch.setattr(run_all, "RESULTS_ROOT", results_root)
+    secret = tmp_path / "secret.json"
+    secret.write_text('{"leak": true}', encoding="utf-8")
+
+    resp = client.get("/results/%2e%2e/report/analysis.json")
+    assert resp.status_code == 404
+    assert "leak" not in resp.text
+
+
+def test_results_analysis_json_missing_run_returns_404(monkeypatch, client, tmp_path):
+    monkeypatch.setattr(run_all, "RESULTS_ROOT", tmp_path)
+    resp = client.get("/results/does-not-exist/report/analysis.json")
+    assert resp.status_code == 404
+    assert "content-disposition" not in resp.headers
+
+
+def test_verified_full_analysis_json_opens_inline_not_as_attachment(monkeypatch, client, tmp_path):
+    monkeypatch.setattr(run_all, "VERIFIED_FULL_REPORT_DIR", tmp_path)
+    (tmp_path / "analysis.json").write_text('{"ok": true}', encoding="utf-8")
+
+    resp = client.get("/verified-full/analysis.json")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json; charset=utf-8"
+    assert "content-disposition" not in resp.headers
+    assert resp.json() == {"ok": True}
 
 
 def test_new_run_allowed_after_previous_job_completes(monkeypatch, client, tmp_path):

@@ -318,6 +318,54 @@ def test_demo_evidence_entry_preserves_provenance_and_fits_header(ui):
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
 
 
+@pytest.mark.parametrize("width", [390, 1440])
+@pytest.mark.parametrize("entry", ["home", "demo"])
+def test_report_anchors_replace_history_and_back_returns_to_entry(ui, width, entry):
+    from report.generate import render_html
+    page, state = ui
+    page.set_viewport_size({'width': width, 'height': 1000})
+    if entry == 'demo':
+        data = json.loads((ROOT / 'artifacts/verified_full_report/analysis.json').read_bytes())
+        data['detailed_report'] = {'available': True, 'relative_href': '/verified-full/report.html'}
+        data['demo_evidence'] = {'notes': [], 'featured_failure': None, 'featured_prediction_flip': None}
+        rendered = render_html(data, source_sha256='a' * 64, mode='demo')
+        page.route(ORIGIN + '/results/history/report.html', lambda route: route.fulfill(
+            content_type='text/html', body=rendered))
+        page.goto(ORIGIN + '/results/history/report.html')
+        origin = page.url
+        page.locator('.downloads .button').click()
+    else:
+        page.goto(ORIGIN)
+        origin = page.url
+        page.locator('.hero-report').click()
+    page.wait_for_url('**/verified-full/report.html')
+    length = page.evaluate('history.length')
+    for target in ('remediation', 'provenance', 'v2-findings'):
+        if width <= 760:
+            page.locator('#toc-toggle').click()
+        page.locator('[data-toc-link][href="#' + target + '"]').click()
+        assert page.url.endswith('#' + target)
+        assert page.evaluate('history.length') == length
+        assert page.locator('[data-toc-link][href="#' + target + '"]').get_attribute('aria-current') == 'location'
+    page.reload()
+    assert page.url.endswith('#v2-findings')
+    assert page.locator('#v2-findings').bounding_box()['y'] >= 0
+    page.locator('.masthead > .rl-back-btn').click()
+    page.wait_for_url(origin)
+    page.go_forward()
+    page.wait_for_url('**/verified-full/report.html#v2-findings')
+    assert state.posts == 0 and state.lab_posts == 0
+
+
+def test_direct_report_deep_link_keeps_safe_back_fallback(ui):
+    page, state = ui
+    page.goto(ORIGIN + '/verified-full/report.html#remediation')
+    assert page.locator('#remediation').bounding_box()['y'] >= 0
+    page.locator('[data-toc-link][href="#provenance"]').click()
+    page.locator('.masthead > .rl-back-btn').click()
+    page.wait_for_url(ORIGIN + '/')
+
+
 def test_charts_exact_verified_rates_denominators_and_scale(ui):
     page, state = ui
     page.goto(ORIGIN + "/verified-full/report.html")

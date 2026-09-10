@@ -19,7 +19,7 @@
   <div class="masthead-inner">
   <a class="brand" href="#top"><img src="{{ logo_data_uri }}" alt="{{ creator_name }}" class="brand-logo"><span class="brand-text"><span class="brand-creator">{{ creator_name }}</span><span class="brand-product">{{ product_version_label }}</span></span></a>
   <button id="report-menu-toggle" class="report-menu-toggle" aria-expanded="false" aria-controls="report-menu" type="button">Menu</button><nav id="report-menu" aria-label="Demo report sections"><a class="home-link" href="/">Back to Red Lab</a><a href="/#run">Live Demo</a><a href="#demo-highlights">Demo</a><a href="#results">Results</a><a href="#method">Method</a><a href="#source">Evidence</a></nav>
-  <div class="downloads"><a href="analysis.json" target="_blank" rel="noopener">Source JSON</a>{% if detailed_report and detailed_report.available %}<a class="button" href="{{ detailed_report.relative_href }}" target="_blank" rel="noopener">View Detailed Report <span aria-hidden="true">↗</span></a>{% endif %}</div>
+  <div class="downloads"><a href="analysis.json" target="_blank" rel="noopener">Source JSON</a>{% if detailed_report and detailed_report.available %}<a class="button" href="{{ detailed_report.relative_href }}">View Detailed Report <span aria-hidden="true">↗</span></a>{% endif %}</div>
   </div>
 </header>
 <main>
@@ -40,7 +40,7 @@
     <p>This live run executes a curated subset of the full attack suite. The
     numbers on this page describe <strong>this demo run only</strong> and must not be read as the
     authoritative aggregate result. {% if detailed_report and detailed_report.available %}See the
-    <a href="{{ detailed_report.relative_href }}" target="_blank" rel="noopener">Technical Report</a>
+    <a href="{{ detailed_report.relative_href }}">Technical Report</a>
     for the complete 1,928-case benchmark.{% else %}See the Technical Report for the complete
     1,928-case benchmark.{% endif %}</p>
     {{ demo_coverage_line() }}
@@ -124,7 +124,7 @@
       <li>This demo mode runs a curated subset of the full attack suite so it finishes quickly for a live audience -- the same runner, same attack definitions, same real inference and analysis as full mode, just fewer cases.</li>
       <li>V2's defenses are application-layer only; a persisting prediction-flip weakness on V2 is an honest non-improvement, not a gap in the hardening -- fixing it needs model-level work, not endpoint code.</li>
       <li>A failed post-request health check is observed unavailability only. It is not proof that the underlying operating-system process terminated.</li>
-      <li>The complete technical evidence -- full finding register, audit appendix, and case-level detail -- exists in the Technical Report{% if detailed_report and detailed_report.available %} (<a href="{{ detailed_report.relative_href }}" target="_blank" rel="noopener">view it here</a>){% endif %}, not in this demo page.</li>
+      <li>The complete technical evidence -- full finding register, audit appendix, and case-level detail -- exists in the Technical Report{% if detailed_report and detailed_report.available %} (<a href="{{ detailed_report.relative_href }}">view it here</a>){% endif %}, not in this demo page.</li>
     </ul></div>
   </section>
 

@@ -1,4 +1,66 @@
-# V5.5 FINAL COLOR AND DYNAMICS CLOSURE
+# SYSTEM V6 — DEPLOYMENT RELEASE (IN PROGRESS)
+
+2026-09-10, Claude (took over from Codex after its usage limit), Asia/Dubai.
+Branch `ahsan/v5-redlab`, starting HEAD `901cc22`. Ahsan's V6 brief approves the V5.5
+visuals and authorizes the report-history fix, release hygiene/docs, a new V6 commit,
+a release-branch GitHub push, an exact-snapshot upload to the existing HF Space while
+Protected, real local/container/cloud/mobile acceptance, then Public visibility and an
+annotated `v6.0.0` tag. No merge, no V5.5 amendment, no redesign, no core/benchmark change.
+
+## V6 work completed and verified locally
+
+- **Report history fix.** `report/template.html`: every internal `a[href^="#"]` now
+  scrolls the target into view and calls `history.replaceState`, so sidebar/rubric/finding
+  navigation updates the deep-link hash without pushing page-history entries. Modified
+  clicks (ctrl/meta/shift/alt/middle) keep native behaviour. Scrollspy, `aria-current`,
+  the mobile drawer and Evidence/Audit ordering are unchanged; the generic Back control
+  was not touched.
+- **Report entry links now open in the same tab** (`web/templates/index.html`,
+  `web/templates/lab.html`, `report/demo_template.html`). Required by the brief's
+  Results -> Report -> Back requirement: a new tab has no previous page to return to.
+  Source JSON keeps its new-tab behaviour. No visual/layout change.
+- Verified report HTML re-rendered from the template (`artifacts/verified_full_report/
+  report.html`, `export_meta.json`). `analysis.json` and `report.pdf` untouched.
+- README deployment section updated to Red Lab V6 / `red-lab-v6:latest`.
+- Tests: 5 new desktop/mobile/direct-entry report-history cases in
+  `tests/test_ui_browser.py`; `tests/test_web.py` entry-link expectation updated.
+
+Validation (all by this checkout, evidence in ignored `results/`):
+- Full suite **604 passed, 1 pre-existing deprecation warning, 84.71s** —
+  `results/v6-final-tests.txt`.
+- Real local acceptance PASS — `results/v6-local-acceptance/summary.json`.
+  Demo -> Results -> Report -> `#remediation`/`#provenance`/`#v2-findings` ->
+  Back returns to Demo Results with `history.length` constant; second Back reaches Home;
+  mobile drawer flow returns to Home; Custom reload/Test Another; CUSTOM -> DEMO -> CUSTOM;
+  active-Demo rejoin keeps the same run_name; no stale completed execution view.
+- Docker `red-lab-v6:latest` built with cached apt/pip/model layers
+  (`results/v6-docker-build.log`); container acceptance PASS with six 200 routes and
+  real CUSTOM -> DEMO -> CUSTOM (`results/v6-docker-acceptance.json`).
+- Hygiene: no tracked `results/`, temporary scripts, logs, caches or credential-shaped
+  values (`results/v6-hygiene.json`). Absolute paths appear only in intentional
+  redaction fixtures in `tests/test_analysis*.py` and are retained.
+- No orphan endpoint processes or 8000/8001 listeners after local and container runs.
+- Integrity, before and after all V6 work:
+  `analysis.json` `12d47b35c700c6c172ceff5fc071f78952aef7a8695473dc457e9d69229737da`,
+  `report.pdf` `0853108d4939bab1ff2069a1e3dc42b8ad68b14096d12cfd1bfa81fbb56718ca`.
+  No benchmark rerun; contract/endpoint/attacks/analysis frozen paths unchanged.
+
+## Remotes and deployment state
+
+`origin` https://github.com/AminMaleh03/adversarial-redteam-toolkit-team-checkmate.git ;
+`space` https://huggingface.co/spaces/ahsan-141117/team-checkmate-adversarial-redteam-toolkit.
+HF authentication verified as `ahsan-141117`. Space pre-deployment: sha `b11bf79`,
+`private=True` (Protected), stage RUNNING — that is V4. Deployment method: `git archive`
+of the exact release commit plus authenticated `huggingface_hub.upload_folder`, then a
+remote tree hash check (raw HF git protocol-v2 fetch is known to fail here).
+Operator: ignored `results/v6_hf_release.py`.
+
+Next: push the V6 commit to `origin`, upload the same snapshot to the Space while it
+stays Protected, then cloud smoke/functional/mobile acceptance, Public visibility and
+the annotated `v6.0.0` tag.
+
+
+## Approved V5.5 snapshot (historical)
 
 Updated: 2026-09-10T18:07:45+04:00, Codex, Asia/Dubai.
 Branch: `ahsan/v5-redlab`. Observed pre-tuning HEAD: `b2b5f18`.

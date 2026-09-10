@@ -27,7 +27,7 @@
         <a href="#run" id="nav-live-demo">Live Demo</a>
         <a href="/lab" id="nav-try-lab">Try Your Own Input</a>
         {% if verified_full_available %}
-        <a href="{{ verified_full_href }}" target="_blank" rel="noopener">Technical Report</a>
+        <a href="{{ verified_full_href }}">Technical Report</a>
         {% endif %}
       </nav>
     </div>
@@ -56,7 +56,7 @@
           <div class="hero-path"><a class="button secondary" href="/lab">Try Your Own Input</a><p class="caption">Put your own sentence to the test</p></div>
         </div>
         {% if verified_full_available %}
-        <a class="button tertiary hero-report" href="{{ verified_full_href }}" target="_blank" rel="noopener">View Technical Report</a>
+        <a class="button tertiary hero-report" href="{{ verified_full_href }}">View Technical Report</a>
         {% endif %}
         <p id="cta-note" class="caption">Real requests. Recorded outcomes. Evidence you can inspect.</p>
         <p class="model">Model: j-hartmann/emotion-english-distilroberta-base &middot; 7 emotion labels</p>

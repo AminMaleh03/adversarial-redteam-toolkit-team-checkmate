@@ -74,14 +74,14 @@ def test_home_navigation_has_required_links(client):
     assert nav.count("<a ") >= 3
 
 
-def test_home_technical_report_link_targets_new_tab(client):
+def test_home_technical_report_link_preserves_page_history(client):
     body = client.get("/").text
     if "Technical Report" not in body:
         pytest.skip("verified_full_report artifact not present in this checkout")
     idx = body.index("Technical Report")
     tag = body[body.rindex("<a", 0, idx):idx]
-    assert 'target="_blank"' in tag
-    assert 'rel="noopener"' in tag
+    assert 'target="_blank"' not in tag
+    assert 'href="/verified-full/report.html"' in tag
 
 
 def test_home_has_mobile_menu_toggle_markup(client):

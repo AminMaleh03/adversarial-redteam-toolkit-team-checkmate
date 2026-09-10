@@ -1301,11 +1301,19 @@ function rlGoBack(event) {
     closeDrawer();
     toc.inert = isMobile();
   });
-  toc.querySelectorAll("[data-toc-link]").forEach(function (link) {
-    link.addEventListener("click", function () {
-      clickedLink = link;
-      setActive(link);
-      if (isMobile()) { closeDrawer(); }
+  document.querySelectorAll('a[href^="#"]').forEach(function (link) {
+    link.addEventListener("click", function (event) {
+      // Internal document navigation stays in one logical report history entry.
+      // Preserve modified clicks so opening a deep link in another tab still works.
+      if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      var target = document.getElementById(link.hash.slice(1));
+      if (!target) return;
+      event.preventDefault();
+      clickedLink = toc.querySelector('[data-toc-link][href="' + link.hash + '"]');
+      setActive(clickedLink);
+      if (isMobile() && toc.classList.contains("is-open")) { closeDrawer(); }
+      target.scrollIntoView({ behavior: "instant", block: "start" });
+      window.history.replaceState(window.history.state, "", link.hash);
     });
   });
 

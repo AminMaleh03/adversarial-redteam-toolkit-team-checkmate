@@ -13,14 +13,11 @@ header: mini
 
 Toolkit for automated robustness testing of AI inference endpoints.
 
-> **In development: System V5 ("Red Lab").** The public web app and generated reports are
-> being rebranded from Team Checkmate's internal toolkit name to **Red Lab** ("Adversarial
-> Testing Redefined"), with a shared design system, responsive navigation and consistent page
-> identity (V5.1, current). Team Checkmate remains the creator/team credit throughout. Later
-> V5 phases (full-screen live-demo UX, a restructured technical report, a custom-input engine,
-> final hardening, Hugging Face deployment) are tracked but not yet implemented -- see
-> `HANDOFF.md` for exact scope and status. This does not change any of the validated attack/
-> analysis/scoring behavior documented below.
+**Red Lab V6 deployment release.** Team Checkmate's adversarial testing application
+includes a live curated Demo, a private custom-input Lab, and the preserved technical
+benchmark report. V5.5 visual design is approved; V6 fixes internal report history and
+packages the existing application for deployment. See `HANDOFF.md` for verified release
+and cloud status. Model, attacks and analysis semantics remain unchanged.
 
 ## What This Project Does
 
@@ -273,11 +270,11 @@ already exist. The [report guide](report/README.md) covers saved input, interpre
 safety and testing; the [analysis guide](analysis/README.md) defines the schema and
 comparison rules.
 
-## Deployment (System V4)
+## Deployment (Red Lab V6)
 
 `web/` is a thin FastAPI layer around the same `run_experiment()` used by `run_all.py` --
 it does not reimplement any attack/runner/analysis/report logic. It serves a public
-welcome page, a "Run Live Attack Test" button that starts one background demo run at a
+Home page, a "Run Live Demo" button that starts one background demo run at a
 time (protected by an in-process lock), and serves the resulting report over HTTP. See
 `AGENTS.md` for the full architecture and ownership rules.
 
@@ -292,8 +289,8 @@ Then open `http://localhost:7860/`.
 With Docker (matches the Hugging Face Docker Space build):
 
 ```bash
-docker build -t team-checkmate-v4 .
-docker run --rm -p 7860:7860 team-checkmate-v4
+docker build -t red-lab-v6:latest .
+docker run --rm -p 7860:7860 red-lab-v6:latest
 ```
 
 Only port 7860 is public; V1/V2 (`127.0.0.1:8000`/`8001`) run and are attacked entirely

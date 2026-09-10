@@ -172,28 +172,23 @@ def test_home_view_has_no_native_back_action(client):
     body = client.get("/").text
     home_section = body[body.index('id="view-home"'):body.index('id="view-execution"')]
     assert 'id="exec-back"' not in home_section
-    assert "&larr; Back<" not in home_section
+    assert 'class="rl-back-btn' not in home_section
 
 
-def test_demo_execution_view_has_native_back_action(client):
+def test_demo_execution_back_lives_in_outer_chrome(client):
     body = client.get("/").text
-    exec_section = body[body.index('id="view-execution"'):body.index("</section>", body.index('id="view-execution"'))]
-    assert 'id="exec-back"' in exec_section
-    assert "&larr; Back" in exec_section
-    # Present in both the running body and the failure sub-state -- it lives outside both,
-    # at the top of .execution-inner, so a single control covers every sub-state.
-    back_idx = exec_section.index('id="exec-back"')
-    body_idx = exec_section.index('id="exec-body"')
-    assert back_idx < body_idx
+    header = body[body.index('<header'):body.index('</header>')]
+    assert 'id="exec-back" class="rl-back-btn" aria-label="Back" title="Back" hidden' in header
+    assert header.index('id="exec-back"') < header.index('class="masthead-inner"')
 
 
 def test_app_js_back_uses_shared_history_fallback_behavior(client):
-    js = client.get("/static/app.js").text
-    assert "function goBack(event)" in js
-    assert "window.history.back()" in js
-    assert "window.history.length > 1" in js
-    assert "document.referrer" in js
-    assert 'execBack.addEventListener("click", goBack)' in js
+    assert '/static/chrome.js' in client.get("/").text
+    js = client.get("/static/chrome.js").text
+    assert 'window.history.back()' in js
+    assert 'window.history.length > 1' in js
+    assert 'new URL(document.referrer).origin === window.location.origin' in js
+    assert 'querySelectorAll(".rl-back-btn")' in js
 
 
 def test_home_page_links_to_v54_live_red_team_lab(client):
@@ -228,7 +223,8 @@ def test_app_js_switches_view_on_run_and_reattach(client):
 def test_app_js_uses_backend_result_url_for_completion_redirect(client):
     js = client.get("/static/app.js").text
     assert "state.result_url" in js
-    assert "COMPLETE_REDIRECT_DELAY_MS" in js
+    assert "window.location.replace(state.result_url)" in js
+    assert "COMPLETE_REDIRECT_DELAY_MS" not in js
 
 
 def test_app_js_has_no_cancel_handler(client):
@@ -257,21 +253,21 @@ def test_home_page_has_no_container_internals_wording(client):
     assert "inside this container" not in body
 
 
-def test_app_js_completion_uses_same_heading_element_as_stage_messages(client):
+def test_app_js_completion_replaces_transient_execution(client):
     body = client.get("/").text
     js = client.get("/static/app.js").text
     # Exactly one exec-heading element server-side -- no separate, smaller completion element.
     assert body.count('id="exec-heading"') == 1
-    assert js.count('execHeading.textContent = "Experiment complete"') == 1
-    assert "execHeading.textContent = state.message" in js
+    assert 'execHeading.textContent = "Experiment complete"' not in js
+    assert "window.location.replace(state.result_url)" in js
 
 
 def test_app_js_nav_live_demo_reuses_start_run_not_duplicated(client):
     js = client.get("/static/app.js").text
     assert "goToLiveDemo" in js
-    assert "startRun(triggerEl)" in js
+    assert "else startRun()" in js
     assert "navLiveDemo.addEventListener" in js
-    assert "e.preventDefault()" in js
+    assert "event.preventDefault()" in js
 
 
 def test_healthz(client):
@@ -479,3 +475,68 @@ def test_new_run_allowed_after_previous_job_completes(monkeypatch, client, tmp_p
     assert resp.status_code == 202
     assert resp.json()["status"] == "running"
     _wait_until_not_running(client)
+
+
+# ------------------------------------------------------------------------------------------
+# System V5.5 release-candidate polish: design-contract checks.
+# ------------------------------------------------------------------------------------------
+
+
+def test_home_page_has_landing_background_canvas_and_particles_script(client):
+    body = client.get("/").text
+    assert 'id="rl-bg-canvas"' in body
+    assert '<script src="/static/particles.js">' in body
+    # The canvas lives inside #view-home only -- never inside the execution view.
+    home_section = body[body.index('id="view-home"'):body.index('id="view-execution"')]
+    assert 'id="rl-bg-canvas"' in home_section
+
+
+def test_particles_script_respects_reduced_motion_and_is_self_contained(client):
+    js = client.get("/static/particles.js").text
+    assert "prefers-reduced-motion" in js
+    # Never runs its animation loop (requestAnimationFrame) when reduced motion is on --
+    # only the one-shot static render path does.
+    assert "requestAnimationFrame" in js
+    assert "draw(0)" in js
+    assert "!media.matches" in js
+    # No dependency on app.js/lab.js globals -- fully self-contained (brief: no new library).
+    assert "getElementById(\"rl-bg-canvas\")" in js
+
+
+def test_app_css_reduced_motion_keeps_static_texture_without_animation():
+    css = (ROOT / "web" / "static" / "app.css").read_text(encoding="utf-8")
+    assert "@media (prefers-reduced-motion: reduce)" in css
+    assert "animation: none !important" in css
+    assert "transition: none !important" in css
+    assert "#rl-bg-canvas { display: none; }" not in css
+
+
+def test_app_css_masthead_has_frosted_backdrop_filter():
+    css = (ROOT / "web" / "static" / "app.css").read_text(encoding="utf-8")
+    assert "backdrop-filter: blur" in css
+    assert "@supports (backdrop-filter: blur(1px))" in css  # graceful fallback, not required
+
+
+def test_back_buttons_share_circular_component_with_accessible_label(client):
+    for path in ("/", "/lab"):
+        body = client.get(path).text
+        header = body[body.index('<header'):body.index('</header>')]
+        assert 'class="rl-back-btn" aria-label="Back" title="Back"' in header
+        assert header.index('class="rl-back-btn"') < header.index('class="masthead-inner"')
+
+
+def test_app_css_rl_back_btn_is_circular_and_focus_visible():
+    css = (ROOT / "web" / "static" / "app.css").read_text(encoding="utf-8")
+    rule = css[css.index(".rl-back-btn {"):css.index(".rl-back-btn {") + 600]
+    assert "border-radius: 50%" in rule
+    assert "width: 40px" in rule and "height: 40px" in rule
+    assert ":focus-visible" in css.split(".rl-back-btn {", 1)[1][:700]
+
+
+def test_version_card_v1_v2_are_distinguished_by_text_and_color_not_color_alone():
+    body_text = (ROOT / "web" / "templates" / "index.html").read_text(encoding="utf-8")
+    assert "Unhardened Endpoint" in body_text
+    assert "Hardened Endpoint" in body_text
+    css = (ROOT / "web" / "static" / "app.css").read_text(encoding="utf-8")
+    assert ".version-card.v1 { border-left-color: var(--rl-danger)" in css
+    assert ".version-card.v2 { border-left-color: var(--rl-success)" in css

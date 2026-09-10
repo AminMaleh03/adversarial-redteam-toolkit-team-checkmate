@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   {# script-src 'unsafe-inline' (System V5.3): the report's own inline <script> at the end of
-     <body> runs the sidebar/TOC/scrollspy interactions below -- still no external script
+     <body class="has-back"> runs the sidebar/TOC/scrollspy interactions below -- still no external script
      source of any kind, no eval, nothing else in this CSP changed. WeasyPrint never executes
      the script when rendering report.pdf, so this has no effect on the PDF. #}
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
@@ -13,7 +13,7 @@
   {# Only the repository-owned stylesheet is trusted; all analysis values stay escaped. #}
   <style>{{ css|safe }}</style>
 </head>
-<body>
+<body class="has-back">
 {% macro ids(label, values) -%}
   {% if values %}<details class="evidence"><summary>{{ label }} · {{ values|length }} case{% if values|length != 1 %}s{% endif %}</summary>
   <div class="id-list">{% for value in values %}<code>{{ value }}</code>{% endfor %}</div></details>{% endif %}
@@ -21,17 +21,21 @@
 {% macro coverage_line() -%}
 <p class="coverage-line">Recorded coverage · {% for s in versions %}{{ s.version|upper }} {{ s.coverage.completed }}/{{ s.coverage.planned }} ({{ s.coverage.coverage_rate|percent }}){% if not loop.last %} · {% endif %}{% endfor %}</p>
 {%- endmacro %}
+{% from "charts.html" import categories_chart, flips_chart %}
 {% set v1 = versions[0] %}
 {% set v2 = versions[1] %}
 {% set remediations = [] %}
 {% for s in versions %}{% for e in s.entries %}{% if e.finding.remediation not in remediations %}{% set _ = remediations.append(e.finding.remediation) %}{% endif %}{% endfor %}{% endfor %}
 <a class="skip-link" href="#report-main">Skip to report content</a>
 <header class="masthead">
+  <a class="rl-back-btn" href="/" onclick="return rlGoBack(event)" aria-label="Back" title="Back">&larr;</a>
+  <div class="masthead-inner">
   <a class="brand" href="#overview"><img src="{{ logo_data_uri }}" alt="{{ creator_name }}" class="brand-logo"><span class="brand-text"><span class="brand-creator">{{ creator_name }}</span><span class="brand-product">{{ product_version_label }}</span></span></a>
   <button id="toc-toggle" class="toc-toggle" type="button" aria-expanded="false" aria-controls="report-toc">
     <span class="toc-toggle-bars" aria-hidden="true"></span> Contents
   </button>
-  <div class="downloads"><a class="home-link" href="/" onclick="return rlGoBack(event)">&larr; Back</a><a class="home-link" href="/">Back to Red Lab</a><a href="analysis.json" target="_blank" rel="noopener">Source JSON</a>{% if include_pdf %}<a class="button" href="report.pdf" download>Download PDF <span aria-hidden="true">↓</span></a>{% endif %}</div>
+  <div class="downloads"><a class="home-link" href="/">Back to Red Lab</a><a href="analysis.json" target="_blank" rel="noopener">Source JSON</a>{% if include_pdf %}<a class="button" href="report.pdf" download>Download PDF <span aria-hidden="true">↓</span></a>{% endif %}</div>
+  </div>
 </header>
 
 <div class="report-shell" id="report-shell">
@@ -66,6 +70,7 @@
             <li><a href="#results" data-toc-link>Overview</a></li>
             {% if not withheld %}
             <li><a href="#category-failure-rates" data-toc-link>Failure Rate by Category</a></li>
+            <li><a href="#prediction-flips" data-toc-link>Prediction Sensitivity</a></li>
             <li><a href="#operational-observations" data-toc-link>Operational Observations</a></li>
             {% endif %}
             <li><a href="#v1-observations" data-toc-link>V1 Coverage &amp; Drift</a></li>
@@ -107,6 +112,16 @@
         </li>
       </ul>
     </nav>
+    <div class="rubric-block" aria-label="Judging rubric quick links">
+      <p class="rubric-title" id="rubric-title">Judging Rubric</p>
+      <ul class="rubric-list" aria-labelledby="rubric-title">
+        <li><a class="rubric-link rubric-fit" href="#experiment">Fit <span class="rubric-pct">20%</span></a></li>
+        <li><a class="rubric-link rubric-relevance" href="#defenses">Relevance <span class="rubric-pct">15%</span></a></li>
+        <li><a class="rubric-link rubric-prototype" href="#v1-observations">Prototype <span class="rubric-pct">25%</span></a></li>
+        <li><a class="rubric-link rubric-depth" href="#results">Technical Depth <span class="rubric-pct">25%</span></a></li>
+        <li><a class="rubric-link rubric-innovation" href="#comparison">Innovation <span class="rubric-pct">15%</span></a></li>
+      </ul>
+    </div>
     </div>
   </aside>
 
@@ -121,7 +136,7 @@
     </section>
 
     <section class="report-section endpoint-intro" id="experiment" aria-label="The experiment">
-      <div class="section-heading"><span class="section-number">A</span><div><p class="eyebrow">THE EXPERIMENT</p><h2>What is V1? What is V2?</h2></div></div>
+      <div class="section-heading"><span class="section-number">A</span><div><span class="rubric-chip rubric-fit">Fit &middot; 20%</span><p class="eyebrow">THE EXPERIMENT</p><h2>What is V1? What is V2?</h2></div></div>
       <p class="same-model-note"><strong>Same underlying AI model.</strong> V1 and V2 run the identical classifier;
       only the endpoint configuration differs between the two columns below.</p>
       <div class="endpoint-pair">
@@ -159,11 +174,11 @@
     </section>
 
     {% if withheld %}
-    <aside class="notice warning" id="comparison" role="note"><p class="eyebrow">THE COMPARISON</p><h2>These runs cannot support a before/after conclusion.</h2><p>{{ withheld }}</p>
+    <aside class="notice warning" id="comparison" role="note"><span class="rubric-chip rubric-innovation">Innovation &middot; 15%</span><p class="eyebrow">THE COMPARISON</p><h2>These runs cannot support a before/after conclusion.</h2><p>{{ withheld }}</p>
     <p>Each version's observations are reported independently below. No resolution or regression conclusions are displayed.</p>{{ coverage_line() }}</aside>
     {% else %}
     <section class="verdict" id="comparison" aria-label="Finding comparison summary">
-      <div class="verdict-heading"><div><p class="eyebrow">THE COMPARISON</p><h2>What changed after hardening?</h2></div><span class="badge compatible">Compatible inputs</span></div>
+      <div class="verdict-heading"><div><span class="rubric-chip rubric-innovation">Innovation &middot; 15%</span><p class="eyebrow">THE COMPARISON</p><h2>What changed after hardening?</h2></div><span class="badge compatible">Compatible inputs</span></div>
       {{ coverage_line() }}
       <div class="metrics">
         <div class="metric"><strong>{{ counts.resolved }}</strong><span>Resolved groups</span><small>Original evidence no longer shows that failure mode.</small></div>
@@ -177,16 +192,20 @@
     {% endif %}
 
     <section id="results" class="report-section">
-      <div class="section-heading"><span class="section-number">01</span><div><p class="eyebrow">MEASURED OUTCOMES</p><h2>Where the pressure landed.</h2></div></div>
+      <div class="section-heading"><span class="section-number">01</span><div><span class="rubric-chip rubric-depth">Technical Depth &middot; 25%</span><p class="eyebrow">MEASURED OUTCOMES</p><h2>Where the pressure landed.</h2></div></div>
       {% if not withheld %}
       {{ coverage_line() }}
       <div class="panel" id="category-failure-rates"><div class="panel-heading"><h3>Failure rate by attack category</h3><div class="legend"><span class="v1-dot">V1</span><span class="v2-dot">V2</span></div></div>
         <p class="caption">Failed / eligible automatically scored attacks. Each attack counts once per category, even if it triggers several failure modes. Rates reflect this suite's composition.</p>
+        {{ categories_chart(categories, comparison) }}
+        <details class="chart-data"><summary>View category data table</summary>
         <table class="category-table"><caption class="sr-only">V1 and V2 category failure rates</caption><thead><tr><th scope="col">Category</th><th scope="col">V1 · Unhardened</th><th scope="col">V2 · Hardened</th></tr></thead><tbody>
         {% for category in categories %}<tr><th scope="row">{{ category|capitalize }}</th>{% for v in ['v1', 'v2'] %}{% set r = comparison.category_failure_rates[category][v] %}
           <td><div class="rate-label"><strong>{{ r.rate|percent }}</strong><span>{{ r.failed }} / {{ r.eligible }}</span></div><div class="bar-track" aria-hidden="true"><div class="bar {{ v }}" style="width: {{ 0 if r.rate == 'N/A' else r.rate * 100 }}%"></div></div></td>{% endfor %}</tr>{% endfor %}
         </tbody></table>
+        </details>
       </div>
+      <div class="panel" id="prediction-flips">{{ flips_chart(versions) }}</div>
       <div class="panel" id="operational-observations"><h3>Operational observations</h3><p class="caption">Scored attacks only. A request error, timeout, and failed health check are separate observations and can overlap.</p>
         <table><caption class="sr-only">Operational observations by version</caption><thead><tr><th scope="col">Outcome</th><th scope="col">V1</th><th scope="col">V2</th></tr></thead><tbody>
         {% for key, label in operations.items() %}<tr><th scope="row">{{ label }}</th><td>{{ comparison.operational.v1[key] }}</td><td>{{ comparison.operational.v2[key] }}</td></tr>{% endfor %}
@@ -196,6 +215,7 @@
 
       {% for s in versions %}
       <article class="version-section" id="{{ s.version }}-observations">
+        {% if s.version == 'v1' %}<span class="rubric-chip rubric-prototype">Prototype &middot; 25%</span>{% endif %}
         <h3><span class="badge {{ s.version }}">{{ s.version|upper }}</span> {{ 'Unhardened endpoint' if s.version == 'v1' else 'Hardened endpoint' }}</h3>
         <div class="two-up">
         <div class="panel coverage-panel"><p class="eyebrow">RECORDED COVERAGE</p><p class="big-stat">{{ s.coverage.completed }}<span> / {{ s.coverage.planned }}</span></p><p>{{ s.coverage.coverage_rate|percent }} of planned cases recorded</p>
@@ -255,7 +275,7 @@
       <div class="panel" id="pipeline"><h3>Pipeline</h3>
       <div class="pipeline" aria-label="System data flow"><span>Clean baseline</span><span>Attack library</span><span>V1 / V2 runner</span><span>Manifest + results</span><span>Analysis</span><span>This report</span></div>
       <p class="caption">Baseline sentences are attacked once per category, sent to both endpoints under the same runner, then scored by the same analysis rules and rendered into this report.</p></div>
-      <div class="panel" id="defenses"><h3>Four defenses, one shared model</h3><ol class="defenses"><li><strong>Length validation.</strong> Reject sequences over the model's limit before inference.</li><li><strong>Strict request types.</strong> Reject wrong types and unexpected fields.</li><li><strong>Scoped exception handling.</strong> Contain unexpected errors while preserving validation responses.</li><li><strong>Unicode and whitespace cleanup.</strong> Normalize text before inference.</li></ol><p>V1 and V2 run the identical model; only V2 adds these four application-layer defenses. No retraining, no silent truncation. Prediction timeout: 10 seconds. Latency bands: under 2 seconds normal, 2 seconds up to the deadline slow, deadline reached timeout.</p></div>
+      <div class="panel" id="defenses"><span class="rubric-chip rubric-relevance">Relevance &middot; 15%</span><h3>Four defenses, one shared model</h3><ol class="defenses"><li><strong>Length validation.</strong> Reject sequences over the model's limit before inference.</li><li><strong>Strict request types.</strong> Reject wrong types and unexpected fields.</li><li><strong>Scoped exception handling.</strong> Contain unexpected errors while preserving validation responses.</li><li><strong>Unicode and whitespace cleanup.</strong> Normalize text before inference.</li></ol><p>V1 and V2 run the identical model; only V2 adds these four application-layer defenses. No retraining, no silent truncation. Prediction timeout: 10 seconds. Latency bands: under 2 seconds normal, 2 seconds up to the deadline slow, deadline reached timeout.</p></div>
       <div class="panel" id="interpretation-limits"><h3>Interpretation limits</h3><ul class="limitations">{% for note in limitations %}<li>{{ note }}</li>{% endfor %}
         <li>Category failure rates and prediction-flip rates use different eligible denominators. A zero denominator is displayed as N/A.</li>
         <li>Manifest and suite compatibility are supplied by analysis. The report validates the JSON interface; it does not independently replay requests or prove when the manifest was registered.</li>
@@ -288,7 +308,7 @@
 // the IIFE below) so the inline onclick attribute on the masthead's Back link can call it.
 function rlGoBack(event) {
   if (window.history.length > 1 && document.referrer &&
-      document.referrer.indexOf(window.location.origin) === 0) {
+      new URL(document.referrer).origin === window.location.origin) {
     event.preventDefault();
     window.history.back();
   }
@@ -309,6 +329,8 @@ function rlGoBack(event) {
 
   function openDrawer() {
     toc.classList.add("is-open");
+    toc.inert = false;
+    document.body.style.overflow = "hidden";
     if (tocBackdrop) tocBackdrop.hidden = false;
     if (tocToggle) tocToggle.setAttribute("aria-expanded", "true");
     var closeBtn = tocClose;
@@ -316,6 +338,8 @@ function rlGoBack(event) {
   }
   function closeDrawer() {
     toc.classList.remove("is-open");
+    toc.inert = isMobile();
+    document.body.style.overflow = "";
     if (tocBackdrop) tocBackdrop.hidden = true;
     if (tocToggle) tocToggle.setAttribute("aria-expanded", "false");
     if (tocToggle) tocToggle.focus();
@@ -329,9 +353,22 @@ function rlGoBack(event) {
   if (tocBackdrop) tocBackdrop.addEventListener("click", closeDrawer);
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && toc.classList.contains("is-open")) { closeDrawer(); }
+    if (e.key === "Tab" && isMobile() && toc.classList.contains("is-open")) {
+      var focusable = Array.prototype.filter.call(toc.querySelectorAll("a, button"), function (el) { return el.getClientRects().length; });
+      var first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  });
+  toc.inert = isMobile();
+  window.matchMedia("(max-width: 760px)").addEventListener("change", function () {
+    closeDrawer();
+    toc.inert = isMobile();
   });
   toc.querySelectorAll("[data-toc-link]").forEach(function (link) {
     link.addEventListener("click", function () {
+      clickedLink = link;
+      setActive(link);
       if (isMobile()) { closeDrawer(); }
     });
   });
@@ -375,7 +412,21 @@ function rlGoBack(event) {
     return 0;
   });
 
+  var activeLink = null;
+  var clickedLink = null;
+  // Near the end of the document several collapsed appendix targets fit on screen.
+  // Honor an explicit destination immediately, until the reader scrolls the document.
+  function releaseClickedLink(event) {
+    if (event.target.closest && event.target.closest("#report-toc")) return;
+    if (event.type === "keydown" && !["ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End", " "].includes(event.key)) return;
+    clickedLink = null;
+  }
+  ["wheel", "touchmove", "keydown", "pointerdown"].forEach(function (type) {
+    document.addEventListener(type, releaseClickedLink, { passive: true });
+  });
   function setActive(link) {
+    if (link === activeLink) return;
+    activeLink = link;
     tocLinks.forEach(function (l) {
       l.classList.remove("is-active");
       l.removeAttribute("aria-current");
@@ -391,7 +442,7 @@ function rlGoBack(event) {
     // percentage) so short/collapsed targets -- e.g. the Evidence & Audit <details>
     // elements, which are only their <summary> line tall when closed -- register reliably
     // right under the bar rather than inside an arbitrary percentage band (System V5.3 fix).
-    var navHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--report-nav-height")) || 84;
+    var navHeight = document.querySelector(".masthead").getBoundingClientRect().height;
     // Track intersection state per target rather than reacting to one entry at a time:
     // several short/collapsed targets (again, the Evidence & Audit details) can be
     // simultaneously intersecting in one observer callback, and picking whichever the
@@ -403,6 +454,7 @@ function rlGoBack(event) {
     targets.forEach(function (t) { intersecting.set(t.el, false); });
 
     function updateActive() {
+      if (clickedLink) { setActive(clickedLink); return; }
       var activeTarget = null;
       for (var i = 0; i < targets.length; i++) {
         if (intersecting.get(targets[i].el)) { activeTarget = targets[i]; }
@@ -410,11 +462,20 @@ function rlGoBack(event) {
       if (activeTarget) { setActive(activeTarget.link); }
     }
 
-    var observer = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) { intersecting.set(entry.target, entry.isIntersecting); });
-      updateActive();
-    }, { rootMargin: "-" + navHeight + "px 0px -65% 0px", threshold: 0 });
-    targets.forEach(function (t) { observer.observe(t.el); });
+    var observer = null;
+    function observeSections() {
+      if (observer) observer.disconnect();
+      navHeight = document.querySelector(".masthead").getBoundingClientRect().height;
+      document.documentElement.style.setProperty("--report-nav-height", navHeight + "px");
+      targets.forEach(function (t) { intersecting.set(t.el, false); });
+      observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) { intersecting.set(entry.target, entry.isIntersecting); });
+        updateActive();
+      }, { rootMargin: "-" + navHeight + "px 0px -65% 0px", threshold: 0 });
+      targets.forEach(function (t) { observer.observe(t.el); });
+    }
+    observeSections();
+    new ResizeObserver(observeSections).observe(document.querySelector(".masthead"));
   }
 })();
 </script>

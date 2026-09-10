@@ -1,217 +1,147 @@
 (function () {
   "use strict";
-
   var viewHome = document.getElementById("view-home");
   var viewExecution = document.getElementById("view-execution");
+  var execHeading = document.getElementById("exec-heading");
+  var execBack = document.getElementById("exec-back");
+  var navLiveDemo = document.getElementById("nav-live-demo");
   var runBtn = document.getElementById("run-btn");
   var retryBtn = document.getElementById("retry-btn");
-  var navLiveDemo = document.getElementById("nav-live-demo");
-  var execHeading = document.getElementById("exec-heading");
-  var execBody = document.getElementById("exec-body");
-  var execFailure = document.getElementById("exec-failure");
-  var execError = document.getElementById("exec-error");
-  var progressBar = document.getElementById("progress-bar");
-  var progressFill = document.getElementById("progress-fill");
-  var execPercent = document.getElementById("exec-percent");
   var stageItems = document.querySelectorAll(".stage-list li");
-  var navToggle = document.getElementById("nav-toggle");
-  var primaryNav = document.getElementById("primary-nav");
-  var execBack = document.getElementById("exec-back");
-  var POLL_MS = 1500;
-  var polling = false;
+  var timer = null;
   var launching = false;
-  var redirectTimer = null;
-  var COMPLETE_REDIRECT_DELAY_MS = 900;
-
-  // Mobile compact/collapsible menu -- keeps navigation reachable on narrow screens
-  // instead of letting the header wrap into an awkward multi-line block. Unchanged by V5.2.
-  if (navToggle && primaryNav) {
-    navToggle.addEventListener("click", function () {
-      var open = primaryNav.classList.toggle("open");
-      navToggle.setAttribute("aria-expanded", open ? "true" : "false");
-    });
-    primaryNav.querySelectorAll("a").forEach(function (link) {
-      link.addEventListener("click", function () {
-        primaryNav.classList.remove("open");
-        navToggle.setAttribute("aria-expanded", "false");
-      });
-    });
+  var checking = false;
+  var generation = 0;
+  var POLL_MS = 1500;
+  function executionRoute() { return window.location.hash === "#demo"; }
+  function showHome() {
+    generation++;
+    clearTimeout(timer); timer = null;
+    viewHome.hidden = false; viewExecution.hidden = true; execBack.hidden = true;
+    document.body.classList.remove("has-back");
+    navLiveDemo.removeAttribute("aria-current");
+    document.getElementById("nav-home").setAttribute("aria-current", "page");
   }
-
-  // ---- shared Red Lab "native-style Back" behavior (System V5.4 final integration) -----
-  // Same logic as report/template.html's/report/demo_template.html's inline rlGoBack() and
-  // lab.js's goBack(): if useful same-origin browser history exists, use it; otherwise let
-  // the link's own href="/" fallback navigate normally (also correct with JS disabled).
-  // Navigating away leaves a running experiment untouched server-side -- if the job is
-  // still "running", the fallback landing on "/" simply re-triggers the existing
-  // reattachment check below, which brings the visitor right back into the live execution
-  // view. Nothing here stops or interrupts the server-side run.
-  function goBack(event) {
-    if (window.history.length > 1 && document.referrer &&
-        document.referrer.indexOf(window.location.origin) === 0) {
-      event.preventDefault();
-      window.history.back();
-    }
-  }
-  if (execBack) {
-    execBack.addEventListener("click", goBack);
-  }
-
-  function setStageClasses(currentIndex) {
-    stageItems.forEach(function (li, idx) {
-      li.classList.remove("active", "done");
-      if (idx < currentIndex) {
-        li.classList.add("done");
-      } else if (idx === currentIndex) {
-        li.classList.add("active");
-      }
-    });
-  }
-
-  function setProgress(percent, message) {
-    var pct = percent || 0;
-    progressFill.style.width = pct + "%";
-    progressBar.setAttribute("aria-valuenow", String(pct));
-    if (message) {
-      progressBar.setAttribute("aria-valuetext", pct + "%, " + message);
-    }
-    if (execPercent) execPercent.textContent = pct + "%";
-  }
-
-  // Switches the page from the landing view into the dedicated, viewport-filling execution
-  // state (System V5.2). The home hero is fully hidden, not just scrolled past -- the
-  // execution view becomes the only visible primary content.
   function activateExecutionView() {
-    if (viewHome) viewHome.hidden = true;
-    if (viewExecution) {
-      viewExecution.hidden = false;
-      viewExecution.classList.remove("is-complete");
-    }
-    if (execFailure) execFailure.hidden = true;
-    if (execBody) execBody.hidden = false;
-    if (execHeading) execHeading.focus();
+    if (!executionRoute()) window.history.pushState({ redLab: "demo" }, "", "/#demo");
+    var entering = viewExecution.hidden;
+    viewHome.hidden = true; viewExecution.hidden = false; execBack.hidden = false;
+    document.body.classList.add("has-back");
+    document.getElementById("exec-failure").hidden = true;
+    document.getElementById("exec-body").hidden = false;
+    navLiveDemo.setAttribute("aria-current", "page");
+    document.getElementById("nav-home").removeAttribute("aria-current");
+    if (entering) execHeading.focus();
   }
-
   function showFailure(message) {
-    if (redirectTimer) {
-      clearTimeout(redirectTimer);
-      redirectTimer = null;
-    }
-    if (execHeading) execHeading.textContent = "LIVE DEMO FAILED";
-    if (execBody) execBody.hidden = true;
-    if (execFailure) execFailure.hidden = false;
-    if (execError) execError.textContent = message || "The live run failed. Please try again.";
-    if (retryBtn) retryBtn.disabled = false;
+    execHeading.textContent = "Live demo paused";
+    document.getElementById("exec-body").hidden = true;
+    document.getElementById("exec-failure").hidden = false;
+    document.getElementById("exec-error").textContent = message;
+    retryBtn.disabled = false;
   }
-
-  function applyState(state) {
-    if (state.status === "running") {
-      if (execHeading) execHeading.textContent = state.message || "Running...";
-      setProgress(state.percent, state.message);
-      setStageClasses(state.stage_index);
-      ensurePolling();
-    } else if (state.status === "complete") {
-      // Same heading element/class as every in-progress stage message (System V5.2 fix --
-      // the completion state must feel like the final stage of one experience, not a
-      // shrunken afterthought), with a restrained success-color accent, no animation.
-      if (execHeading) execHeading.textContent = "Experiment complete";
-      if (viewExecution) viewExecution.classList.add("is-complete");
-      setProgress(100, "Experiment complete");
-      setStageClasses(stageItems.length);
-      if (state.result_url && !redirectTimer) {
-        redirectTimer = setTimeout(function () {
-          window.location.href = state.result_url;
-        }, COMPLETE_REDIRECT_DELAY_MS);
-      }
-    } else if (state.status === "failed") {
-      showFailure(state.error);
-    }
-  }
-
   function ensurePolling() {
-    if (polling) return;
-    polling = true;
-    setTimeout(poll, POLL_MS);
+    if (timer !== null || !executionRoute()) return;
+    timer = setTimeout(function () { timer = null; poll(); }, POLL_MS);
   }
-
+  function applyState(state) {
+    if (!executionRoute()) return;
+    if (state.status === "complete") {
+      // Replace transient execution on completion, reload and BFCache reattachment.
+      // Fresh Home visits must never redirect to a previous visitor's result.
+      if (state.result_url) window.location.replace(state.result_url);
+      else showFailure("The run finished but its results are unavailable. Please retry.");
+      return;
+    }
+    if (state.status === "failed" || state.status === "busy") {
+      showFailure(state.error || "Red Lab is running another experiment. Please try again shortly."); return;
+    }
+    if (state.status !== "running") {
+      showFailure("There is no active demo to rejoin. Start a new live demo."); return;
+    }
+    execHeading.textContent = state.stage === "complete" ? "Opening your results…" : state.message || "Running…";
+    var pct = state.percent || 0;
+    document.getElementById("progress-fill").style.width = pct + "%";
+    var bar = document.getElementById("progress-bar");
+    bar.setAttribute("aria-valuenow", String(pct));
+    bar.setAttribute("aria-valuetext", pct + "%, " + execHeading.textContent);
+    document.getElementById("exec-percent").textContent = pct + "%";
+    stageItems.forEach(function (item, index) {
+      item.classList.toggle("done", index < state.stage_index);
+      item.classList.toggle("active", index === state.stage_index);
+    });
+    window.rlUpdateLanes(state.stage, stageItems, viewExecution);
+    ensurePolling();
+  }
   function poll() {
-    fetch("/api/status")
-      .then(function (res) { return res.json(); })
-      .then(function (state) {
-        polling = false;
-        applyState(state);
-      })
+    var current = generation;
+    fetch("/api/status", { cache: "no-store" })
+      .then(function (res) { if (!res.ok) throw new Error(); return res.json(); })
+      .then(function (state) { if (current === generation) applyState(state); })
       .catch(function () {
-        polling = false;
+        if (current === generation && executionRoute()) {
+          execHeading.textContent = "Reconnecting to live progress…"; ensurePolling();
+        }
       });
   }
-
-  function startRun(triggerBtn) {
+  function startRun() {
     if (launching) return;
-    launching = true;
-    if (triggerBtn) triggerBtn.disabled = true;
-    activateExecutionView();
-    if (execHeading) execHeading.textContent = "Launching adversarial test…";
-    setProgress(0, "Launching adversarial test");
-    setStageClasses(-1);
+    launching = true; activateExecutionView();
+    execHeading.textContent = "Launching adversarial test…";
     fetch("/api/run", { method: "POST" })
       .then(function (res) { return res.json(); })
-      .then(function (state) {
-        launching = false;
-        applyState(state);
-      })
+      .then(function (state) { launching = false; applyState(state); })
       .catch(function () {
-        launching = false;
-        if (triggerBtn) triggerBtn.disabled = false;
-        showFailure("Could not start the live run. Please try again.");
+        // The POST may have succeeded before the response was lost: reconcile, never repost.
+        launching = false; poll();
       });
   }
-
-  // Single source of truth for launching a run: the nav "Live Demo" item reuses the exact
-  // same startRun()/activateExecutionView() functions the main CTA and Retry use (System
-  // V5.2 fix) rather than a second, parallel run-start path. If a run is already active it
-  // reattaches to the real state instead of resetting the visible progress back to 0% --
-  // and never calls POST /api/run a second time while one is already running.
-  function goToLiveDemo(triggerEl) {
-    fetch("/api/status")
-      .then(function (res) { return res.json(); })
+  function goToLiveDemo() {
+    if (checking || launching) return;
+    checking = true;
+    var wasExecution = executionRoute();
+    var current = generation;
+    fetch("/api/status", { cache: "no-store" })
+      .then(function (res) { if (!res.ok) throw new Error(); return res.json(); })
       .then(function (state) {
-        if (state.status === "running") {
-          activateExecutionView();
-          applyState(state);
-        } else {
-          startRun(triggerEl);
-        }
+        checking = false;
+        if (current !== generation) return;
+        if (state.status === "running" || (wasExecution && state.status === "complete")) {
+          activateExecutionView(); applyState(state);
+        } else startRun();
       })
       .catch(function () {
-        startRun(triggerEl);
+        checking = false;
+        if (current !== generation) return;
+        activateExecutionView(); execHeading.textContent = "Reconnecting to live progress…"; ensurePolling();
       });
   }
-
-  if (runBtn) {
-    runBtn.addEventListener("click", function () { startRun(runBtn); });
-  }
-  if (retryBtn) {
-    retryBtn.addEventListener("click", function () { startRun(retryBtn); });
-  }
-  if (navLiveDemo) {
-    navLiveDemo.addEventListener("click", function (e) {
-      e.preventDefault();
-      goToLiveDemo(navLiveDemo);
-    });
-  }
-
-  // A run may already be active if another visitor started one, or this visitor refreshed
-  // mid-run -- reattach to that live progress instead of pretending the home page is idle.
-  // A completed or failed prior job never auto-navigates a fresh visitor (System V4/V5.2):
-  // only a currently RUNNING job causes the execution view to appear on load.
-  fetch("/api/status")
-    .then(function (res) { return res.json(); })
-    .then(function (state) {
-      if (state.status === "running") {
-        activateExecutionView();
-        applyState(state);
+  runBtn.addEventListener("click", goToLiveDemo);
+  retryBtn.addEventListener("click", goToLiveDemo);
+  navLiveDemo.addEventListener("click", function (event) { event.preventDefault(); goToLiveDemo(); });
+  document.getElementById("nav-home").addEventListener("click", function (event) {
+    event.preventDefault();
+    if (executionRoute()) window.history.pushState({ redLab: "home" }, "", "/");
+    showHome();
+  });
+  function reconcile(fresh) {
+    generation++; clearTimeout(timer); timer = null;
+    if (executionRoute()) { activateExecutionView(); poll(); }
+    else if (window.location.hash === "#run") {
+      window.history.replaceState({ redLab: "home" }, "", "/"); showHome(); goToLiveDemo();
+    } else {
+      showHome();
+      if (fresh) {
+        var current = generation;
+        fetch("/api/status", { cache: "no-store" }).then(function (res) { return res.json(); })
+          .then(function (state) {
+            if (current === generation && state.status === "running") { activateExecutionView(); applyState(state); }
+          }).catch(function () {});
       }
-    })
-    .catch(function () {});
+    }
+  }
+  window.addEventListener("popstate", function () { reconcile(false); });
+  window.addEventListener("pageshow", function (event) { if (event.persisted) reconcile(false); });
+  window.addEventListener("pagehide", function () { generation++; clearTimeout(timer); timer = null; });
+  reconcile(true);
 })();

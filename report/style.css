@@ -1,9 +1,15 @@
-:root { color-scheme: light;
-  /* Red Lab shared design tokens (System V5.1) -- also defined in web/static/app.css;
-     keep both in sync so the web app and generated reports read as one product. */
-  --rl-red: #b4232f; --rl-charcoal: #17191d; --rl-paper: #f5f2ea; --rl-surface: #fffdfc;
-  --rl-muted: #667078; --rl-border: #d8d2c8; --rl-success: #2e7d4f; --rl-warning: #9a6b12;
-  --rl-danger: #b4232f;
+:root {
+  --rl-button-height: 48px; --rl-button-pad: 22px; --rl-button-font: 14px; color-scheme: light;
+  /* Red Lab shared design tokens (System V5.1, refreshed V5.5) -- also defined in
+     web/static/app.css; keep both in sync so the web app and generated reports read as one
+     product. V5.5 palette: richer brand red, deeper charcoal, warmer paper/surface, a
+     restrained citrus accent -- see app.css's token block for the full rationale. */
+  --rl-red: #c6253d; --rl-red-dark: #971e32; --rl-charcoal: #17181c; --rl-charcoal-soft: #292a2f;
+  --rl-paper: #fff9f4; --rl-surface: #ffffff;
+  --rl-muted: #6d655f; --rl-border: #e7dcd3; --rl-accent: #e5622e; --rl-accent-soft: #fff0e5;
+  --rl-warm-red: #d53a3e; --rl-citrus: #f0a33a;
+  --rl-success: #2e7d4f; --rl-warning: #9a6b12;
+  --rl-danger: #a5322c;
   /* Legacy names kept so the rest of this stylesheet did not need a full rewrite --
      --ink/--muted/--paper/--line have one meaning each and alias cleanly; --teal/--coral
      used to double as both "general brand accent" and "V1 vs V2" semantic colors, so those
@@ -11,7 +17,8 @@
      and the handful of general-brand-accent uses are overridden individually below. */
   --ink: var(--rl-charcoal); --muted: var(--rl-muted); --paper: var(--rl-paper); --line: var(--rl-border);
   --teal: var(--rl-success); --coral: var(--rl-danger);
-  --rl-radius-sm: 4px;
+  --rl-radius-sm: 6px;
+  --rl-shadow-sm: 0 1px 4px rgba(26, 27, 31, 0.06);
   /* Masthead-only tokens (System V5.4) -- mirrored in web/static/app.css with identical values
      so Home, Live Demo Results and Technical Report share one visual spec for the top bar.
      --report-nav-height is kept as an alias (not removed) so the scrollspy script below, which
@@ -25,6 +32,7 @@
   --report-toc-collapsed-width: 56px;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { scroll-behavior: auto; scroll-padding-top: 100px; }
 @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
 .skip-link {
@@ -38,6 +46,15 @@ a { color: var(--rl-red); text-decoration-thickness: 1px; text-underline-offset:
 a:hover { color: #7e1a23; }
 a:focus-visible, summary:focus-visible { outline: 3px solid var(--coral); outline-offset: 4px; }
 .masthead { position: sticky; top: 0; z-index: 20; background: var(--paper); max-width: var(--rl-masthead-width); margin: auto; min-height: var(--rl-nav-height); padding: var(--rl-masthead-pad-y) var(--rl-masthead-pad-x); display: flex; align-items: center; gap: 36px; border-bottom: 1px solid var(--line); }
+/* Frosted premium masthead (System V5.5) -- mirrors web/static/app.css's treatment so Home,
+   Live Demo Results and the Technical Report read as one visual system at the top bar. */
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .masthead { background: rgba(255, 249, 244, 0.90); backdrop-filter: blur(14px) saturate(140%); -webkit-backdrop-filter: blur(14px) saturate(140%); }
+}
+/* Circular Back control (System V5.5; mirrors app.css's .rl-back-btn exactly). */
+.rl-back-btn { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; background: var(--rl-surface); border: 1px solid var(--line); color: var(--ink); font-size: 18px; line-height: 1; text-decoration: none; box-shadow: var(--rl-shadow-sm); flex: none; transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease; }
+.rl-back-btn:hover { border-color: var(--rl-red); color: var(--rl-red); transform: translateX(-2px); }
+.rl-back-btn:focus-visible { outline: 3px solid var(--coral); outline-offset: 3px; }
 .brand { display: flex; align-items: center; gap: 12px; color: var(--ink); text-decoration: none; white-space: nowrap; }
 .brand-logo { height: 36px; width: 36px; object-fit: contain; display: block; border-radius: var(--rl-radius-sm); }
 .brand-text { display: flex; flex-direction: column; line-height: 1.3; }
@@ -81,8 +98,8 @@ h2 { font-size: 29px; line-height: 1.2; letter-spacing: -.8px; margin: 0 0 15px;
 .badge { display: inline-block; border-radius: 3px; padding: 4px 9px; font-size: 10px; line-height: 1.5; font-weight: 700; white-space: nowrap; }.compatible { background: #33534e; color: #c8efdf; }.coverage-line { font-size: 11px; color: var(--muted); }
 .metrics { display: flex; gap: 24px; margin: 24px 0; }.metric { flex: 1; border-left: 1px solid #496063; padding-left: 20px; }.metric:first-child { border: 0; padding-left: 0; }.metric strong { display: block; font-size: 49px; line-height: 1.1; font-weight: 600; letter-spacing: -2px; }.metric:first-child strong { color: #9dd9bd; }.metric:nth-child(2) strong { color: #f2ab93; }.metric span { font-size: 12px; display: block; margin: 10px 0 7px; font-weight: 600; }.metric small { font-size: 10px; line-height: 1.6; color: #c1d2cc; display: block; }
 .caption { font-size: 11px; line-height: 1.6; color: var(--muted); }.verdict > .caption { margin-bottom: 0; }
-.report-section { padding-top: 62px; }.section-heading { display: flex; gap: 18px; align-items: flex-start; margin-bottom: 26px; }.section-heading .eyebrow { margin-bottom: 8px; }.section-number { color: var(--coral); font: 12px Consolas, monospace; border-top: 2px solid var(--coral); padding-top: 8px; min-width: 28px; }.section-intro { max-width: 800px; color: var(--muted); font-size: 13px; }
-.panel { background: #fff; border: 1px solid var(--line); border-radius: 5px; padding: 27px; margin-bottom: 20px; }.panel-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; }.legend { display: flex; gap: 18px; font-size: 11px; }.legend span::before { content: ""; display: inline-block; height: 8px; width: 8px; margin-right: 6px; border-radius: 50%; }.v1-dot::before { background: var(--coral); }.v2-dot::before { background: var(--teal); }
+.report-section { padding-top: 74px; }.section-heading { display: flex; gap: 18px; align-items: flex-start; margin-bottom: 30px; }.section-heading .eyebrow { margin-bottom: 8px; }.section-number { color: var(--coral); font: 12px Consolas, monospace; border-top: 2px solid var(--coral); padding-top: 8px; min-width: 28px; }.section-intro { max-width: 800px; color: var(--muted); font-size: 13px; }
+.panel { background: #fff; border: 1px solid var(--line); border-radius: var(--rl-radius-sm); padding: 30px; margin-bottom: 24px; box-shadow: var(--rl-shadow-sm); }.panel-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; }.legend { display: flex; gap: 18px; font-size: 11px; }.legend span::before { content: ""; display: inline-block; height: 8px; width: 8px; margin-right: 6px; border-radius: 50%; }.v1-dot::before { background: var(--coral); }.v2-dot::before { background: var(--teal); }
 table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }th, td { padding: 11px 12px; border-bottom: 1px solid #e5e9e5; text-align: left; overflow-wrap: anywhere; vertical-align: top; }th:first-child, td:first-child { padding-left: 0; }thead th { color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; }tbody th { font-weight: 600; }table th:first-child { width: 48%; }.category-table th:first-child { width: 25%; }.category-table td { padding: 15px 22px; }.category-table tbody th { padding-top: 19px; }.rate-label { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 8px; }.rate-label span { color: var(--muted); font-size: 10px; }.bar-track { height: 6px; background: #edf0eb; border-radius: 1px; }.bar { height: 6px; }.bar.v1 { background: var(--coral); }.bar.v2 { background: var(--teal); }
 .version-section { margin-top: 30px; }.badge.v1 { background: #f5e6dd; color: #893b27; }.badge.v2 { background: #dfeee8; color: #135f53; }.two-up { display: flex; gap: 20px; }.two-up > .panel { width: 50%; }.big-stat { font-size: 38px; letter-spacing: -1px; line-height: 1.2; margin-bottom: 8px; font-weight: 650; }.big-stat span { color: var(--muted); font-size: 20px; font-weight: 400; }.drift-panel .big-stat { color: var(--teal); }.denominator { font-size: 12px; background: #edf4ee; border-left: 2px solid var(--teal); padding: 8px 10px; }
 .facts { font-size: 11px; margin: 18px 0 0; }.facts div { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid #e5e9e5; padding: 5px 0; }.facts dd { margin: 0; font-weight: 650; }.facts dt { color: var(--muted); }
@@ -106,8 +123,8 @@ footer { max-width: 1080px; margin: 35px auto 0; padding: 25px 0 35px; border-to
 .same-model-note { font-size: 14px; margin: 0 0 20px; }
 .endpoint-pair { display: flex; gap: 20px; }
 .endpoint-card { flex: 1; min-width: 0; border-top: 3px solid var(--line); }
-.endpoint-card.v1 { border-top-color: var(--rl-danger); }
-.endpoint-card.v2 { border-top-color: var(--rl-success); }
+.endpoint-card.v1 { border-top-color: var(--rl-danger); background: #fbf1ee; }
+.endpoint-card.v2 { border-top-color: var(--rl-success); background: #eef6f0; }
 .endpoint-card .version-id { display: inline-block; margin-bottom: 16px; }
 .endpoint-traits { list-style: none; margin: 0 0 20px; padding: 0; font-size: 13px; }
 .endpoint-traits li { padding: 7px 0 7px 20px; border-bottom: 1px solid #eef0ec; position: relative; }
@@ -168,9 +185,51 @@ footer { max-width: 1080px; margin: 35px auto 0; padding: 25px 0 35px; border-to
 .toc-collapse-btn:hover { color: var(--ink); border-color: var(--muted); }
 .toc-collapse-icon { transition: transform 0.15s ease; }
 
+/* ---- judging rubric navigation layer (System V5.5) --------------------------------------
+   A small, restrained reference in the sidebar mapping the competition rubric's five
+   dimensions to the report sections that genuinely support them -- not a replacement for
+   the report's own information architecture, just a faster way in for a judge who already
+   knows what they're scoring. Five muted tonal accents derived from the brand palette
+   (never the V2 semantic green, so this never reads as a pass/fail signal); every chip
+   carries a text label, never color alone. */
+.rubric-fit { --rubric-color: #c6253d; }
+.rubric-relevance { --rubric-color: #7a2230; }
+.rubric-prototype { --rubric-color: #9c5219; }
+.rubric-depth { --rubric-color: #93690c; }
+.rubric-innovation { --rubric-color: #6a4a68; }
+
+.rubric-block { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+.rubric-title { font-size: 11px; font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+.rubric-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.rubric-link {
+  display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: 4px;
+  font-size: 12px; font-weight: 700; color: var(--ink); text-decoration: none;
+  border-left: 3px solid var(--rubric-color);
+}
+.rubric-link:hover { background: #efece2; }
+.rubric-link .rubric-pct { margin-left: auto; color: var(--muted); font-weight: 600; font-size: 11px; }
+
+/* In-content marker chip -- a small eyebrow-adjacent label, not a badge flood. Used on at
+   most one place per rubric dimension (brief: "do not mechanically assign every paragraph"). */
+.rubric-chip {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 800;
+  letter-spacing: 0.6px; text-transform: uppercase; color: var(--rubric-color);
+  border: 1px solid var(--rubric-color); border-radius: 999px; padding: 3px 10px;
+  margin: 0 0 10px;
+}
+.rubric-chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--rubric-color); }
+/* .verdict has a dark ink background -- the default rubric-color values are tuned for
+   light panels and fail contrast there, so this one placement gets a lighter tint of the
+   same hue instead of the shared --rubric-color (System V5.5 contrast fix). */
+.verdict .rubric-chip { color: #e9dee8; border-color: #e9dee8; }
+.verdict .rubric-chip::before { background: #e9dee8; }
+
+@media (max-width: 760px) { .rubric-block { display: none; } }
+
 /* Collapsed rail: hide the label text, keep the toggle (in the sticky head, always visible
    regardless of scroll position) reachable/labelled for AT. */
 .report-shell.toc-collapsed .toc-title,
+.report-shell.toc-collapsed .rubric-block,
 .report-shell.toc-collapsed .toc-list,
 .report-shell.toc-collapsed .toc-collapse-label { display: none; }
 .report-shell.toc-collapsed .toc-sticky-head { padding: 18px 8px 14px; }
@@ -223,3 +282,144 @@ footer { max-width: 1080px; margin: 35px auto 0; padding: 25px 0 35px; border-to
   .report-shell > main { min-width: 0; }.brand-logo { height: 22px; width: 22px; }.brand-creator { font-size: 7px; }.brand-product { font-size: 9px; }.hero { padding: 30px 0 20px; }h1 { font-size: 53px; letter-spacing: -2px; }h1.page-title { font-size: 26px; }.page-identity { font-size: 9px; }.version-id-row { gap: 6px; }.version-id { font-size: 10px; padding: 4px 8px; }.deck { font-size: 14px; max-width: 450px; }.hero-meta span, .model { font-size: 9px; }.eyebrow { font-size: 8px; }.verdict { padding: 22px; }.verdict h2 { font-size: 20px; }.metrics { gap: 15px; }.metric { padding-left: 14px; }.metric strong { font-size: 36px; }.metric span { font-size: 10px; }.metric small { font-size: 8px; }.caption, .coverage-line { font-size: 9px; }.report-section { padding-top: 28px; break-before: page; }h2 { font-size: 23px; }h3 { font-size: 15px; }h4 { font-size: 12px; }.section-heading { margin-bottom: 16px; }.panel { padding: 17px; margin-bottom: 14px; }.panel, .two-up, .verdict, .partial-banner, .metric-tile { break-inside: avoid; }.partial-banner { padding: 16px; margin: 14px 0; }.partial-banner h2 { font-size: 18px; }.metrics-row { gap: 12px; }.metric-tile { padding: 10px 12px; }.metric-tile strong { font-size: 26px; }.demo-preview { max-height: 90px; }.panel-heading { display: block; }.legend { margin-bottom: 8px; }.two-up { gap: 14px; }.big-stat { font-size: 30px; }.facts { font-size: 9px; }.denominator { font-size: 10px; }table { font-size: 10px; }thead { display: table-header-group; }tr { break-inside: avoid; }th, td { padding: 7px; }thead th { font-size: 8px; }.category-table td { padding: 10px 16px; }.rate-label span { font-size: 9px; }.section-intro { font-size: 10px; }
   details { display: block; }details > :not(summary) { display: block !important; }summary { display: block; list-style: none; break-after: avoid; }summary::before { content: "+ "; }details[open] summary::before { content: ""; }.audit-details { padding: 13px; font-size: 10px; background: #f5f5f0; }.audit-details > summary { margin-bottom: 10px; }.evidence { font-size: 9px; }.compact { font-size: 8px; }.compact th, .compact td { padding: 4px; }.compact code { font-size: 7.5px; }.compact thead th { font-size: 7px; letter-spacing: 0; }.audit-details table { display: table !important; }.id-list { display: block; }.id-list code { display: inline; border: 0; background: none; font-size: 7.5px; padding: 0; }.id-list code::after { content: "; "; }.finding-index { display: block; columns: 2; column-gap: 20px; }.finding-index a { display: block; font-size: 8px; margin-bottom: 4px; }.finding { padding: 17px; font-size: 10px; break-inside: auto; }.finding-top, .finding h4, .finding-tags, h2, h3, h4, h5 { break-after: avoid; }.finding h4 { font-size: 14px; }.finding-tags { font-size: 8px; }.finding-id { font-size: 9px; }.badge { font-size: 8px; }.qualification { font-size: 9px; padding: 8px; }.remediation { break-inside: avoid; padding: 10px; }.remediation h5 { font-size: 9px; }.case-comparison { margin-top: 10px; padding-top: 8px; }.pipeline { gap: 0; }.pipeline span { font-size: 8px; }.limitations, .defenses { font-size: 10px; }.notice { font-size: 10px; }.provenance { font-size: 10px; }.hash { font-size: 8px; }a { text-decoration: none; }.version-title { break-after: avoid; }
 }
+
+/* V5.5 closure: outer viewport material, inner content measure, independent Back. */
+@media screen {
+  body {
+    background-color: var(--rl-paper);
+    background-image: radial-gradient(ellipse at 8% 10%, rgba(198,37,61,.055), transparent 46%),
+      radial-gradient(ellipse at 94% 50%, rgba(229,98,46,.065), transparent 45%),
+      radial-gradient(rgba(47,39,32,.025) .55px, transparent .55px);
+    background-size: auto, auto, 5px 5px;
+    background-attachment: fixed;
+  }
+  .masthead { width: 100%; max-width: none; margin: 0; padding: 0; display: block; z-index: 40; }
+  .masthead-inner {
+    width: 100%; max-width: var(--rl-masthead-width); min-height: var(--rl-nav-height);
+    margin: auto; padding: 16px 32px; display: flex; align-items: center; gap: 24px;
+  }
+  .has-back .masthead-inner { padding-left: 84px; }
+  .masthead > .rl-back-btn {
+    position: absolute; left: clamp(12px, 2vw, 28px); top: 20px;
+    width: 44px; height: 44px; margin: 0; padding: 0; font-size: 21px;
+    border: 1px solid var(--rl-border); border-radius: 50%;
+    background: var(--rl-surface); box-shadow: 0 2px 0 var(--rl-border), 0 4px 12px #241d1310;
+    display: inline-flex; align-items: center; justify-content: center; text-decoration: none;
+    color: var(--rl-charcoal); transition: color 140ms, border-color 140ms, box-shadow 140ms;
+  }
+  .masthead > .rl-back-btn:hover { color: var(--rl-red); border-color: var(--rl-red); transform: none; box-shadow: 0 2px 0 var(--rl-red), 0 4px 12px #241d1310; }
+  .masthead > .rl-back-btn:active { box-shadow: none; }
+  .masthead > .rl-back-btn[hidden] { display: none; }
+  .button {
+    display: inline-flex; align-items: center; justify-content: center; min-height: var(--rl-button-height);
+    height: auto; padding: 10px var(--rl-button-pad); border-radius: var(--rl-radius-sm);
+    border: 1px solid transparent; font: 700 var(--rl-button-font)/1.3 "Segoe UI", Arial, sans-serif;
+    text-decoration: none; cursor: pointer;
+    transition: background 140ms, color 140ms, border-color 140ms, box-shadow 140ms, transform 140ms;
+  }
+  .button.primary { background: var(--rl-red); color: #fff; }
+  .button.secondary, .downloads .button { background: var(--rl-charcoal); color: #fff; }
+  .button.ghost, .button.tertiary { min-height: var(--rl-button-height); height: auto; padding: 10px var(--rl-button-pad); font-size: var(--rl-button-font); background: transparent; color: var(--rl-charcoal); border-color: var(--rl-border); }
+  .button.tertiary { border-color: var(--rl-red); color: var(--rl-red); background: var(--rl-surface); }
+  .button.ghost:hover, .button.tertiary:hover { color: var(--rl-red); border-color: var(--rl-red); background: #fff8f4; }
+  .button:active { transform: translateY(1px); box-shadow: none; }
+  .button:disabled { opacity: .6; cursor: wait; }
+  :is(a, button, summary, textarea):focus-visible { outline: 3px solid var(--rl-red); outline-offset: 4px; }
+  .brand-product { font-size: 15px; }
+  .brand-creator { font-size: 10px; }
+  .nav-toggle { margin-left: auto; }
+  @media (max-width: 1000px) {
+    .masthead-inner { gap: 18px; padding-right: 20px; }
+    .primary-nav { gap: 18px; }
+  }
+  @media (max-width: 760px) {
+    .masthead-inner { padding: 12px 18px; min-height: 84px; gap: 12px; }
+    .has-back .masthead-inner { padding-left: 72px; }
+    .brand-logo { width: 30px; height: 30px; }
+    .brand { gap: 9px; }
+    .brand-product { font-size: 13px; }
+    .brand-creator { font-size: 9px; letter-spacing: 1px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
+}
+
+/* Readable comparisons: grouped bars, shared scale, explicit rates and denominators. */
+.comparison-chart { margin: 24px 0 8px; }
+.comparison-chart figcaption { font-size: 20px; font-weight: 750; letter-spacing: -.4px; margin-bottom: 8px; }
+.chart-axis { display: flex; justify-content: space-between; margin: 24px 160px 6px 32px; font-size: 10px; color: var(--muted); }
+.chart-category { padding: 14px 0; border-bottom: 1px solid var(--line); }
+.chart-category h4 { margin: 0 0 10px; font-size: 14px; }
+.chart-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) 152px; gap: 8px; align-items: center; margin: 9px 0; }
+.chart-version { font-size: 11px; font-weight: 800; }
+.chart-version.v1 { color: var(--coral); } .chart-version.v2 { color: var(--teal); }
+.chart-track { height: 20px; border-left: 1px solid #b8b2aa; border-right: 1px solid #b8b2aa;
+ background: repeating-linear-gradient(to right, transparent 0, transparent calc(25% - 1px), #e7dcd3 25%), #eeeae4; }
+.chart-bar { display: block; height: 100%; }
+.chart-bar.v1 { background: var(--coral); } .chart-bar.v2 { background: var(--teal); }
+.chart-value { font-size: 14px; line-height: 1.3; font-variant-numeric: tabular-nums; }
+.chart-value small { display: block; font-size: 10px; color: var(--muted); margin-top: 2px; }
+.chart-data { margin-top: 24px; font-size: 12px; }
+.chart-data summary { cursor: pointer; font-weight: 700; padding: 10px 0; }
+@media screen {
+  html { scroll-behavior: auto; scroll-padding-top: calc(var(--report-nav-height) + 16px); }
+  .audit-details, .provenance { scroll-margin-top: 0; }
+  .masthead-inner { gap: 22px; }
+  .masthead nav { gap: 16px; flex-wrap: nowrap; }
+  .masthead nav a, .downloads a { font-size: 12px; }
+  .downloads { gap: 18px; }
+  .downloads .button { white-space: nowrap; font-size: 12px; }
+  .report-menu-toggle { display: none; }
+  .report-shell { max-width: 1440px; }
+  .report-shell > main { width: 100%; padding: 0 34px; }
+  .report-toc { background: #fff9f4f0; }
+  .toc-sticky-head { padding: 18px 20px; }
+  .toc-scroll { padding: 16px 20px 24px; scrollbar-width: thin; scrollbar-color: #a9a199 transparent; }
+  .toc-sublist a { font-size: 13px; padding: 8px 8px 8px 14px; border-radius: 0 4px 4px 0; transition: color 100ms, background-color 100ms; }
+  .toc-sublist a.is-active { background: #c6253d0c; border-left-width: 3px; }
+  .toc-group-toggle { font-size: 11px; }
+  .toc-collapse-btn { min-height: 40px; padding: 8px 14px; font-size: 12px; }
+  .rubric-block { background: #ffffffb0; border: 1px solid var(--line); padding: 16px 12px; border-radius: 5px; }
+  .rubric-link { font-size: 12px; }
+  .rubric-prototype, .rubric-depth { font-weight: 800; }
+  .hero { padding-top: 44px; padding-bottom: 32px; }
+  h1.page-title { font-size: clamp(32px, 4vw, 52px); }
+  .hero .deck { font-size: 20px; }
+  .panel { border-radius: 8px; background: #ffffff; box-shadow: 0 10px 25px #30201506; }
+  .report-section { padding-top: 44px; }
+  .section-heading { margin-bottom: 30px; }
+  .panel h3 { font-size: 19px; }
+  .partial-banner { background: #ffffff; border-top: 1px solid var(--line); box-shadow: 0 8px 24px #30201506; }
+  .endpoint-card { padding: 26px; }
+  .verdict { border-radius: 8px; }
+  .finding { border-radius: 6px; }
+  .rubric-chip { font-size: 10px; }
+  @media (max-width: 1200px) {
+    .masthead-inner { flex-wrap: wrap; column-gap: 16px; }
+    .masthead nav { order: 3; width: 100%; margin: 0; padding: 8px 0 0; justify-content: flex-end; }
+    .masthead:has(#report-menu) { --rl-nav-height: 118px; }
+  }
+  @media (max-width: 760px) {
+    .masthead-inner { padding-bottom: 12px; gap: 12px; }
+    .downloads { order: 3; width: 100%; justify-content: flex-start; gap: 16px; }
+    .downloads a { font-size: 11px; }
+    .downloads .button { min-height: 40px; padding: 8px 12px; font-size: 11px; }
+    .toc-toggle { margin-left: auto; font-size: 11px; padding: 8px; }
+    .report-menu-toggle { display: block; margin-left: auto; background: var(--rl-surface); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; min-height: 40px; padding: 8px 12px; font: inherit; font-size: 12px; cursor: pointer; }
+    .masthead #report-menu { display: none; position: absolute; left: 0; right: 0; top: 100%; width: 100%; padding: 8px 18px; background: var(--rl-surface); box-shadow: 0 8px 18px #30201520; flex-direction: column; align-items: stretch; gap: 0; }
+    .masthead #report-menu.open { display: flex; }
+    #report-menu a { padding: 12px; font-size: 14px; }
+    .report-shell > main { padding: 0 18px; }
+    .hero .deck { font-size: 17px; }
+    .toc-sticky-head { padding: 20px; }
+    .chart-row { grid-template-columns: 24px minmax(0, 1fr) 106px; gap: 6px; }
+    .chart-axis { margin-left: 30px; margin-right: 112px; font-size: 8px; }
+    .chart-value { font-size: 12px; }
+    .chart-value small { font-size: 9px; }
+    .chart-track { height: 18px; }
+    .comparison-chart figcaption { font-size: 18px; }
+    .toc-close { width: 44px; height: 44px; }
+  }
+}
+@media print { .rl-back-btn, .report-menu-toggle { display: none !important; } .chart-data { display: none; } .comparison-chart { break-inside: avoid; } }

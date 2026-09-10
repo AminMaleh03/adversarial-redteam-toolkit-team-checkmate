@@ -1,0 +1,37 @@
+{# Each bar uses the same explicit 0–100% scale. Values/denominators remain visible
+   without JavaScript, hover, color perception, or access to the optional detail table. #}
+{% macro rate_row(version, rate, numerator, denominator, context) -%}
+<div class="chart-row">
+  <span class="chart-version {{ version }}">{{ version|upper }}</span>
+  <div class="chart-track" aria-hidden="true"><span class="chart-bar {{ version }}" style="width: {{ 0 if rate == 'N/A' else rate * 100 }}%"></span></div>
+  <span class="chart-value"><strong>{{ rate|percent }}</strong><small>{{ numerator }} / {{ denominator }} {{ context }}</small></span>
+</div>
+{%- endmacro %}
+{% macro scale() -%}
+<div class="chart-axis" aria-hidden="true"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
+{%- endmacro %}
+{% macro categories_chart(categories, comparison) -%}
+<figure class="comparison-chart" aria-label="Category failure rates, V1 versus V2, zero to one hundred percent">
+  <figcaption>Where did hardening reduce failures?</figcaption>
+  <p class="caption">V1: unhardened · V2: hardened. Failures include oracle violations and qualifying label flips, not just endpoint errors.</p>
+  {{ scale() }}
+  {% for category in categories %}
+  <div class="chart-category"><h4>{{ category|capitalize }}</h4>
+    {% for v in ['v1', 'v2'] %}{% set r = comparison.category_failure_rates[category][v] %}
+      {{ rate_row(v, r.rate, r.failed, r.eligible, 'eligible attacks') }}
+    {% endfor %}
+  </div>
+  {% endfor %}
+</figure>
+{%- endmacro %}
+{% macro flips_chart(versions) -%}
+<figure class="comparison-chart" aria-label="Qualifying prediction flip rates, V1 versus V2, zero to one hundred percent">
+  <figcaption>How much prediction sensitivity remains?</figcaption>
+  <p class="caption">Top label changed with clean confidence ≥ {{ versions[0].drift.baseline_denominator.threshold }}.
+    Each version uses its own eligible clean prediction pairs. This measures sensitivity, not accuracy.</p>
+  {{ scale() }}
+  {% for s in versions %}
+    {{ rate_row(s.version, s.drift.flip_rate, s.drift.qualifying_flips, s.drift.eligible_comparisons, 'eligible pairs') }}
+  {% endfor %}
+</figure>
+{%- endmacro %}

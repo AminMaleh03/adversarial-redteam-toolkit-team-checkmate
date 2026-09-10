@@ -510,20 +510,18 @@ def test_custom_lab_run_cleans_up_its_temp_directories(monkeypatch, tmp_path):
 
 def test_lab_masthead_has_native_back_first(client):
     body = client.get("/lab").text
-    nav = body[body.index('id="primary-nav"'):body.index("</nav>")]
-    assert 'id="nav-back"' in nav
-    assert "&larr; Back<" in nav
-    assert "Back to Red Lab" in nav
-    assert nav.index('id="nav-back"') < nav.index("Back to Red Lab")
+    header = body[body.index('<header'):body.index('</header>')]
+    assert 'id="nav-back" class="rl-back-btn" aria-label="Back"' in header
+    assert header.index('id="nav-back"') < header.index('class="masthead-inner"')
 
 
 def test_lab_js_back_uses_shared_history_fallback_behavior(client):
-    js = client.get("/static/lab.js").text
-    assert "function goBack(event)" in js
-    assert "window.history.back()" in js
-    assert "window.history.length > 1" in js
-    assert "document.referrer" in js
-    assert 'navBack.addEventListener("click", goBack)' in js
+    assert '/static/chrome.js' in client.get("/lab").text
+    js = client.get("/static/chrome.js").text
+    assert 'window.history.back()' in js
+    assert 'window.history.length > 1' in js
+    assert 'new URL(document.referrer).origin === window.location.origin' in js
+    assert 'querySelectorAll(".rl-back-btn")' in js
 
 
 def test_test_another_input_lives_in_sticky_masthead_not_bottom_of_results(client):
@@ -575,8 +573,8 @@ def test_lab_masthead_retains_v54_navbar_tokens(client):
 def test_lab_mobile_nav_closes_on_button_click_not_only_links(client):
     # nav-test-another is a <button>, not an <a> -- the mobile-menu-close wiring must cover
     # both element types or the sticky action would leave the mobile drawer open.
-    js = client.get("/static/lab.js").text
-    assert 'primaryNav.querySelectorAll("a, button")' in js
+    js = client.get("/static/chrome.js").text
+    assert 'nav.querySelectorAll("a, button")' in js
 
 
 # ------------------------------------------------------------------------------------------
@@ -688,3 +686,25 @@ def test_job_marked_complete_only_after_run_custom_lab_returns(monkeypatch, clie
 
     assert state["status"] == "complete"
     assert order == ["run_custom_lab:enter", "run_custom_lab:exit"]
+
+
+# ------------------------------------------------------------------------------------------
+# System V5.5 release-candidate polish: Lab masthead/design-contract checks.
+# ------------------------------------------------------------------------------------------
+
+
+def test_lab_page_loads_shared_app_css_and_no_lab_only_stylesheet(client):
+    # Lab intentionally has no stylesheet of its own -- every visual token/component (frosted
+    # masthead, circular back button, cards, landing tokens) comes from the one shared
+    # web/static/app.css, so Home and Lab can never visually drift apart again.
+    body = client.get("/lab").text
+    assert '<link rel="stylesheet" href="/static/app.css">' in body
+    assert body.count("<link rel=\"stylesheet\"") == 1
+
+
+def test_lab_has_no_landing_particle_canvas(client):
+    # The particle background is a Home-only flourish (brief: "internal pages... static or
+    # nearly static") -- Lab must not load or render it.
+    body = client.get("/lab").text
+    assert 'id="rl-bg-canvas"' not in body
+    assert "particles.js" not in body

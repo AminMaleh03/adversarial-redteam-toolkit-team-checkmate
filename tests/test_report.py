@@ -752,21 +752,14 @@ def test_report_style_css_masthead_tokens_match_web_app():
 # ------------------------------------------------------------------------------------------
 
 
-def test_technical_report_masthead_has_native_back_first(demo_data):
-    result = html(demo_data, mode="full")
-    downloads = result[result.index('class="downloads"'):result.index("</div>", result.index('class="downloads"'))]
-    assert 'onclick="return rlGoBack(event)"' in downloads
-    assert "&larr; Back<" in downloads
-    # Back is the FIRST item in the cluster, ahead of "Back to Red Lab".
-    assert downloads.index("rlGoBack") < downloads.index("Back to Red Lab")
-
-
-def test_demo_results_masthead_has_native_back_first(demo_data):
-    result = html(demo_data, mode="demo")
-    nav = result[result.index("<nav"):result.index("</nav>")]
-    assert 'onclick="return rlGoBack(event)"' in nav
-    assert "&larr; Back<" in nav
-    assert nav.index("rlGoBack") < nav.index("Back to Red Lab")
+@pytest.mark.parametrize("mode", ["full", "demo"])
+def test_report_back_is_outside_constrained_header_content(demo_data, mode):
+    result = html(demo_data, mode=mode)
+    header = result[result.index('<header'):result.index('</header>')]
+    assert 'onclick="return rlGoBack(event)"' in header
+    assert 'class="rl-back-btn"' in header
+    assert 'aria-label="Back" title="Back"' in header
+    assert header.index('class="rl-back-btn"') < header.index('class="masthead-inner"')
 
 
 def test_reports_back_uses_shared_history_fallback_behavior(demo_data):
@@ -994,7 +987,7 @@ def test_full_report_scrollspy_tracks_every_toc_link_not_just_top_level(data):
     # IntersectionObserver batch entry (which broke for closed <details> elements).
     assert "intersecting.set(entry.target, entry.isIntersecting)" in script
     assert "compareDocumentPosition" in script
-    assert "aria-current" in script.split("setActive")[1][:200]
+    assert "aria-current" in script.split("function setActive")[1][:400]
 
 
 def test_full_report_toc_collapse_is_above_the_scrollable_toc_area(data):
@@ -1065,3 +1058,66 @@ def test_long_unbroken_evidence_stays_on_pdf_page(data):
             if hasattr(box, "text") and box.text.strip():
                 assert box.position_x >= 0
                 assert box.position_x + box.width <= page.width + 1, box.text
+
+
+# ------------------------------------------------------------------------------------------
+# System V5.5 release-candidate polish: judging-rubric navigation layer.
+# ------------------------------------------------------------------------------------------
+
+RUBRIC_DIMENSIONS = {
+    "Fit": ("20%", "#experiment"),
+    "Relevance": ("15%", "#defenses"),
+    "Prototype": ("25%", "#v1-observations"),
+    "Technical Depth": ("25%", "#results"),
+    "Innovation": ("15%", "#comparison"),
+}
+
+
+def test_full_report_sidebar_has_five_rubric_dimensions_with_percentages(data):
+    result = html(data, mode="full")
+    sidebar = result[result.index('id="report-toc"'):result.index("</aside>")]
+    assert "Judging Rubric" in sidebar
+    for name, (pct, _href) in RUBRIC_DIMENSIONS.items():
+        assert name in sidebar
+        assert pct in sidebar
+    # Sums to 100% -- the real competition weighting, not an invented one.
+    total = sum(int(pct.rstrip("%")) for pct, _ in RUBRIC_DIMENSIONS.values())
+    assert total == 100
+
+
+def test_full_report_rubric_links_resolve_to_real_section_ids(data):
+    result = html(data, mode="full")
+    sidebar = result[result.index('id="report-toc"'):result.index("</aside>")]
+    for name, (_pct, href) in RUBRIC_DIMENSIONS.items():
+        assert f'href="{href}"' in sidebar, f"{name} rubric link missing from sidebar"
+        target_id = href.lstrip("#")
+        assert f'id="{target_id}"' in result, f"{name} rubric link target #{target_id} does not exist in the report"
+
+
+def test_full_report_rubric_chips_carry_text_labels_not_color_alone(data):
+    result = html(data, mode="full")
+    # Every in-content rubric chip repeats its dimension name and percentage as visible text
+    # (never a color swatch alone) -- brief section 29/43.
+    for name, (pct, _href) in RUBRIC_DIMENSIONS.items():
+        chip_text = f"{name} &middot; {pct}"
+        assert chip_text in result, f"missing visible rubric-chip text for {name}"
+
+
+def test_full_report_rubric_does_not_use_v2_success_green():
+    css = (ROOT / "report" / "style.css").read_text(encoding="utf-8")
+    rubric_vars = css[css.index(".rubric-fit"):css.index(".rubric-block")]
+    assert "--rl-success" not in rubric_vars
+    assert "#2e7d4f" not in rubric_vars
+
+
+def test_report_has_no_unsupported_superlative_claims(demo_data):
+    for mode in ("demo", "full"):
+        result = html(demo_data, mode=mode).lower()
+        for phrase in ("world first", "world-first", "unique in the industry", "industry-leading"):
+            assert phrase not in result
+
+
+def test_full_report_rubric_block_hidden_on_narrow_mobile_sidebar_drawer():
+    css = (ROOT / "report" / "style.css").read_text(encoding="utf-8")
+    mobile_block = css[css.index("@media (max-width: 760px)"):]
+    assert ".rubric-block { display: none; }" in mobile_block

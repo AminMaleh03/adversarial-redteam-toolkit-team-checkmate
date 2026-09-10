@@ -1,0 +1,2 @@
+# Optional browser regression tooling; never needed by the runtime image.
+playwright==1.55.0

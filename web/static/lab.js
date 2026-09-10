@@ -33,44 +33,12 @@
   var cleanCardsEl = document.getElementById("lab-clean-cards");
   var variantsEl = document.getElementById("lab-variants");
 
-  var navToggle = document.getElementById("nav-toggle");
-  var primaryNav = document.getElementById("primary-nav");
-  var navBack = document.getElementById("nav-back");
   var navTestAnother = document.getElementById("nav-test-another");
 
-  var polling = false;
+  var pollTimer = null;
+  var generation = 0;
   var launching = false;
   var lastText = "";
-
-  // ---- mobile nav toggle (same markup/behaviour as app.js, duplicated here since lab.html
-  // loads this script instead of app.js -- keeps app.js untouched per the V5.4 brief) --------
-  if (navToggle && primaryNav) {
-    navToggle.addEventListener("click", function () {
-      var open = primaryNav.classList.toggle("open");
-      navToggle.setAttribute("aria-expanded", open ? "true" : "false");
-    });
-    primaryNav.querySelectorAll("a, button").forEach(function (control) {
-      control.addEventListener("click", function () {
-        primaryNav.classList.remove("open");
-        navToggle.setAttribute("aria-expanded", "false");
-      });
-    });
-  }
-
-  // ---- shared Red Lab "native-style Back" behavior (System V5.4 final integration) -----
-  // Same logic as report/template.html's/report/demo_template.html's inline rlGoBack(): if
-  // useful same-origin browser history exists, use it; otherwise let the link's own
-  // href="/" fallback navigate normally (also correct with JS disabled).
-  function goBack(event) {
-    if (window.history.length > 1 && document.referrer &&
-        document.referrer.indexOf(window.location.origin) === 0) {
-      event.preventDefault();
-      window.history.back();
-    }
-  }
-  if (navBack) {
-    navBack.addEventListener("click", goBack);
-  }
 
   // ---- view switching -----------------------------------------------------------------
   // navTestAnother (the sticky masthead action) is visible ONLY while viewing results --
@@ -91,7 +59,7 @@
     if (execFailure) execFailure.hidden = true;
     if (execBusy) execBusy.hidden = true;
     if (navTestAnother) navTestAnother.hidden = true;
-    if (execHeading) execHeading.focus();
+    if (execHeading && document.activeElement === document.body) execHeading.focus();
   }
 
   function showResults() {
@@ -247,21 +215,43 @@
   function renderSummary(summary) {
     summaryEl.textContent = "";
     var rows = [
-      ["Variants tested", summary.variants_tested],
-      ["V1 label flips", summary.v1_flips],
-      ["V2 label flips", summary.v2_flips],
-      ["Mitigated by V2", summary.mitigated_by_v2],
-      ["Persisting after hardening", summary.persisting_after_hardening],
-      ["Safe rejections", summary.safe_rejections],
-      ["Endpoint errors", summary.endpoint_errors],
+      ["Variants tested", summary.variants_tested, "variants", "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z"],
+      ["V1 label flips", summary.v1_flips, "v1", "M4 7h16m-4-4 4 4-4 4 M20 17H4m4-4-4 4 4 4"],
+      ["V2 label flips", summary.v2_flips, "v2", "M4 7h16m-4-4 4 4-4 4 M20 17H4m4-4-4 4 4 4"],
+      ["Mitigated by V2", summary.mitigated_by_v2, "mitigated", "M12 2 4 5v6c0 5 4 8 8 11 4-3 8-6 8-11V5z M8 12l3 3 5-6"],
+      ["Persisting after hardening", summary.persisting_after_hardening, "persisting", "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18 M12 8v5 M12 16v.1"],
+      ["Safe rejections", summary.safe_rejections, "rejections", "M12 2 4 5v6c0 5 4 8 8 11 4-3 8-6 8-11V5z M8 12h8"],
+      ["Endpoint errors", summary.endpoint_errors, "errors", "M12 3 2 21h20z M12 9v5 M12 17v.1"],
     ];
     var list = document.createElement("dl");
     list.className = "lab-summary-list";
     rows.forEach(function (row) {
-      list.appendChild(el("dt", null, row[0]));
-      list.appendChild(el("dd", null, row[1]));
+      var metric = el("div", "lab-metric lab-metric-" + row[2]);
+      metric.appendChild(el("dt", null, row[0]));
+      var value = el("dd");
+      value.appendChild(el("span", "lab-metric-value", row[1]));
+      // Decorative geometry stays inside the definition; labels and values remain text.
+      var icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      icon.setAttribute("class", "lab-metric-icon");
+      icon.setAttribute("viewBox", "0 0 24 24");
+      icon.setAttribute("aria-hidden", "true");
+      icon.setAttribute("focusable", "false");
+      icon.setAttribute("fill", "none");
+      icon.setAttribute("stroke", "currentColor");
+      icon.setAttribute("stroke-width", "1.6");
+      icon.setAttribute("stroke-linecap", "round");
+      icon.setAttribute("stroke-linejoin", "round");
+      var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", row[3]);
+      icon.appendChild(path);
+      value.appendChild(icon);
+      metric.appendChild(value);
+      list.appendChild(metric);
     });
     summaryEl.appendChild(list);
+    summaryEl.appendChild(el("p", "lab-summary-verdict",
+      summary.mitigated_by_v2 + " variants mitigated by V2 \u00b7 " +
+      summary.persisting_after_hardening + " persist after hardening"));
   }
 
   function renderVersionOutcome(container, label, versionData) {
@@ -339,11 +329,14 @@
     if (execHeading) execHeading.textContent = state.message || "Running…";
     setProgress(state.percent, state.message || "");
     setStageClasses(state.stage_index);
+    window.rlUpdateLanes(state.stage, stageItems, viewExecution);
   }
 
   function pollLabStatus(jobId) {
+    var current = generation;
     fetch("/api/lab/status/" + encodeURIComponent(jobId))
       .then(function (response) {
+        if (current !== generation) return null;
         if (response.status === 404) {
           clearJobId();
           showInput();
@@ -352,11 +345,11 @@
         return response.json();
       })
       .then(function (state) {
-        if (!state) return;
+        if (!state || current !== generation) return;
         if (state.status === "running") {
           showExecution();
           applyRunningState(state);
-          setTimeout(function () { pollLabStatus(jobId); }, POLL_MS);
+          pollTimer = setTimeout(function () { pollLabStatus(jobId); }, POLL_MS);
         } else if (state.status === "complete") {
           renderResults(state.result);
         } else if (state.status === "failed") {
@@ -367,7 +360,10 @@
         }
       })
       .catch(function () {
-        // transient network error -- stop polling silently, matches app.js's own pattern
+        if (current === generation && readJobId() === jobId) {
+          if (execHeading) execHeading.textContent = "Reconnecting to live progress...";
+          pollTimer = setTimeout(function () { pollLabStatus(jobId); }, POLL_MS);
+        }
       });
   }
 
@@ -402,7 +398,7 @@
         storeJobId(data.job_id);
         showExecution();
         applyRunningState(data);
-        setTimeout(function () { pollLabStatus(data.job_id); }, POLL_MS);
+        pollTimer = setTimeout(function () { pollLabStatus(data.job_id); }, POLL_MS);
       })
       .catch(function () {
         launching = false;
@@ -455,6 +451,8 @@
   // sessionStorage job token, and returns to the input form -- never touches verified
   // benchmark data or completed Demo state, which this function has no access to at all.
   function resetToInput() {
+    generation++;
+    clearTimeout(pollTimer);
     clearJobId();
     lastText = "";
     if (textarea) textarea.value = "";
@@ -465,6 +463,15 @@
   if (navTestAnother) {
     navTestAnother.addEventListener("click", resetToInput);
   }
+
+  window.addEventListener("pagehide", function () { generation++; clearTimeout(pollTimer); });
+  window.addEventListener("pageshow", function (event) {
+    if (!event.persisted) return;
+    generation++;
+    clearTimeout(pollTimer);
+    var jobId = readJobId();
+    if (jobId) pollLabStatus(jobId); else showInput();
+  });
 
   // ---- reattachment on load -------------------------------------------------------------
   var existingJobId = readJobId();

@@ -9,6 +9,7 @@
 </head>
 <body>
   <header class="masthead">
+    <a href="/" id="exec-back" class="rl-back-btn" aria-label="Back" title="Back" hidden>&larr;</a>
     <div class="masthead-inner">
       <a class="brand" href="/">
         <img src="{{ logo_data_uri }}" alt="{{ creator_name }}" class="brand-logo">
@@ -22,7 +23,7 @@
         <span class="nav-toggle-bar" aria-hidden="true"></span>
       </button>
       <nav id="primary-nav" class="primary-nav" aria-label="Primary">
-        <a href="/" aria-current="page">Home</a>
+        <a href="/" id="nav-home" aria-current="page">Home</a>
         <a href="#run" id="nav-live-demo">Live Demo</a>
         <a href="/lab" id="nav-try-lab">Try Your Own Input</a>
         {% if verified_full_available %}
@@ -34,6 +35,7 @@
 
   <main>
     <div id="view-home">
+      <canvas id="rl-bg-canvas" aria-hidden="true"></canvas>
       <section class="hero" id="welcome">
         <div class="rl-hero-brand">
           <img src="{{ red_lab_logo_data_uri }}" alt="{{ product_name }} logo" class="rl-logo">
@@ -43,29 +45,29 @@
             <p class="rl-tagline">{{ product_tagline }}</p>
           </div>
         </div>
-        <p class="deck">
-          An automated adversarial testing environment for AI inference endpoints. Red Lab
-          executes controlled malformed, boundary, encoding and adversarial inputs against the
-          same model before and after application-layer hardening, then measures how the
-          system responds.
-        </p>
-        <p class="model">Model: j-hartmann/emotion-english-distilroberta-base &middot; 7 emotion labels</p>
-        <div class="cta-row" id="run">
-          <button id="run-btn" class="button primary" type="button">Run Live Demo</button>
-          <a class="button secondary" href="/lab">Try Your Own Input</a>
-          {% if verified_full_available %}
-          <a class="button ghost" href="{{ verified_full_href }}" target="_blank" rel="noopener">View Technical Report</a>
-          {% endif %}
+        <p class="hero-statement">Put the endpoint under pressure.<br>See what hardening changes.</p>
+        <p class="deck">Controlled malformed, boundary, encoding and adversarial inputs.
+          The same AI model, tested before and after application-layer hardening.</p>
+        <div class="hero-control" aria-label="Experiment design">
+          <span class="control-v1">V1 &middot; Unhardened</span><span class="control-model">Same model</span><span class="control-v2">V2 &middot; Hardened</span>
         </div>
-        <p id="cta-note" class="caption">Executes a real curated attack subset against both endpoint configurations.</p>
+        <div class="cta-row hero-actions" id="run">
+          <div class="hero-path"><button id="run-btn" class="button primary" type="button">Run Live Demo</button><p class="caption">Explore a curated attack suite</p></div>
+          <div class="hero-path"><a class="button secondary" href="/lab">Try Your Own Input</a><p class="caption">Put your own sentence to the test</p></div>
+        </div>
+        {% if verified_full_available %}
+        <a class="button tertiary hero-report" href="{{ verified_full_href }}" target="_blank" rel="noopener">View Technical Report</a>
+        {% endif %}
+        <p id="cta-note" class="caption">Real requests. Recorded outcomes. Evidence you can inspect.</p>
+        <p class="model">Model: j-hartmann/emotion-english-distilroberta-base &middot; 7 emotion labels</p>
       </section>
     </div>
 
     <section id="view-execution" class="execution-view" hidden>
       <div class="execution-inner">
-        <a href="/" id="exec-back" class="exec-back">&larr; Back</a>
+
         <p class="exec-identity">{{ creator_name }} / {{ product_version_label }}</p>
-        <p class="exec-kicker">LIVE DEMO</p>
+        <p class="exec-kicker">LIVE DEMO <span class="exec-mode">Controlled experiment</span></p>
         <h1 id="exec-heading" class="exec-heading" tabindex="-1" aria-live="polite">Launching adversarial test&hellip;</h1>
 
         <div id="exec-body">
@@ -74,22 +76,27 @@
           </div>
           <p id="exec-percent" class="exec-percent" aria-hidden="true">0%</p>
 
+
+
+          <p class="same-model-label">Same model <span>Two endpoint configurations</span></p>
+          <div class="version-context">
+            <div class="version-card v1" data-lane="v1" data-state="not-started">
+              <span class="lane-status">Not started</span>
+              <p class="version-card-title">V1 &mdash; Unhardened Endpoint</p>
+              <p class="version-card-note">No application-layer hardening.</p>
+            </div>
+            <div class="version-card v2" data-lane="v2" data-state="not-started">
+              <span class="lane-status">Not started</span>
+              <p class="version-card-title">V2 &mdash; Hardened Endpoint</p>
+              <p class="version-card-note">Input validation, length controls, exception handling and normalization.</p>
+            </div>
+          </div>
+          <p class="tracker-label">Experiment stages</p>
           <ol class="stage-list" id="stage-list">
             {% for stage in stage_order %}
             <li data-stage="{{ stage }}">{{ stage_labels[stage] }}</li>
             {% endfor %}
           </ol>
-
-          <div class="version-context">
-            <div class="version-card v1">
-              <p class="version-card-title">V1 &mdash; Unhardened Endpoint</p>
-              <p class="version-card-note">No application-layer hardening.</p>
-            </div>
-            <div class="version-card v2">
-              <p class="version-card-title">V2 &mdash; Hardened Endpoint</p>
-              <p class="version-card-note">Input validation, length controls, exception handling and normalization.</p>
-            </div>
-          </div>
           <p class="exec-model-note">Same underlying AI model in both cases &mdash; only the endpoint hardening differs.</p>
         </div>
 
@@ -108,6 +115,8 @@
     <p>{{ creator_name }} &mdash; {{ product_name }}, {{ product_tagline }}</p>
   </footer>
 
+  <script src="/static/chrome.js"></script>
   <script src="/static/app.js"></script>
+  <script src="/static/particles.js"></script>
 </body>
 </html>

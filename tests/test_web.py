@@ -70,7 +70,8 @@ def test_home_navigation_has_required_links(client):
     nav = body[body.index('id="primary-nav"'):body.index("</nav>")]
     assert 'href="/"' in nav  # Home
     assert 'href="#run"' in nav  # Live Demo
-    assert nav.count("<a ") >= 2
+    assert 'href="/lab"' in nav  # Try Your Own Input (System V5.4)
+    assert nav.count("<a ") >= 3
 
 
 def test_home_technical_report_link_targets_new_tab(client):
@@ -160,9 +161,48 @@ def test_execution_view_has_retry_and_home_on_failure(client):
     assert "Back to Red Lab" in failure_section
 
 
-def test_home_page_has_no_v54_custom_input_ui(client):
+# ------------------------------------------------------------------------------------------
+# System V5.4 final integration: native-style Back navigation + sequential-run regression.
+# ------------------------------------------------------------------------------------------
+
+
+def test_home_view_has_no_native_back_action(client):
+    # Home is the only surface that should not show a native Back control -- scoped strictly
+    # to #view-home (the execution view, sharing this same page/URL, does carry one).
     body = client.get("/").text
-    assert "Try Your Own Input" not in body
+    home_section = body[body.index('id="view-home"'):body.index('id="view-execution"')]
+    assert 'id="exec-back"' not in home_section
+    assert "&larr; Back<" not in home_section
+
+
+def test_demo_execution_view_has_native_back_action(client):
+    body = client.get("/").text
+    exec_section = body[body.index('id="view-execution"'):body.index("</section>", body.index('id="view-execution"'))]
+    assert 'id="exec-back"' in exec_section
+    assert "&larr; Back" in exec_section
+    # Present in both the running body and the failure sub-state -- it lives outside both,
+    # at the top of .execution-inner, so a single control covers every sub-state.
+    back_idx = exec_section.index('id="exec-back"')
+    body_idx = exec_section.index('id="exec-body"')
+    assert back_idx < body_idx
+
+
+def test_app_js_back_uses_shared_history_fallback_behavior(client):
+    js = client.get("/static/app.js").text
+    assert "function goBack(event)" in js
+    assert "window.history.back()" in js
+    assert "window.history.length > 1" in js
+    assert "document.referrer" in js
+    assert 'execBack.addEventListener("click", goBack)' in js
+
+
+def test_home_page_links_to_v54_live_red_team_lab(client):
+    # System V5.4: "Try Your Own Input" now exists, as a link to the dedicated /lab page --
+    # the home page itself still carries no <textarea> or inline Lab form (brief section 4:
+    # "Do NOT place the entire textarea/form directly in the homepage hero").
+    body = client.get("/").text
+    assert "Try Your Own Input" in body
+    assert 'href="/lab"' in body
     assert "<textarea" not in body
 
 
@@ -365,6 +405,19 @@ def test_static_css_still_defines_red_lab_tokens(client):
     body = client.get("/static/app.css").text
     for token in ("--rl-red", "--rl-charcoal", "--rl-paper", "--rl-surface", "--rl-muted", "--rl-border"):
         assert token in body
+
+
+def test_static_css_masthead_tokens_match_report_stylesheet(client):
+    # System V5.4 navbar unification: the web app and the report stylesheet must share the
+    # same masthead height/width/padding tokens (see report/style.css's mirrored block).
+    app_css = client.get("/static/app.css").text
+    report_css = (ROOT / "report" / "style.css").read_text(encoding="utf-8")
+    assert "--rl-nav-height: 84px" in app_css
+    assert "--rl-nav-height: 84px" in report_css
+    assert "--rl-masthead-width: 1160px" in app_css
+    assert "--rl-masthead-width: 1160px" in report_css
+    assert "--rl-masthead-pad-x: 32px" in app_css
+    assert "--rl-masthead-pad-x: 32px" in report_css
 
 
 def test_results_analysis_json_opens_inline_not_as_attachment(monkeypatch, client, tmp_path):

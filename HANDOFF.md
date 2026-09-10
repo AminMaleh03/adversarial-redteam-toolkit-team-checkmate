@@ -1,3 +1,598 @@
+## System V5.4 FINAL INTEGRATION - sequential-run bug fix + native Back navigation - Claude
+
+- Updated: 2026-09-10T15:35:00+04:00, Claude Code; branch `ahsan/v5-redlab`, observed HEAD
+  `4e0057a` at session start (the V5.4 commit below, local-only, not pushed anywhere). This
+  session's changes are folded into that same commit via `git commit --amend` once verified
+  (explicit instruction: nothing pushed, so amend rather than a separate bugfix commit; do
+  not amend V5.3 `6716107`, V5.2 `5eb8735`, or V5.1 `6b0bc9c`; confirmed `ahsan/v5-redlab` has
+  no remote tracking branch/upstream before amending).
+- Ahsan's real-browser manual testing of V5.4 found the custom Lab and Live Demo each work
+  individually, but exposed a genuine release blocker plus two navigation gaps to close.
+
+### CRITICAL: sequential Custom-Lab-then-Demo failure -- root cause found by reproduction, not guessed
+
+- Reproduced first, exactly as instructed, **before** touching any code: a standalone script
+  called the real `web.lab.run_custom_lab()` (genuine V1/V2 subprocesses, no mocks) followed
+  immediately by the real `run_all.run_experiment(mode="demo", ...)`, in the same Python
+  process, with no artificial delay. This reliably reproduced the reported failure on the
+  first try: the demo's V1 and V2 both attacked successfully (162/1928 cases each, matching
+  normal demo coverage), but the run then failed with
+  ```
+  ValueError: v1: planned attack IDs disagree with manifest
+  ```
+  raised from `analysis/validation.py:125` inside `validate_run()`, called from
+  `run_analysis_and_report()` at the "analyzing" stage -- i.e. **after** both endpoints had
+  already been attacked and torn down, not during V1/V2 process/port lifecycle at all. This
+  explains Ahsan's observed symptom ("failure occurs around Testing the hardened endpoint"):
+  that was simply the last stage message visible before the crash, not the actual point of
+  failure.
+- **The real mechanism** (confirmed by reading `attacks/metadata.py` and
+  `analysis/validation.py:123-125` directly, then verifying with the reproduction above):
+  `attacks.metadata._MANIFEST` / `_FINGERPRINTS` are plain **module-level dicts** that persist
+  for the entire life of the long-running uvicorn web process (unlike the CLI, `python
+  run_all.py`, which starts a fresh process every time and never hit this). `analysis
+  /validation.py`'s `validate_run()` asserts an **exact set-equality** between a run's planned
+  attack ids and the manifest's current keys:
+  ```python
+  planned_attacks = {key[7:] for key in sets["planned"] if key.startswith("attack:")}
+  if planned_attacks != set(manifest):
+      raise ValueError(f"{version}: planned attack IDs disagree with manifest")
+  ```
+  Before this session's fix, `web/lab.py`'s `select_lab_variants()` called
+  `attacks.library.build_derived(baseline)` on an **ephemeral, unique-per-job baseline**
+  (`baseline_id=f"lab.{job_id}"`), which permanently registered that job's ~9-44 unique
+  attack ids into the same global `_MANIFEST` and never removed them. Since every Lab job
+  uses a fresh `job_id`, these entries never match a demo/full run's own planned set and never
+  get cleaned up on their own -- so after even **one** Lab job had ever run in the process,
+  **every** Demo/Full run attempted afterward (regardless of how much later, or how many
+  demo/full runs had already succeeded before that first Lab job) would fail at its analysis
+  stage. This was a real, previously-undiscovered defect in the V5.4 feature itself, not a
+  latent bug in `run_all.py`/`analysis/`/`attacks/` -- those modules' behavior is exactly as
+  designed for a fresh-process CLI invocation; V5.4 was the first thing to ever call into
+  `attacks.metadata` repeatedly across multiple logically-distinct "experiments" within one
+  long-lived process.
+- **Hypotheses explicitly investigated and ruled out by evidence** (per the brief's
+  instruction not to select a cause without evidence): stale V2 process still alive, port 8001
+  not released, process handle reuse, a cleanup race, the shared lock releasing before
+  endpoint teardown finishes, and stale readiness/health state. None of these are the cause --
+  `run_all.run_experiment()`'s per-version loop already calls `EndpointHandle.stop()`
+  synchronously in a `finally` block **before** moving to the next version or returning (this
+  was true before this session and needed no change), and a new
+  `test_run_custom_lab_stops_each_endpoint_before_starting_the_next` regression test now
+  pins that ordering explicitly. The failure reproduced with zero relationship to V1/V2
+  process state: the demo's V1 and V2 both fully succeeded (real predictions, real coverage
+  numbers) before the crash.
+- **Fix** (`web/lab.py`, new `_isolated_attack_registry()` context manager wrapping
+  `select_lab_variants()`'s call to `build_derived()`): snapshot
+  `attacks.metadata._MANIFEST`/`_FINGERPRINTS` immediately before building a Lab job's
+  variants, and restore them to that exact snapshot in a `finally` block immediately after --
+  so a Lab job's registration is fully transient/invisible to the rest of the process, exactly
+  matching the "ephemeral, never persisted" design already established for every other part
+  of the Lab feature. **Deliberately does not touch `attacks/metadata.py`** (Lamei's folder,
+  per `AGENTS.md`'s file-ownership rule) -- the fix lives entirely in `web/lab.py`, which only
+  reads and temporarily mutates that module's already-existing module-level dicts from the
+  caller's side, then puts them back exactly as found. Verified this is safe under the
+  existing `JOB_LOCK`: only one experiment (Lab or Demo) is ever actually in progress
+  process-wide, so there is no concurrent registration this could race with.
+- **Reverse direction** (Demo/Full run's registrations, then a Lab job): was never actually
+  broken -- Lab's own baseline ids are always unique per job and never collide with
+  `baseline.json`'s fixed dataset ids, so `select_lab_variants()` already worked fine
+  afterward. Confirmed by reproduction and by a new regression test
+  (`test_full_suite_then_custom_lab_selection_still_works`) that runs lighter-weight than the
+  forward-direction one, per the brief.
+- **Regression tests added** (`tests/test_lab.py`): `test_custom_lab_registration_leaves_no_
+  trace_in_global_manifest` (fast, pure, asserts the manifest is byte-for-byte unchanged
+  after a Lab job); `test_custom_then_full_suite_manifest_still_matches_exactly` (reproduces
+  the exact `planned_attacks == set(manifest)` invariant `analysis/validation.py` checks on
+  every real run, using the real `attacks.library`/`attacks.metadata`/`run_all.build_full_
+  suite` -- no network needed, since attack generation touches none); `test_full_suite_then_
+  custom_lab_selection_still_works` (reverse direction); `test_run_custom_lab_stops_each_
+  endpoint_before_starting_the_next` (lifecycle-ordering guard, mocked); `test_job_marked_
+  complete_only_after_run_custom_lab_returns` (confirms the shared lock's "available again"
+  state genuinely waits for the job function to return, not any earlier point).
+- **Real sequential acceptance (not mocked)**, following the established project pattern that
+  real end-to-end verification is a manual/local step each session, never a slow test added
+  to the committed pytest suite (confirmed by inspecting `tests/test_run_all.py`, which mocks
+  every V1/V2 interaction -- there is no precedent for a real-network test in this repo's
+  suite): started `uvicorn web.app:app` on `127.0.0.1:7860` as a harness-tracked background
+  task. Ran, with no artificial wait between steps: **A.** `GET /` 200. **B/C.** `POST
+  /api/lab/run` with real text, polled to `complete` (real V1/V2, ~10s). **E/F.** `GET /` 200,
+  then **immediately** `POST /api/run` (the exact previously-failing sequence). **G/H/I.**
+  polled `/api/status` through `attacking_v1` -> `starting_v2` -> `attacking_v2` ->
+  `generating_results` -> **`complete`** -- the demo run that previously failed here now
+  succeeds completely, full report generated. **J.** fetched the real `result_url` (Demo
+  Results page), 200. Then started a **third** job (another real custom Lab test)
+  immediately after the demo completed, confirming the full **CUSTOM -> DEMO -> CUSTOM**
+  lifecycle: also completed successfully with real, varied results (9 variants, 1 flip on V1
+  neutralized to 0 flips on V2 for the `whitespace.interior_runs` case -- a genuine
+  `MITIGATED_BY_V2` diagnosis with TV distance 0.0 on V2 vs 0.83 on V1). After the full
+  sequence: `netstat` showed no `LISTENING` socket on 8000/8001; no orphan V1/V2 subprocess
+  remained (`Get-CimInstance Win32_Process`); exactly one new `results/` directory existed
+  (the one real demo run, cleaned up afterward); `GET /api/status` and `GET /api/lab/status
+  /<id>` both correctly reported `"complete"` with no job stuck "running"; verified artifact
+  hashes re-checked identical to the values recorded before this session.
+
+### Sticky "Test Another Input" (Lab Results masthead)
+
+- Moved from a single button at the bottom of the results page into the Lab masthead's nav
+  cluster (`web/templates/lab.html`: `<button id="nav-test-another" class="button ghost
+  nav-action" hidden>`), which is `position: sticky` (inherited from the existing `.masthead`
+  rule -- no new sticky mechanism). `web/static/lab.js`'s `showInput()`/`showExecution()`/
+  `showResults()`/`showFailure()`/`showBusy()` now each explicitly set
+  `navTestAnother.hidden`, so it's visible **only** while viewing `#view-lab-results`, per the
+  brief's "not overcrowded" instruction.
+- The old bottom `<button id="lab-again-btn">` and its surrounding `.cta-row` were **removed
+  entirely** -- one reset implementation (`resetToInput()`, extracted from the old handler
+  body unchanged) is now called by exactly one control. `resetToInput()` still does the same
+  four things as before: clears `sessionStorage`'s job token (`clearJobId()`), clears local
+  result/text state, resets the textarea, and returns to `#view-lab-input` -- it has no
+  access to demo state or verified artifacts at all, so it cannot touch either.
+- The mobile hamburger-menu-close wiring (previously `primaryNav.querySelectorAll("a")`) was
+  widened to `"a, button"` so the new `<button>` nav item also closes the mobile drawer on
+  click, matching every `<a>` nav item's existing behavior.
+
+### Native-style "&larr; Back" on every non-Home surface
+
+- One shared behavior, defined identically (not "slightly different" per the brief's
+  instruction) in three places, each wired the way that surface already wires its JS: `web
+  /static/app.js` (`goBack()`, for the Demo execution view), `web/static/lab.js` (`goBack()`,
+  for `/lab`'s masthead, covering all three Lab sub-views since they share one masthead), and
+  a global `rlGoBack(event)` inside `report/template.html`'s/`report/demo_template.html`'s
+  existing (`template.html`) or newly-CSP-permitted (`demo_template.html`, which previously
+  had no `script-src` at all -- added `script-src 'unsafe-inline'`, mirroring the exact
+  change V5.3 made to `template.html`) inline `<script>`, wired via `onclick="return
+  rlGoBack(event)"` on the report pages since they have no other JS-wiring convention to
+  match. Logic everywhere: if `window.history.length > 1` **and** `document.referrer` is
+  same-origin, `event.preventDefault()` + `window.history.back()`; otherwise, the control's
+  own `href="/"` navigates normally (also the correct, safe fallback with JavaScript
+  disabled, and for a page opened directly or via a `target="_blank"` link, where
+  `history.length` stays 1).
+- **Placement, audited against every surface** (Home is the only one that must not show it):
+  - `/lab` (input/execution/results, one shared masthead): `<a id="nav-back">&larr; Back</a>`
+    added as the first `<nav>` item, before the existing "Back to Red Lab" -- both now appear,
+    with distinct hrefs/semantics, per the brief's section 15.
+  - Demo execution (`web/templates/index.html`'s `#view-execution`, the same URL as Home,
+    `/`): since Home and Execution share one masthead/page, adding Back there would have
+    meant conditionally changing the masthead's content between the two states -- risking
+    exactly the kind of masthead inconsistency V5.4's first session just fixed. Instead,
+    `<a id="exec-back" class="exec-back">&larr; Back</a>` lives inside `#view-execution`
+    itself (top of `.execution-inner`, above the identity line), visible in both the running
+    and failure sub-states, and the shared masthead stays byte-identical between Home and
+    Execution.
+  - Demo Results (`report/demo_template.html`): added as the first `<nav>` item, before the
+    existing "Back to Red Lab".
+  - Technical Report (`report/template.html`): added as the first `.downloads` item, before
+    the existing "Back to Red Lab".
+  - Home (`#view-home`): unchanged, no Back control anywhere in it -- confirmed by a new test
+    scoped strictly to the `#view-home` HTML slice.
+- **Back during active execution** (brief section 14): no cancel/abort call exists anywhere in
+  this codebase for either Demo or Lab jobs (confirmed again this session, source-level), so
+  clicking Back can never terminate a running experiment -- navigating away (or falling back
+  to `/`) just stops that tab's own polling; the server-side job runs to completion regardless,
+  and the existing load-time reattachment logic (unchanged) brings a visitor straight back
+  into the live execution view if they return while it's still running.
+
+### Tests
+
+- New: 20 (10 in `tests/test_web.py`/`tests/test_lab.py`/`tests/test_report.py` combined for
+  Back-navigation placement, the shared `goBack`/`rlGoBack` source pattern, CSP on the now-
+  scripted demo report, and the sticky-action/removed-duplicate/reset-reuse/sessionStorage-
+  clearing checks for "Test Another Input"; the 5 sequential-lifecycle regression tests
+  described above). One pre-existing test needed a wording-only fix in this session's own new
+  code, not the test itself: `test_app_js_has_no_cancel_handler` (a real, still-valid guard --
+  no cancel feature was ever added) initially flagged a code **comment** in `app.js` that
+  happened to contain the substring "cancels"; reworded the comment, the guard stays exactly
+  as strict as before. Full suite:
+  `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .venv/Scripts/python.exe -m pytest -q`:
+  **564 passed** (544 at session start + 20 new), 1 pre-existing Starlette/AnyIO warning.
+
+### Verified benchmark isolation
+
+- `analysis.json` SHA-256 `12d47b35c700c6c172ceff5fc071f78952aef7a8695473dc457e9d69229737da`
+  and `report.pdf` SHA-256
+  `0853108d4939bab1ff2069a1e3dc42b8ad68b14096d12cfd1bfa81fbb56718ca` -- unchanged, re-checked
+  after the full local sequential acceptance run and again after the containerized one. No
+  re-render of `report.html` was needed this session (no template/generate.py change touches
+  the verified artifact's rendering inputs this time). Full 1,928-case benchmark was not
+  rerun.
+
+### Docker
+
+- Rebuilt `team-checkmate-v5-redlab:latest` from the unmodified `Dockerfile`. All four
+  expensive layers (`apt-get`, `COPY requirements.txt .`, `pip install`, the pinned-model
+  pre-download) reported `CACHED`; only `COPY . .` and the final `useradd`/`chown` step
+  re-ran. Ran the freshly built image; confirmed `/healthz`, `/`, `/lab` all 200. Performed
+  the **critical CUSTOM -> DEMO sequence inside the container**: a real Lab job completed,
+  then a real Demo run started immediately afterward and completed successfully through
+  `attacking_v1` -> `starting_v2` -> `attacking_v2` -> `complete` (the exact sequence that
+  fails without this session's fix). Confirmed inside the container afterward: no `uvicorn`
+  process for V1/V2 remained (`ps aux`); no `LISTEN`-state socket on port 8000 (state `06`
+  TIME_WAIT entries only, confirmed by reading `/proc/net/tcp`'s state column directly, not
+  just filtering by port); `/app/results` contained exactly the one expected demo run
+  directory; `/app/artifacts/verified_full_report/{analysis.json,report.pdf}` SHA-256 hashes
+  identical to the values recorded before this session. Container removed afterward. Did not
+  run the full 1,928-case suite.
+
+### Files changed this session
+
+- **Modified**: `web/lab.py` (the `_isolated_attack_registry()` fix, `contextlib` import,
+  `resetToInput`-equivalent reset logic unchanged), `web/templates/lab.html` (masthead Back +
+  sticky Test Another Input, bottom duplicate button removed), `web/static/lab.js` (`goBack()`,
+  `resetToInput()`, view-state toggling for the new nav button, widened mobile-menu-close
+  selector), `web/templates/index.html` (`#exec-back` link inside the execution view),
+  `web/static/app.js` (`goBack()`, wired to `#exec-back`; one comment reworded to avoid a
+  false-positive "cancel" match), `web/static/app.css` (`.exec-back`, `.nav-action` styling
+  only -- no color/layout-system change), `report/template.html` (`rlGoBack()` added to its
+  existing single `<script>`, `&larr; Back` added first in `.downloads`), `report/demo_
+  template.html` (CSP gained `script-src 'unsafe-inline'`, a new inline `<script>` defining
+  `rlGoBack()`, `&larr; Back` added first in the masthead `<nav>`), `tests/test_web.py`,
+  `tests/test_lab.py`, `tests/test_report.py`. **No changes** to `contract.py`, `endpoint/`,
+  `runner/`, `analysis/`, `baseline/`, `attacks/` (confirmed -- the fix deliberately stays out
+  of Lamei's folder), `run_all.py`, `report/generate.py`, `report/audit.html`,
+  `report/style.css`, `web/app.py`, `web/templates/lab.html`'s underlying data/attack
+  semantics, or any verified artifact file.
+- **Not done / explicitly out of scope**: the V5.5 broader visual redesign (colors, cards,
+  animation, artistic direction -- none of it touched), the full 1,928-case benchmark rerun,
+  any push to GitHub `origin` or the `space` Hugging Face remote, any merge to `main`. `v4.0.0`
+  /`bba3a7b`, the V5.1 commit `6b0bc9c`, the V5.2 commit `5eb8735`, and the V5.3 commit
+  `6716107` are all untouched.
+- **Manual visual review -- not performed by this session**: no browser display in this
+  environment. The sticky masthead action's visual fit on desktop/mobile, the "&larr; Back"
+  link's placement/spacing next to "Back to Red Lab" everywhere it now appears, and the demo
+  execution view's new top-of-content Back link have all been verified structurally/via
+  source and functionally via real HTTP/API sequences, not screenshot-checked. Ahsan should
+  manually re-verify in a real browser: the Custom -> Demo -> Custom sequence from a real
+  click-through (not just curl); the sticky Test Another Input staying visible while scrolling
+  a long results page; that "&larr; Back" and "Back to Red Lab" read as two distinct, sensible
+  actions rather than a confusing duplicate, on `/lab`, Demo Results, and the Technical
+  Report; and that clicking Back mid-execution behaves sensibly (reattaches rather than
+  looking broken).
+- Next: Ahsan performs the manual visual/browser recheck above, then decides whether to
+  proceed to V5.5 (final UI direction, integration/security review, responsive polish), V5.6
+  (Hugging Face deployment/public visibility), or push `ahsan/v5-redlab`.
+
+## System V5.4 - Live Red-Team Lab (Try Your Own Input) + navbar unification - Claude
+
+- Updated: 2026-09-10T14:40:00+04:00, Claude Code; branch `ahsan/v5-redlab`, observed HEAD
+  `6716107` at session start (the closed V5.3 commit, local-only, not pushed anywhere). This
+  session's changes are a **new** commit after V5.3, per explicit instruction not to amend
+  `6716107` (V5.3), `5eb8735` (V5.2), or `6b0bc9c` (V5.1).
+- Scope: (1) fix the masthead/navbar inconsistency across Home, Live Demo Results and
+  Technical Report that V5.3 intentionally carried forward; (2) add "Try Your Own Input" -- a
+  dedicated `/lab` page where a judge types a sentence and Red Lab derives a curated set of
+  adversarial variants using the *existing* attack library, runs them against V1 and V2, and
+  shows a deterministic mitigated/persists/regression/no-effect/inconclusive diagnosis. No
+  `contract.py` change (frozen, unneeded), no `run_all.py` change (its
+  `start_endpoint`/`EndpointHandle.stop()` primitives were already generic enough to reuse
+  as-is), no change to the verified 1,928-case benchmark's underlying data, no full suite
+  rerun, no push, no Hugging Face deploy, no broader visual redesign.
+
+### Navbar unification (Part 1)
+
+- Root cause established before touching anything (three parallel Explore-agent passes plus
+  direct reads of `web/static/app.css`, `report/style.css`, and all three masthead templates):
+  `web/static/app.css` and `report/style.css` are two fully independent stylesheets, hand-kept
+  in sync only for the base color palette. Masthead height (`76px` vs `84px`), content width
+  (`1100px` token vs hardcoded `1320px`), padding (`14px 24px` vs `25px 48px`), brand markup
+  shape (`brand-text/brand-creator/brand-product` two-part vs a single-block `.brand` plus
+  `brand-lines/brand-name/brand-version`), logo size (`44px` vs `30px`), nav-link typography
+  (`13px/700` vs `12px/600`), and the brand-vs-nav right-alignment technique
+  (`.brand{margin-right:auto}` vs `.masthead nav{margin-left:auto}`) all diverged.
+- Unified via **new masthead-only tokens**, deliberately separate from `--rl-content-width`
+  (which other layout still uses) so unifying the top bar could not silently change hero/body
+  widths: `--rl-nav-height: 84px` (canonical value, adopted from the report side),
+  `--rl-masthead-width: 1160px`, `--rl-masthead-pad-x: 32px`, `--rl-masthead-pad-y: 16px` --
+  added identically to both `:root` blocks. `report/style.css`'s existing
+  `--report-nav-height` is now an alias (`--report-nav-height: var(--rl-nav-height)`), so
+  `report/template.html`'s inline scrollspy script (`getComputedStyle(...).getPropertyValue
+  ("--report-nav-height")`) keeps working unchanged -- confirmed by the existing scrollspy
+  tests still passing.
+- Alignment technique standardized on `margin-left: auto` on the nav/action cluster (the
+  report's existing technique) in both stylesheets; `.brand`'s `margin-right: auto` was
+  removed from `web/static/app.css`.
+- Brand markup unified: both report templates now render `{{ creator_name }}` (the same
+  `CREATOR_NAME` constant `web/app.py` already imports from `report/generate.py`, i.e.
+  `"Team Checkmate"`) inside `.brand-creator`/`.brand-product` spans under a `.brand-text`
+  wrapper -- the exact same class names and two-part typography (10px/700/uppercase over
+  14px/800) `web/templates/index.html`'s masthead already used, replacing the report-only
+  `brand-lines`/`brand-name`/`brand-version` names and the literal hardcoded `"TEAM CHECKMATE"`
+  string. Visually still reads as "TEAM CHECKMATE" everywhere via `.brand-creator`'s
+  `text-transform: uppercase` -- confirmed by a new test
+  (`test_reports_masthead_brand_shows_version_label`, updated to check for `creator_name`'s
+  actual title-case value plus the CSS class, not a hardcoded uppercase literal) and by the
+  re-rendered verified artifact.
+- Logo size unified to `36px` (midpoint of the app's 44px and the report's 30px) with a shared
+  `border-radius: var(--rl-radius-sm)` (the report previously hardcoded `6px`; `--rl-radius-sm`
+  was added to `report/style.css`'s token block to match). Nav-link typography unified to
+  13px/700/0.3px-letter-spacing/2px-bottom-border everywhere.
+- Deliberately **not** changed: `.report-shell`'s own `1320px` max-width, `main`'s `1160px`,
+  the report's mobile `order:`-based wrap strategy vs the app's hamburger-dropdown (two
+  different, already-working responsive mechanisms -- brief required visual/typographic
+  consistency, not identical DOM/JS mechanics), the report's print stylesheet structure (only
+  its brand-related literal values were updated to match the renamed classes).
+- Nav *content* on the two report pages was already correct per the brief's examples (`Back to
+  Red Lab, Demo, Results, Method, Source JSON, View Detailed Report` /
+  `Back to Red Lab, Source JSON, Download PDF`) -- no link changes needed there, only the
+  shared stylesheet/markup edits above (one `report/style.css` edit fixes both pages at once,
+  since `report/generate.py` inlines the same file into both).
+
+### Home page (Part 2)
+
+- `web/templates/index.html`: masthead nav gained `<a href="/lab" id="nav-try-lab">Try Your
+  Own Input</a>` between Live Demo and Technical Report. Hero `.cta-row` gained a secondary
+  `Try Your Own Input` button (`.button.secondary`) between `Run Live Demo` (primary) and
+  `View Technical Report` (now `.button.ghost`, kept easily accessible as the supporting
+  evidence path per the brief's hierarchy) -- no textarea/form on the homepage itself.
+
+### Live Red-Team Lab architecture (Parts 3-5)
+
+- **New module `web/lab.py`** -- owns everything Lab-specific: job state, curated attack
+  selection, ephemeral experiment execution, metrics, diagnosis. Deliberately does **not**
+  touch `run_all.py`; it imports and reuses `run_all.start_endpoint(version, out_dir) ->
+  EndpointHandle` / `EndpointHandle.stop()` directly, which were already generic enough (no
+  refactor needed, per the brief's "do not rewrite run_all.py wholesale").
+- **API routes** (added to `web/app.py`, which stays a thin deployment layer delegating to
+  `web/lab.py`): `GET /lab` (renders `web/templates/lab.html`), `POST /api/lab/run` (body
+  `{"text": str}` only -- rejects non-dict/non-string/empty/whitespace-only/oversized with
+  422; never accepts JSON, attack ids, URLs, file paths, or commands), `GET
+  /api/lab/status/{job_id}`.
+- **Ephemeral job model**: a fresh `BaselineCase(baseline_id=f"lab.{job_id}", ...)` is built
+  in memory per submission (`build_lab_baseline`) -- required because
+  `attacks.metadata.register()` raises on an `attack_id` collision with different content, and
+  attack ids are derived from `baseline_id`. `send_case()` talks to the running V1/V2 process
+  directly via `runner.run.Runner(target=url, version=version, writer=None)` -- reusing
+  `Runner.send()`, `Runner.health_ok()`, and the module-level `parse_prediction()` (all
+  pure/stateless with respect to disk) -- and builds a `contract.RunResult` manually, entirely
+  bypassing `Runner._record`'s file-writing `ResultWriter` path. Nothing is ever written to
+  `results/` or `artifacts/verified_full_report/`; confirmed structurally (new tests
+  `test_custom_lab_run_never_writes_under_results_or_verified_artifacts`) and against the real
+  filesystem during the local and containerized acceptance runs below. The only files a run
+  touches are the two uvicorn boot logs `start_endpoint` already writes, into a
+  `tempfile.mkdtemp()` directory (never `results/`), removed as soon as each endpoint stops.
+- **Shared global job lock (concurrency, brief sections 8-9)**: `web/lab.py` defines
+  `JOB_LOCK = threading.Lock()`; `web/app.py` now does `_job_lock = lab_module.JOB_LOCK`
+  instead of constructing its own `Lock()` -- the **only** change made to existing demo logic,
+  and it's lock-object identity only, so every pre-existing demo route/test is untouched and
+  still passes unmodified. `POST /api/run` (demo) now also checks
+  `lab_module.is_running_unlocked()` (a lock-free read of Lab's own state, safe because it's
+  only ever called from inside a block that already holds the same lock object) and returns a
+  distinct `{"status": "busy"}` at 409 if a Lab job is active, kept separate from demo's
+  pre-existing "reattach to my own running job" 202 branch so that branch's behavior/tests are
+  byte-for-byte unchanged. `web/lab.py`'s own `start_lab_job(text, demo_is_running)` takes a
+  callable bound to `web/app.py`'s own `_job_state` check and invokes it *inside* the same
+  `with JOB_LOCK:` block that also guards Lab's own state -- demo-vs-lab exclusion is therefore
+  fully atomic (one lock, one critical section), not a best-effort check-then-act. Verified
+  live against the real server (not just mocked): starting a real Lab job, then hitting both
+  `POST /api/lab/run` and `POST /api/run` while it was active, returned `{"status":"busy"}`/409
+  from both, with no leaked job id or text in either response.
+- **Per-job security (brief section 8)**: `job_id = secrets.token_urlsafe(24)` (cryptographic,
+  never sequential). `GET /api/lab/status/{job_id}` returns the real state only if the id
+  matches the single current job exactly; any other id (wrong, stale, or simply made up) gets
+  a generic `{"status": "not_found"}` 404 -- never a hint that a different job exists or what
+  it contains. A stale progress callback from a superseded job (re-checked by `job_id` on every
+  write) can never clobber a newer job's state.
+- **sessionStorage reattachment (brief section 10)**: `web/static/lab.js` stores only the
+  opaque `job_id` via `sessionStorage.setItem` (never `localStorage` -- confirmed by a source-
+  level test that the served script contains no `localStorage.setItem`/`.getItem` call at
+  all). On load, if a stored id exists, it's used to re-poll `/api/lab/status/{id}`; a 404 (bad
+  token, expired, or server restarted since) clears storage and returns to the input form.
+- **Curated attack selection (`CUSTOM_LAB_ATTACKS`, brief section 13)** -- one authoritative,
+  documented constant in `web/lab.py`, matched against **real** `attacks.metadata
+  .metadata_for(attack_id)` fields (`family`, `subfamily`, `dose`, `position`) after calling
+  the real `attacks.library.build_derived(baseline)`, never guessed from the attack_id string
+  or invented:
+  | family | subfamily | match | friendly label |
+  |---|---|---|---|
+  | encoding | homoglyph | dose=3, middle | Cyrillic homoglyph substitution |
+  | encoding | homoglyph_greek | dose=3, middle | Greek homoglyph substitution |
+  | encoding | invisible_zero_width | middle | Invisible Unicode insertion |
+  | perturbation | keyboard_typo | -- | Keyboard-adjacent typo |
+  | perturbation | word_split | -- | Word-split perturbation |
+  | perturbation | swap_adjacent | -- | Adjacent-letter swap |
+  | whitespace | interior_runs | -- | Whitespace distortion |
+  | whitespace | unicode_spaces | -- | Unicode space substitution |
+  | truncation | signal_head_only | -- | Sentence truncation (head only) |
+
+  9 variants for a normal-length sentence (confirmed live: the acceptance-test sentence
+  yielded all 9); `signal_head_only` needs >=4 words and a couple of the encoding matches need
+  a few eligible characters, so a very short input (e.g. 3 words) can yield as few as ~7 --
+  still within the brief's "approximately 6-10." Every entry is genuinely derived from
+  arbitrary text, `is_raw=False`, and excludes everything resource-heavy or non-text-driven:
+  the 100KB/1MB/10MB oversized payloads, the deep-JSON-nesting ladder, all `type_confusion.*`
+  and other `malformed.*` raw/malformed-body cases (hardcoded bodies, not derivable from
+  arbitrary text at all), and the two over-limit truncation cases (large filler-padded text
+  built specifically to probe the length boundary) are all excluded -- confirmed by a test
+  asserting no `CUSTOM_LAB_ATTACKS` entry's family is `malformed`/`boundary` and no subfamily
+  contains `type_confusion`/`oversized`/`deeply_nested`/`over_limit`.
+- **Metrics** (`web/lab.py`, genuinely new -- confirmed via research that no
+  distribution-distance code existed anywhere in the repo before this): `total_variation_distance
+  (p, q) = 0.5 * sum(abs(p_i - q_i))` over the union of both label sets, range 0-1, `None` if
+  either distribution is missing; `label_flipped` = exact top-label inequality, no confidence
+  gate (the Lab is exploratory, not the verified benchmark -- deliberately not reusing
+  `analysis/drift.py`'s 0.6-confidence-gated flip rule, per the brief's explicit instruction
+  not to silently reuse benchmark thresholds where they aren't semantically appropriate);
+  `confidence_change` returns `{clean, attacked, delta}`.
+- **Diagnosis** (`web/lab.py:diagnose`, deterministic, rule-based, never an LLM): per endpoint,
+  `_adverse(clean, attacked)` is `True` if the attacked response 5xx'd or failed to connect,
+  or if the label flipped relative to that *same endpoint's own* clean reference; `None` if the
+  clean reference itself wasn't a usable 200; otherwise `False`. Then: both `None` ->
+  `INCONCLUSIVE`; V1 adverse and V2 not -> `MITIGATED_BY_V2`; both adverse ->
+  `PERSISTS_AFTER_HARDENING`; V1 not adverse but V2 is -> `V2_REGRESSION`; neither ->
+  `NO_MATERIAL_EFFECT`. TV distance is computed and shown per variant but never gates the
+  diagnosis (brief section 18: it's a displayed continuous measurement, not a trigger). Every
+  branch has a dedicated fixture-based test in `tests/test_lab.py`.
+- **Remediation mapping** -- flat `dict[str, str]` in `web/lab.py` (`REMEDIATION`), using the
+  brief's exact section-19 wording for `MITIGATED_BY_V2`/`PERSISTS_AFTER_HARDENING`/
+  `V2_REGRESSION`, plus two short additional entries for `NO_MATERIAL_EFFECT`/`INCONCLUSIVE`.
+- **Diff highlighting** reuses `run_all.highlight_diff_html()` unchanged (its `html.escape`
+  based escaping is unconditionally safe for arbitrary input) -- only its docstring was updated
+  to note it's now also called with judge-supplied text, not just our own generated attack
+  text. The server embeds the two pre-escaped `<mark class="demo-mark">`-wrapped strings under
+  explicitly-named JSON fields (`diff_original_html`/`diff_attacked_html`); `web/static/lab.js`
+  is the *only* place in the whole feature that ever sets `.innerHTML`, and only for those two
+  named fields (verified by a source-level regex test) -- every other user-influenced string
+  (attack labels, error text, the original input itself) goes through `.textContent`/`el()`
+  helper functions, never raw HTML.
+- **Frontend** (`web/templates/lab.html`, `web/static/lab.js`, a delimited "Live Red-Team Lab"
+  CSS section appended to `web/static/app.css`): three mutually-exclusive views
+  (`#view-lab-input`/`#view-lab-execution`/`#view-lab-results`) using the same `hidden`-
+  attribute + `[hidden]{display:none!important}` mechanism `index.html`/`app.css` already
+  established, reusing the `.execution-view`/`.progress-bar`/`.stage-list`/`.version-card`
+  visual language. `LAB_STAGE_ORDER` = preparing -> starting_v1 -> clean_v1 -> attacking_v1 ->
+  starting_v2 -> clean_v2 -> attacking_v2 -> analyzing -> complete, driven entirely by real
+  backend stage callbacks (no fake timer). `web/static/lab.js` is a separate file from
+  `app.js` (which is untouched) with its own small duplicated mobile-nav-toggle handler (same
+  markup ids, ~10 lines) since `lab.html` doesn't load `app.js`. Accessibility: labelled
+  textarea with `aria-describedby` tying in a live char counter and a `role="alert"` error
+  region, `aria-live="polite"` execution heading, `role="progressbar"` with real
+  `aria-valuenow`/`aria-valuetext`, diagnosis shown as a text-labelled badge (never color
+  alone), expandable probability/diff detail via native `<details>`/`<summary>`.
+
+### Tests
+
+- New `tests/test_lab.py` (34 tests): route/form checks; server-side empty/whitespace/oversized/
+  non-string/missing-field rejection (422); a source-level regex test that `lab.js` only ever
+  sets `.innerHTML` for the two trusted diff fields and never touches `localStorage`; job-id
+  format/uniqueness; status scoping (wrong id -> 404, never leaks another job's text); shared-
+  lock busy behavior in both directions (lab-vs-lab, lab-vs-demo, demo-vs-lab) plus a regression
+  guard that plain demo-vs-demo reattachment is unaffected by the lock-aliasing change;
+  deterministic/safe/genuinely-text-derived attack selection; TV-distance formula/range/
+  identity/missing-data; one fixture per diagnosis rule; a real (mocked-network) run through
+  `run_custom_lab()` checking real summary counts and zero TV distance for identical
+  distributions; and two tests confirming a run never writes under `results/`/verified
+  artifacts and that its temp directories are removed.
+- `tests/test_web.py`: replaced the old guardrail test (`test_home_page_has_no_v54_custom
+  _input_ui`, which asserted "Try Your Own Input" was *absent*) with
+  `test_home_page_links_to_v54_live_red_team_lab` (asserts presence + `href="/lab"` + still no
+  inline `<textarea>`); `test_home_navigation_has_required_links` updated for the 4th nav link;
+  added `test_static_css_masthead_tokens_match_report_stylesheet`.
+- `tests/test_report.py`: `test_reports_masthead_brand_shows_version_label` updated (checks
+  `creator_name`'s real value + the CSS class, not a hardcoded uppercase literal); added
+  `test_reports_masthead_brand_uses_shared_class_names_with_web_app` and
+  `test_report_style_css_masthead_tokens_match_web_app`.
+- Full suite: `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .venv/Scripts/python.exe -m pytest -q`:
+  **544 passed** (507 at session start + 37 new), 1 pre-existing Starlette/AnyIO warning.
+
+### Verified artifact re-render (same pattern as V5.1-V5.3, not a new benchmark)
+
+- `analysis.json` SHA-256 recorded before touching anything:
+  `12d47b35c700c6c172ceff5fc071f78952aef7a8695473dc457e9d69229737da`. Since this session's
+  `report/template.html`/`report/demo_template.html` markup changed (brand class renames),
+  `artifacts/verified_full_report/report.html` was re-rendered via
+  `report.generate.render_html(mode="full")` against that same, byte-unchanged `analysis.json`
+  -- only `export_meta.json`'s `report.html` hash entry was updated to match. Re-checked
+  **after**: `analysis.json` and `report.pdf` hashes both byte-identical to before
+  (`12d47b35...` and `0853108d4939bab1ff2069a1e3dc42b8ad68b14096d12cfd1bfa81fbb56718ca`
+  respectively) -- confirmed again, a third time, after the full local + containerized
+  acceptance testing below, still unchanged. The re-rendered `report.html` contains exactly one
+  `class="brand-text"` and zero occurrences of the old `brand-lines`/`brand-name`/`brand-version`
+  class names.
+
+### Real local acceptance test (not mocked)
+
+- Started `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 uvicorn web.app:app` on `127.0.0.1:7860`
+  (as a harness-tracked background task, after an earlier attempt accidentally left a stale
+  pre-fix server process running on the same port across separate shell invocations --
+  caught and corrected before drawing any conclusions from it; see the temp-cleanup note
+  below for what that stale-process detour actually revealed). Confirmed `GET /`, `GET /lab`,
+  `GET /healthz` all 200 against the real served bytes.
+- Ran **three** real end-to-end custom Lab tests via `POST /api/lab/run` against real V1/V2
+  uvicorn subprocesses (not mocked), including the brief's suggested sample sentence
+  ("I feel calm and happy about finishing this project."): each moved through real stage
+  transitions (`starting_v1` -> ... -> `complete`, ~6-11s total per run), returned real
+  label/confidence/all_scores for both clean references, real per-variant TV distances (e.g.
+  the whitespace/zero-width variants showed **TV distance exactly 0.0 on V2 but nonzero on
+  V1** for the calm/happy sentence -- V2's whitespace-collapse and normalization genuinely
+  neutralizing those perturbations end-to-end, a real demonstration of the feature's purpose),
+  and a real, varied diagnosis distribution on a different (negative-sentiment) sentence: 9
+  variants tested, 3 V1 flips, 2 V2 flips, 1 mitigated-by-V2, 2 persisting, 6 no-material-
+  effect -- not a degenerate all-one-value result.
+- Confirmed via `GET /api/lab/status/{job_id}` with a deliberately wrong id: 404
+  `{"status":"not_found"}`, no data leaked.
+- **Live concurrency check** (not just the mocked pytest version): started one real Lab job,
+  then while it was active, `POST /api/lab/run` (a second, different sentence) and `POST
+  /api/run` (demo) both returned `{"status":"busy"}` at HTTP 409, with no job id or either
+  sentence's text present in either response body.
+- **Temp-directory cleanup -- a real bug found and fixed this session**: the first two "real"
+  acceptance attempts appeared to leave `redlab_lab_v1_*`/`redlab_lab_v2_*` directories behind
+  in the OS temp folder after completion. Root-caused with an isolated repro script
+  (`start_endpoint` + immediate `stop()` + `shutil.rmtree` with the error surfaced instead of
+  swallowed): Windows raised `PermissionError [WinError 32] ... being used by another process`
+  on the log file for a few seconds even after the subprocess had fully exited and
+  `EndpointHandle.stop()` (which explicitly closes the log handle) had returned -- most likely
+  real-time antivirus scanning the freshly-written log file, with the lock duration varying
+  with system load. Fixed in `web/lab.py` (`_cleanup_temp_dir`/`_try_rmtree`/
+  `_cleanup_temp_dir_background`): a few quick inline retries cover the common (no-lock) case
+  at effectively zero cost; if still locked, the remaining retries continue in a background
+  daemon thread so a slow OS-level lock never adds latency to the judge-facing job. These log
+  files never contain user text (confirmed by inspecting their contents -- plain uvicorn
+  request/health log lines only), so a delayed cleanup was always a tidiness issue, never a
+  privacy one, but "removed immediately" per the brief is still honored in the common case and
+  closely approximated (typically within seconds) under load. **Separately**, the *apparent*
+  continued failure after this fix was itself traced to a second, unrelated mistake: `kill
+  %1`/`%2` job-control references do not persist across separate Bash tool invocations in this
+  harness (each is a fresh shell), so earlier "restart the server" steps had failed to kill
+  the previous process, and curl requests were silently still hitting the stale, pre-fix
+  server the whole time. Caught via `Get-CimInstance Win32_Process`, both stray processes
+  force-killed by PID, and the acceptance test re-run cleanly afterward (confirmed via a
+  harness-tracked background task instead of an ad-hoc `&`) with immediate, successful
+  cleanup on every subsequent run. `tests/test_lab.py`'s own cleanup test uses a `FakeHandle`
+  with no real subprocess/lock, so it was unaffected either way and continued passing
+  throughout.
+- Confirmed via `netstat -ano` and `Get-CimInstance Win32_Process`: no `LISTENING` socket on
+  8000/8001 and no stray python/uvicorn processes after every run in this session, including
+  the concurrency check's in-flight job once it finished. Confirmed via directory listing that
+  `results/` gained no new entries from any Lab run (only the pre-existing historical demo run
+  directories already in that folder from earlier sessions/this session's own unrelated demo-
+  route testing). Verified artifact hashes re-checked unchanged after all of the above (see
+  above). Stopped the web app process afterward via the harness's task-stop mechanism.
+
+### Docker
+
+- Rebuilt `team-checkmate-v5-redlab:latest` from the unmodified `Dockerfile`. All four
+  expensive layers (`apt-get`, `COPY requirements.txt .`, `pip install`, the pinned-model
+  pre-download) reported `CACHED`; only `COPY . .` and the final `useradd`/`chown` step
+  re-ran. Ran the freshly built image on host port 7861; confirmed over real HTTP: `/healthz`
+  200, `/` 200, `/lab` 200, `/verified-full/report.html` 200.
+- Ran **one real containerized custom-Lab test** end to end (`POST /api/lab/run` -> polled to
+  `complete`). Confirmed inside the container: no lingering uvicorn process (`ps aux`), no
+  listening socket on 8000/8001 (`/proc/net/tcp`), `/app/results` completely empty (zero
+  entries), and `/app/artifacts/verified_full_report/{analysis.json,report.pdf}` SHA-256
+  hashes identical to the values recorded before this session started. Container removed
+  afterward. Did not run the full 1,928-case suite.
+
+### Files changed this session
+
+- **Added**: `web/lab.py`, `web/templates/lab.html`, `web/static/lab.js`, `tests/test_lab.py`.
+- **Modified**: `web/app.py` (shared `JOB_LOCK` alias, `/lab` route, `/api/lab/run` +
+  `/api/lab/status/{job_id}` routes, a distinct lab-active busy branch on `/api/run`),
+  `web/templates/index.html` (nav link + hero CTA), `web/static/app.css` (masthead token
+  unification + new Lab-specific CSS section), `report/style.css` (masthead token/brand-class
+  unification, mirrored from `web/static/app.css`), `report/template.html` and
+  `report/demo_template.html` (brand markup class rename only), `run_all.py`
+  (`highlight_diff_html`'s docstring only -- no behavior change), `tests/test_web.py`,
+  `tests/test_report.py`, `artifacts/verified_full_report/report.html` + `export_meta.json`
+  (re-rendered view only, evidence untouched). **No changes** to `contract.py`, `endpoint/`,
+  `runner/`, `analysis/`, `baseline/`, `attacks/`, `report/generate.py`, `report/audit.html`,
+  `web/static/app.js` (demo execution JS untouched), or the `Dockerfile`.
+- **Not done / explicitly out of scope**: the full 1,928-case benchmark rerun, any push to
+  GitHub `origin` or the `space` Hugging Face remote, any merge to `main`, and the later,
+  separately-briefed broader Red Lab visual redesign (V5.5). `v4.0.0`/`bba3a7b`, the V5.1
+  commit `6b0bc9c`, the V5.2 commit `5eb8735`, and the V5.3 commit `6716107` are all untouched.
+- **Manual visual review -- not performed by this session**: no browser display in this
+  environment. Everything above (masthead alignment/spacing at a real viewport, the Lab page's
+  layout on mobile/tablet, the diagnosis badges' color contrast, the variant cards' responsive
+  stacking) is structural/HTTP/API-level verification -- the *functional* correctness was
+  confirmed against real V1/V2 endpoints end to end (see above), but the visual presentation
+  itself has not been screenshot-checked. Ahsan should manually verify in a real browser:
+  masthead consistency across Home/Live Demo Results/Technical Report/Lab at a real viewport;
+  the Lab input form, execution progress, and results view (clean cards, variant cards, diff
+  highlighting, diagnosis badges) on desktop and mobile; that "Test Another Input" and a page
+  refresh mid-run both behave as expected in a real browser tab (not just via curl).
+- Next: Ahsan performs the manual visual/browser review above, then decides whether to proceed
+  to V5.5 (final integration, security review, responsive acceptance, later visual/UI polish),
+  V5.6 (Hugging Face deployment/public visibility), or push `ahsan/v5-redlab`.
+
 ## System V5.3 CLOSED - final manual-review fixes - Claude
 
 - Updated: 2026-09-10T07:35:00+04:00, Claude Code; branch `ahsan/v5-redlab`, observed HEAD

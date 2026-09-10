@@ -16,6 +16,7 @@
   var stageItems = document.querySelectorAll(".stage-list li");
   var navToggle = document.getElementById("nav-toggle");
   var primaryNav = document.getElementById("primary-nav");
+  var execBack = document.getElementById("exec-back");
   var POLL_MS = 1500;
   var polling = false;
   var launching = false;
@@ -35,6 +36,25 @@
         navToggle.setAttribute("aria-expanded", "false");
       });
     });
+  }
+
+  // ---- shared Red Lab "native-style Back" behavior (System V5.4 final integration) -----
+  // Same logic as report/template.html's/report/demo_template.html's inline rlGoBack() and
+  // lab.js's goBack(): if useful same-origin browser history exists, use it; otherwise let
+  // the link's own href="/" fallback navigate normally (also correct with JS disabled).
+  // Navigating away leaves a running experiment untouched server-side -- if the job is
+  // still "running", the fallback landing on "/" simply re-triggers the existing
+  // reattachment check below, which brings the visitor right back into the live execution
+  // view. Nothing here stops or interrupts the server-side run.
+  function goBack(event) {
+    if (window.history.length > 1 && document.referrer &&
+        document.referrer.indexOf(window.location.origin) === 0) {
+      event.preventDefault();
+      window.history.back();
+    }
+  }
+  if (execBack) {
+    execBack.addEventListener("click", goBack);
   }
 
   function setStageClasses(currentIndex) {

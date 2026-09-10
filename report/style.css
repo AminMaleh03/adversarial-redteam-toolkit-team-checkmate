@@ -11,7 +11,16 @@
      and the handful of general-brand-accent uses are overridden individually below. */
   --ink: var(--rl-charcoal); --muted: var(--rl-muted); --paper: var(--rl-paper); --line: var(--rl-border);
   --teal: var(--rl-success); --coral: var(--rl-danger);
-  --report-nav-height: 84px;
+  --rl-radius-sm: 4px;
+  /* Masthead-only tokens (System V5.4) -- mirrored in web/static/app.css with identical values
+     so Home, Live Demo Results and Technical Report share one visual spec for the top bar.
+     --report-nav-height is kept as an alias (not removed) so the scrollspy script below, which
+     reads it via getComputedStyle, keeps working unchanged. */
+  --rl-nav-height: 84px;
+  --report-nav-height: var(--rl-nav-height);
+  --rl-masthead-width: 1160px;
+  --rl-masthead-pad-x: 32px;
+  --rl-masthead-pad-y: 16px;
   --report-toc-width: 280px;
   --report-toc-collapsed-width: 56px;
 }
@@ -28,16 +37,17 @@ body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.65 "
 a { color: var(--rl-red); text-decoration-thickness: 1px; text-underline-offset: 3px; }
 a:hover { color: #7e1a23; }
 a:focus-visible, summary:focus-visible { outline: 3px solid var(--coral); outline-offset: 4px; }
-.masthead { position: sticky; top: 0; z-index: 20; background: var(--paper); max-width: 1320px; margin: auto; min-height: var(--report-nav-height); padding: 25px 48px; display: flex; align-items: center; gap: 36px; border-bottom: 1px solid var(--line); }
-.brand { display: flex; align-items: center; gap: 12px; color: var(--ink); font-size: 11px; letter-spacing: 1.7px; font-weight: 800; text-decoration: none; white-space: nowrap; }
-.brand-logo { height: 30px; width: 30px; object-fit: contain; display: block; border-radius: 6px; }
-.brand-lines { display: flex; flex-direction: column; line-height: 1.35; }
-.brand-version { font-size: 0.8em; font-weight: 700; letter-spacing: 0.4px; text-transform: none; color: var(--muted); margin-top: 2px; }
+.masthead { position: sticky; top: 0; z-index: 20; background: var(--paper); max-width: var(--rl-masthead-width); margin: auto; min-height: var(--rl-nav-height); padding: var(--rl-masthead-pad-y) var(--rl-masthead-pad-x); display: flex; align-items: center; gap: 36px; border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 12px; color: var(--ink); text-decoration: none; white-space: nowrap; }
+.brand-logo { height: 36px; width: 36px; object-fit: contain; display: block; border-radius: var(--rl-radius-sm); }
+.brand-text { display: flex; flex-direction: column; line-height: 1.3; }
+.brand-creator { font-size: 10px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: var(--muted); }
+.brand-product { font-size: 14px; font-weight: 800; letter-spacing: 0.4px; color: var(--ink); }
 .mark { font-size: 31px; line-height: 1; letter-spacing: -3px; }.mark span { color: var(--coral); }
 .masthead nav { display: flex; align-items: center; flex-wrap: wrap; gap: 18px 25px; margin-left: auto; }
-.masthead nav a, .downloads a { font-size: 12px; font-weight: 600; text-decoration: none; }
+.masthead nav a, .downloads a { font-size: 13px; font-weight: 700; letter-spacing: 0.3px; text-decoration: none; }
 .masthead nav a:not(.button), .downloads a:not(.button) {
-  color: var(--ink); border-bottom: 2px solid transparent; padding-bottom: 2px;
+  color: var(--ink); border-bottom: 2px solid transparent; padding-bottom: 4px;
 }
 .masthead nav a:not(.button):hover, .downloads a:not(.button):hover,
 .masthead nav a[aria-current="page"] { color: var(--rl-red); border-bottom-color: var(--rl-red); }
@@ -175,7 +185,7 @@ footer { max-width: 1080px; margin: 35px auto 0; padding: 25px 0 35px; border-to
 }
 
 @media (max-width: 760px) {
-  .masthead { padding: 18px 22px; flex-wrap: wrap; gap: 16px; }.masthead nav { order: 3; width: 100%; margin: 0; gap: 14px 20px; }.brand-logo { height: 24px; width: 24px; }.downloads a { font-size: 10px; }.brand { font-size: 9px; letter-spacing: 1px; }main { padding: 0 22px; }.hero { padding-top: 42px; }h1 { font-size: 53px; letter-spacing: -2.5px; }h1.page-title { font-size: 30px; letter-spacing: -1px; }.deck { font-size: 17px; }.verdict { padding: 24px; }.verdict-heading { display: block; }.verdict-heading .badge { margin-bottom: 14px; }.metrics { flex-wrap: wrap; gap: 23px 0; }.metric { flex-basis: 50%; padding-right: 10px; }.metric:nth-child(3) { border: 0; padding-left: 0; }.metric strong { font-size: 40px; }.two-up { display: block; }.two-up > .panel { width: 100%; }.panel { padding: 19px; }h2 { font-size: 24px; }.category-table td { padding: 14px 8px; }.category-table th:first-child { width: 29%; }.rate-label { display: block; }.rate-label span { display: block; }.compact { font-size: 9px; }.compact th, .compact td { padding: 4px; }.compact thead th { letter-spacing: 0; font-size: 8px; }.finding-index { grid-template-columns: 1fr; }.finding { padding: 20px; }footer { margin: 25px 22px 0; display: block; }footer a { display: block; margin-top: 10px; }
+  .masthead { padding: 18px 22px; flex-wrap: wrap; gap: 16px; }.masthead nav { order: 3; width: 100%; margin: 0; gap: 14px 20px; }.brand-logo { height: 24px; width: 24px; }.downloads a { font-size: 10px; }.brand-creator { font-size: 8px; letter-spacing: 1px; }.brand-product { font-size: 11px; }main { padding: 0 22px; }.hero { padding-top: 42px; }h1 { font-size: 53px; letter-spacing: -2.5px; }h1.page-title { font-size: 30px; letter-spacing: -1px; }.deck { font-size: 17px; }.verdict { padding: 24px; }.verdict-heading { display: block; }.verdict-heading .badge { margin-bottom: 14px; }.metrics { flex-wrap: wrap; gap: 23px 0; }.metric { flex-basis: 50%; padding-right: 10px; }.metric:nth-child(3) { border: 0; padding-left: 0; }.metric strong { font-size: 40px; }.two-up { display: block; }.two-up > .panel { width: 100%; }.panel { padding: 19px; }h2 { font-size: 24px; }.category-table td { padding: 14px 8px; }.category-table th:first-child { width: 29%; }.rate-label { display: block; }.rate-label span { display: block; }.compact { font-size: 9px; }.compact th, .compact td { padding: 4px; }.compact thead th { letter-spacing: 0; font-size: 8px; }.finding-index { grid-template-columns: 1fr; }.finding { padding: 20px; }footer { margin: 25px 22px 0; display: block; }footer a { display: block; margin-top: 10px; }
   .endpoint-pair { flex-direction: column; }
 
   .report-shell { display: block; }
@@ -210,6 +220,6 @@ footer { max-width: 1080px; margin: 35px auto 0; padding: 25px 0 35px; border-to
      the original single-column, full-width report layout with no interactive chrome. */
   .skip-link, .toc-toggle, .report-toc, .toc-backdrop { display: none !important; }
   .report-shell, .report-shell.toc-collapsed { display: block; max-width: none; }
-  .report-shell > main { min-width: 0; }.brand-logo { height: 22px; width: 22px; }.brand { font-size: 9px; }.hero { padding: 30px 0 20px; }h1 { font-size: 53px; letter-spacing: -2px; }h1.page-title { font-size: 26px; }.page-identity { font-size: 9px; }.version-id-row { gap: 6px; }.version-id { font-size: 10px; padding: 4px 8px; }.deck { font-size: 14px; max-width: 450px; }.hero-meta span, .model { font-size: 9px; }.eyebrow { font-size: 8px; }.verdict { padding: 22px; }.verdict h2 { font-size: 20px; }.metrics { gap: 15px; }.metric { padding-left: 14px; }.metric strong { font-size: 36px; }.metric span { font-size: 10px; }.metric small { font-size: 8px; }.caption, .coverage-line { font-size: 9px; }.report-section { padding-top: 28px; break-before: page; }h2 { font-size: 23px; }h3 { font-size: 15px; }h4 { font-size: 12px; }.section-heading { margin-bottom: 16px; }.panel { padding: 17px; margin-bottom: 14px; }.panel, .two-up, .verdict, .partial-banner, .metric-tile { break-inside: avoid; }.partial-banner { padding: 16px; margin: 14px 0; }.partial-banner h2 { font-size: 18px; }.metrics-row { gap: 12px; }.metric-tile { padding: 10px 12px; }.metric-tile strong { font-size: 26px; }.demo-preview { max-height: 90px; }.panel-heading { display: block; }.legend { margin-bottom: 8px; }.two-up { gap: 14px; }.big-stat { font-size: 30px; }.facts { font-size: 9px; }.denominator { font-size: 10px; }table { font-size: 10px; }thead { display: table-header-group; }tr { break-inside: avoid; }th, td { padding: 7px; }thead th { font-size: 8px; }.category-table td { padding: 10px 16px; }.rate-label span { font-size: 9px; }.section-intro { font-size: 10px; }
+  .report-shell > main { min-width: 0; }.brand-logo { height: 22px; width: 22px; }.brand-creator { font-size: 7px; }.brand-product { font-size: 9px; }.hero { padding: 30px 0 20px; }h1 { font-size: 53px; letter-spacing: -2px; }h1.page-title { font-size: 26px; }.page-identity { font-size: 9px; }.version-id-row { gap: 6px; }.version-id { font-size: 10px; padding: 4px 8px; }.deck { font-size: 14px; max-width: 450px; }.hero-meta span, .model { font-size: 9px; }.eyebrow { font-size: 8px; }.verdict { padding: 22px; }.verdict h2 { font-size: 20px; }.metrics { gap: 15px; }.metric { padding-left: 14px; }.metric strong { font-size: 36px; }.metric span { font-size: 10px; }.metric small { font-size: 8px; }.caption, .coverage-line { font-size: 9px; }.report-section { padding-top: 28px; break-before: page; }h2 { font-size: 23px; }h3 { font-size: 15px; }h4 { font-size: 12px; }.section-heading { margin-bottom: 16px; }.panel { padding: 17px; margin-bottom: 14px; }.panel, .two-up, .verdict, .partial-banner, .metric-tile { break-inside: avoid; }.partial-banner { padding: 16px; margin: 14px 0; }.partial-banner h2 { font-size: 18px; }.metrics-row { gap: 12px; }.metric-tile { padding: 10px 12px; }.metric-tile strong { font-size: 26px; }.demo-preview { max-height: 90px; }.panel-heading { display: block; }.legend { margin-bottom: 8px; }.two-up { gap: 14px; }.big-stat { font-size: 30px; }.facts { font-size: 9px; }.denominator { font-size: 10px; }table { font-size: 10px; }thead { display: table-header-group; }tr { break-inside: avoid; }th, td { padding: 7px; }thead th { font-size: 8px; }.category-table td { padding: 10px 16px; }.rate-label span { font-size: 9px; }.section-intro { font-size: 10px; }
   details { display: block; }details > :not(summary) { display: block !important; }summary { display: block; list-style: none; break-after: avoid; }summary::before { content: "+ "; }details[open] summary::before { content: ""; }.audit-details { padding: 13px; font-size: 10px; background: #f5f5f0; }.audit-details > summary { margin-bottom: 10px; }.evidence { font-size: 9px; }.compact { font-size: 8px; }.compact th, .compact td { padding: 4px; }.compact code { font-size: 7.5px; }.compact thead th { font-size: 7px; letter-spacing: 0; }.audit-details table { display: table !important; }.id-list { display: block; }.id-list code { display: inline; border: 0; background: none; font-size: 7.5px; padding: 0; }.id-list code::after { content: "; "; }.finding-index { display: block; columns: 2; column-gap: 20px; }.finding-index a { display: block; font-size: 8px; margin-bottom: 4px; }.finding { padding: 17px; font-size: 10px; break-inside: auto; }.finding-top, .finding h4, .finding-tags, h2, h3, h4, h5 { break-after: avoid; }.finding h4 { font-size: 14px; }.finding-tags { font-size: 8px; }.finding-id { font-size: 9px; }.badge { font-size: 8px; }.qualification { font-size: 9px; padding: 8px; }.remediation { break-inside: avoid; padding: 10px; }.remediation h5 { font-size: 9px; }.case-comparison { margin-top: 10px; padding-top: 8px; }.pipeline { gap: 0; }.pipeline span { font-size: 8px; }.limitations, .defenses { font-size: 10px; }.notice { font-size: 10px; }.provenance { font-size: 10px; }.hash { font-size: 8px; }a { text-decoration: none; }.version-title { break-after: avoid; }
 }

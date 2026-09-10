@@ -304,10 +304,14 @@ def describe_modification(original: Optional[str], attacked: Optional[str]) -> s
 def highlight_diff_html(original: Optional[str], attacked: Optional[str]) -> tuple[str, str]:
     """Pre-escaped HTML for both strings, with the differing spans wrapped in <mark>.
 
-    Escaping happens once, here, in Python; the report template renders these two
-    fields with Jinja's `safe` filter, so this function is what makes that safe. Only
-    ever fed our own generated attack text (deterministic transformations of committed
-    baseline sentences), never live user input.
+    Escaping happens once, here, in Python -- callers embed the two returned strings as
+    trusted HTML (the report template via Jinja's `safe` filter; web/lab.py's Live Red-Team
+    Lab embeds them directly into its JSON response under clearly-named fields), so this
+    function is what makes that safe. `html.escape` is unconditionally safe for arbitrary
+    input, so this is fine both for our own generated attack text (deterministic
+    transformations of committed baseline sentences) and for text derived from live,
+    judge-supplied Lab input (System V5.4) -- the function makes no assumption about
+    provenance either way.
     """
     if original is None or attacked is None:
         return html.escape(original or ""), html.escape(attacked or "")

@@ -27,11 +27,11 @@
 {% for s in versions %}{% for e in s.entries %}{% if e.finding.remediation not in remediations %}{% set _ = remediations.append(e.finding.remediation) %}{% endif %}{% endfor %}{% endfor %}
 <a class="skip-link" href="#report-main">Skip to report content</a>
 <header class="masthead">
-  <a class="brand" href="#overview"><img src="{{ logo_data_uri }}" alt="Team Checkmate" class="brand-logo"><span class="brand-lines"><span class="brand-name">TEAM CHECKMATE</span><span class="brand-version">{{ product_version_label }}</span></span></a>
+  <a class="brand" href="#overview"><img src="{{ logo_data_uri }}" alt="{{ creator_name }}" class="brand-logo"><span class="brand-text"><span class="brand-creator">{{ creator_name }}</span><span class="brand-product">{{ product_version_label }}</span></span></a>
   <button id="toc-toggle" class="toc-toggle" type="button" aria-expanded="false" aria-controls="report-toc">
     <span class="toc-toggle-bars" aria-hidden="true"></span> Contents
   </button>
-  <div class="downloads"><a class="home-link" href="/">&larr; Back to Red Lab</a><a href="analysis.json" target="_blank" rel="noopener">Source JSON</a>{% if include_pdf %}<a class="button" href="report.pdf" download>Download PDF <span aria-hidden="true">↓</span></a>{% endif %}</div>
+  <div class="downloads"><a class="home-link" href="/" onclick="return rlGoBack(event)">&larr; Back</a><a class="home-link" href="/">Back to Red Lab</a><a href="analysis.json" target="_blank" rel="noopener">Source JSON</a>{% if include_pdf %}<a class="button" href="report.pdf" download>Download PDF <span aria-hidden="true">↓</span></a>{% endif %}</div>
 </header>
 
 <div class="report-shell" id="report-shell">
@@ -282,6 +282,19 @@
 </div>
 <footer><span>{{ creator_name }} / {{ product_version_label }} / TECHNICAL REPORT</span><a class="home-link" href="/">&larr; Back to Red Lab</a><a href="#overview">Back to overview ↑</a></footer>
 <script>
+// Shared Red Lab "native-style Back" behavior (System V5.4 final integration): if useful
+// same-origin browser history exists, go back to it; otherwise the anchor's own href="/"
+// fallback runs unmodified (also the correct behavior with JS disabled). Global (not inside
+// the IIFE below) so the inline onclick attribute on the masthead's Back link can call it.
+function rlGoBack(event) {
+  if (window.history.length > 1 && document.referrer &&
+      document.referrer.indexOf(window.location.origin) === 0) {
+    event.preventDefault();
+    window.history.back();
+  }
+  return true;
+}
+
 (function () {
   "use strict";
   var shell = document.getElementById("report-shell");

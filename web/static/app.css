@@ -19,7 +19,14 @@
   --rl-radius-sm: 4px;
   --rl-shadow: 0 2px 14px rgba(23, 25, 29, 0.08);
   --rl-content-width: 1100px;
-  --rl-nav-height: 76px;
+  /* Masthead-only tokens (System V5.4) -- kept separate from --rl-content-width/other layout
+     tokens on purpose, so unifying the navbar never touches hero/body layout widths. Mirrored
+     in report/style.css with identical values so all three browser-facing surfaces (Home, Live
+     Demo Results, Technical Report) share one visual spec for the top bar. */
+  --rl-nav-height: 84px;
+  --rl-masthead-width: 1160px;
+  --rl-masthead-pad-x: 32px;
+  --rl-masthead-pad-y: 16px;
   --rl-button-height: 52px;
   --rl-space-1: 8px;
   --rl-space-2: 16px;
@@ -73,10 +80,10 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--rl-red); outlin
 }
 
 .masthead-inner {
-  max-width: var(--rl-content-width);
+  max-width: var(--rl-masthead-width);
   margin: auto;
   min-height: var(--rl-nav-height);
-  padding: 14px 24px;
+  padding: var(--rl-masthead-pad-y) var(--rl-masthead-pad-x);
   display: flex;
   align-items: center;
   gap: var(--rl-space-3);
@@ -88,10 +95,9 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--rl-red); outlin
   gap: 14px;
   color: var(--rl-charcoal);
   text-decoration: none;
-  margin-right: auto;
 }
 
-.brand-logo { height: 44px; width: 44px; object-fit: contain; display: block; border-radius: var(--rl-radius-sm); flex: none; }
+.brand-logo { height: 36px; width: 36px; object-fit: contain; display: block; border-radius: var(--rl-radius-sm); flex: none; }
 
 .brand-text { display: flex; flex-direction: column; line-height: 1.3; }
 .brand-creator { font-size: 10px; font-weight: 700; letter-spacing: 1.6px; text-transform: uppercase; color: var(--rl-muted); }
@@ -120,7 +126,7 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--rl-red); outlin
 .nav-toggle-bar::before { top: -6px; }
 .nav-toggle-bar::after { top: 6px; }
 
-.primary-nav { display: flex; align-items: center; gap: 28px; }
+.primary-nav { display: flex; align-items: center; gap: 28px; margin-left: auto; }
 .primary-nav a {
   color: var(--rl-charcoal);
   text-decoration: none;
@@ -244,6 +250,11 @@ main { max-width: var(--rl-content-width); margin: auto; padding: 0 24px 90px; }
 
 .execution-inner { width: 100%; max-width: 640px; margin: 0 auto; }
 
+/* Native-style Back control for the execution view (System V5.4 final integration) -- the
+   only non-Home surface on this page, since Home and Execution share one URL/masthead. */
+.exec-back { display: inline-block; font-size: 13px; font-weight: 700; color: var(--rl-charcoal); text-decoration: none; margin: 0 0 14px; }
+.exec-back:hover { color: var(--rl-red); }
+
 .exec-identity { font-size: 12px; font-weight: 800; letter-spacing: 1.6px; text-transform: uppercase; color: var(--rl-muted); margin: 0 0 10px; }
 .exec-kicker { font-size: 13px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: var(--rl-red); margin: 0 0 12px; }
 .exec-heading {
@@ -305,7 +316,6 @@ main { max-width: var(--rl-content-width); margin: auto; padding: 0 24px 90px; }
 
 @media (max-width: 760px) {
   .masthead-inner { padding: 10px 18px; }
-  .brand-logo { height: 36px; width: 36px; }
   .brand-product { font-size: 13px; }
   .nav-toggle { display: inline-flex; }
   .primary-nav {
@@ -339,4 +349,88 @@ main { max-width: var(--rl-content-width); margin: auto; padding: 0 24px 90px; }
   .execution-view { padding: 28px 0; }
   .exec-heading { font-size: 24px; margin-bottom: 20px; }
   .version-context { flex-direction: column; gap: 10px; margin: 20px 0 10px; }
+
+  .lab-variant-versions { flex-direction: column; }
 }
+
+/* ---- Live Red-Team Lab (System V5.4) --------------------------------------------------
+   Reuses the existing execution-view/version-card/panel visual language above -- no new
+   color, no motion beyond the existing reduced-motion-gated fade. */
+
+.lab-heading { font-size: 34px; line-height: 1.2; letter-spacing: -0.6px; font-weight: 800; color: var(--rl-charcoal); margin: 8px 0 14px; }
+.lab-model-note { margin: 0 0 24px; }
+.lab-label { display: block; font-size: 13px; font-weight: 700; color: var(--rl-charcoal); margin: 0 0 8px; }
+
+#lab-text {
+  width: 100%;
+  font: inherit;
+  font-size: 15px;
+  padding: 14px 16px;
+  border: 1px solid var(--rl-border);
+  border-radius: var(--rl-radius-sm);
+  background: var(--rl-surface);
+  color: var(--rl-charcoal);
+  resize: vertical;
+}
+#lab-text:focus-visible { outline: 3px solid var(--rl-red); outline-offset: 1px; }
+
+.exec-heading.is-small { font-size: 24px; margin-bottom: 16px; }
+
+/* demo-mark is the class run_all.highlight_diff_html() emits (shared server-side helper with
+   the demo report -- same visual treatment as report/style.css's mark.demo-mark). */
+mark.demo-mark { background: #f6c453; color: #3a2c05; padding: 0 1px; border-radius: 2px; font-weight: 700; unicode-bidi: plaintext; }
+
+.lab-summary-list, .lab-score-list {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 16px;
+  margin: 16px 0 28px;
+  font-size: 14px;
+}
+.lab-summary-list dt, .lab-score-list dt { color: var(--rl-muted); }
+.lab-summary-list dd, .lab-score-list dd { margin: 0; font-weight: 700; color: var(--rl-charcoal); text-align: right; }
+
+.lab-section-heading { font-size: 20px; font-weight: 800; color: var(--rl-charcoal); margin: 28px 0 14px; }
+
+.lab-clean-cards .version-context { margin: 12px 0; }
+
+.lab-variants { display: flex; flex-direction: column; gap: 16px; }
+.lab-variant-card { padding: 22px; }
+.lab-variant-card h3 { margin: 0 0 4px; font-size: 17px; }
+
+.lab-diagnosis-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  margin: 8px 0;
+  border: 1px solid var(--rl-border);
+  color: var(--rl-charcoal);
+}
+.lab-diagnosis-mitigated_by_v2 { border-color: var(--rl-success); color: var(--rl-success); }
+.lab-diagnosis-persists_after_hardening { border-color: var(--rl-danger); color: var(--rl-danger); }
+.lab-diagnosis-v2_regression { border-color: var(--rl-warning); color: var(--rl-warning); }
+.lab-diagnosis-no_material_effect { border-color: var(--rl-muted); color: var(--rl-muted); }
+.lab-diagnosis-inconclusive { border-color: var(--rl-muted); color: var(--rl-muted); }
+
+.lab-diff { margin: 14px 0; font-size: 14px; }
+.lab-diff-line { margin: 6px 0; line-height: 1.6; overflow-wrap: anywhere; }
+
+.lab-variant-versions { display: flex; gap: 16px; margin-top: 14px; }
+.lab-variant-version {
+  flex: 1;
+  min-width: 0;
+  background: var(--rl-paper);
+  border: 1px solid var(--rl-border);
+  border-radius: var(--rl-radius-sm);
+  padding: 14px 16px;
+  font-size: 13px;
+}
+.lab-field { margin: 6px 0; }
+.lab-outcome { font-weight: 700; margin: 0 0 4px; }
+
+/* Sticky masthead "Test Another Input" action (System V5.4 final integration) -- reuses
+   .button.ghost, just kept inline-height-compatible with the surrounding nav links. */
+.nav-action { white-space: nowrap; flex: none; }

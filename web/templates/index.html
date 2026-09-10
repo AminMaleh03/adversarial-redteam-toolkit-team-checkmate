@@ -24,6 +24,7 @@
       <nav id="primary-nav" class="primary-nav" aria-label="Primary">
         <a href="/" aria-current="page">Home</a>
         <a href="#run" id="nav-live-demo">Live Demo</a>
+        <a href="/lab" id="nav-try-lab">Try Your Own Input</a>
         {% if verified_full_available %}
         <a href="{{ verified_full_href }}" target="_blank" rel="noopener">Technical Report</a>
         {% endif %}
@@ -51,8 +52,9 @@
         <p class="model">Model: j-hartmann/emotion-english-distilroberta-base &middot; 7 emotion labels</p>
         <div class="cta-row" id="run">
           <button id="run-btn" class="button primary" type="button">Run Live Demo</button>
+          <a class="button secondary" href="/lab">Try Your Own Input</a>
           {% if verified_full_available %}
-          <a class="button secondary" href="{{ verified_full_href }}" target="_blank" rel="noopener">View Technical Report</a>
+          <a class="button ghost" href="{{ verified_full_href }}" target="_blank" rel="noopener">View Technical Report</a>
           {% endif %}
         </div>
         <p id="cta-note" class="caption">Executes a real curated attack subset against both endpoint configurations.</p>
@@ -61,6 +63,7 @@
 
     <section id="view-execution" class="execution-view" hidden>
       <div class="execution-inner">
+        <a href="/" id="exec-back" class="exec-back">&larr; Back</a>
         <p class="exec-identity">{{ creator_name }} / {{ product_version_label }}</p>
         <p class="exec-kicker">LIVE DEMO</p>
         <h1 id="exec-heading" class="exec-heading" tabindex="-1" aria-live="polite">Launching adversarial test&hellip;</h1>

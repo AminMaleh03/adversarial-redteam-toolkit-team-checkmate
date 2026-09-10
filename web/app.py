@@ -35,6 +35,7 @@ import run_all  # noqa: E402
 from report.generate import (  # noqa: E402
     CREATOR_NAME, PRODUCT_NAME, PRODUCT_TAGLINE, PRODUCT_VERSION_LABEL,
 )
+from web import lab as lab_module  # noqa: E402
 
 logger = logging.getLogger("team_checkmate.web")
 
@@ -89,7 +90,12 @@ def _idle_state() -> dict:
     }
 
 
-_job_lock = threading.Lock()
+# Shared with web/lab.py's Live Red-Team Lab job (System V5.4): both flows start V1/V2 on the
+# same fixed ports (run_all.ENDPOINT_SPECS), so a demo run and a lab run must never overlap.
+# Aliasing lab_module.JOB_LOCK here (instead of constructing a second Lock()) is the only
+# change this module makes to its own demo logic -- every existing demo route/test still works
+# unchanged, since a threading.Lock behaves identically regardless of which module built it.
+_job_lock = lab_module.JOB_LOCK
 _job_state = _idle_state()
 
 
@@ -202,6 +208,24 @@ def index(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "index.html", context)
 
 
+@app.get("/lab", response_class=HTMLResponse)
+def lab_page(request: Request) -> HTMLResponse:
+    context = {
+        "logo_data_uri": _logo_data_uri(),
+        "red_lab_logo_data_uri": _red_lab_logo_data_uri(),
+        "creator_name": CREATOR_NAME,
+        "product_name": PRODUCT_NAME,
+        "product_tagline": PRODUCT_TAGLINE,
+        "product_version_label": PRODUCT_VERSION_LABEL,
+        "verified_full_available": run_all.VERIFIED_FULL_REPORT_DIR.exists(),
+        "verified_full_href": f"{VERIFIED_MOUNT}/report.html",
+        "lab_stage_order": list(lab_module.LAB_STAGE_ORDER),
+        "lab_stage_labels": lab_module.LAB_STAGE_LABELS,
+        "lab_max_chars": lab_module.MAX_INPUT_CHARS,
+    }
+    return templates.TemplateResponse(request, "lab.html", context)
+
+
 @app.get("/healthz")
 def healthz() -> dict:
     # Confirms only that the public web app itself is alive -- never starts V1/V2.
@@ -213,6 +237,11 @@ def start_run() -> JSONResponse:
     with _job_lock:
         if _job_state["status"] == "running":
             return JSONResponse(dict(_job_state), status_code=202)
+        if lab_module.is_running_unlocked():
+            # A Live Red-Team Lab job holds the shared slot -- distinct from the branch above
+            # (which reattaches to demo's own already-running job): this is a real "try again"
+            # busy signal, in the same shape as Lab's own busy response (brief section 9).
+            return JSONResponse({"status": "busy"}, status_code=409)
         run_name = _generate_run_name()
         _job_state.update(
             status="running", stage="initializing", stage_index=0,
@@ -229,3 +258,28 @@ def start_run() -> JSONResponse:
 @app.get("/api/status")
 def status() -> dict:
     return _snapshot()
+
+
+@app.post("/api/lab/run")
+async def start_lab(request: Request) -> JSONResponse:
+    try:
+        body = await request.json()
+    except Exception:  # noqa: BLE001 -- malformed JSON body, not our concern beyond a 422
+        body = None
+    text = body.get("text") if isinstance(body, dict) else None
+    if not isinstance(text, str):
+        return JSONResponse({"status": "invalid", "error": "Text is required."}, status_code=422)
+    try:
+        result = lab_module.start_lab_job(text, lambda: _job_state["status"] == "running")
+    except lab_module.LabValidationError as exc:
+        return JSONResponse({"status": "invalid", "error": str(exc)}, status_code=422)
+    status_code = 409 if result.get("status") == "busy" else 202
+    return JSONResponse(result, status_code=status_code)
+
+
+@app.get("/api/lab/status/{job_id}")
+def lab_status(job_id: str) -> JSONResponse:
+    state = lab_module.lab_status(job_id)
+    if state is None:
+        return JSONResponse({"status": "not_found"}, status_code=404)
+    return JSONResponse(state)

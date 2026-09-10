@@ -713,11 +713,79 @@ def test_demo_partial_banner_mentions_technical_report_without_cli_when_no_detai
 
 
 def test_reports_masthead_brand_shows_version_label(demo_data):
+    # System V5.4: the masthead brand now renders from {{ creator_name }} ("Team Checkmate",
+    # title case) inside .brand-creator, which applies text-transform: uppercase in CSS --
+    # visually "TEAM CHECKMATE", same as web/templates/index.html's masthead -- rather than a
+    # separate hardcoded uppercase literal in the template.
     for mode in ("demo", "full"):
         result = html(demo_data, mode=mode)
         header = result[result.index("<header"):result.index("</header>")]
-        assert "TEAM CHECKMATE" in header
+        assert "Team Checkmate" in header
+        assert 'class="brand-creator"' in header
         assert "Red Lab v5.0" in header
+
+
+def test_reports_masthead_brand_uses_shared_class_names_with_web_app(demo_data):
+    # System V5.4 navbar unification: report masthead brand markup uses the same class names
+    # as web/templates/index.html's masthead (brand-text/brand-creator/brand-product), not the
+    # old report-only brand-lines/brand-name/brand-version names.
+    for mode in ("demo", "full"):
+        result = html(demo_data, mode=mode)
+        header = result[result.index("<header"):result.index("</header>")]
+        assert 'class="brand-text"' in header
+        assert 'class="brand-product"' in header
+        assert "brand-lines" not in header
+        assert "brand-name" not in header
+        assert "brand-version" not in header
+
+
+def test_report_style_css_masthead_tokens_match_web_app():
+    css = (ROOT / "report" / "style.css").read_text(encoding="utf-8")
+    assert "--rl-nav-height: 84px" in css
+    assert "--rl-masthead-width: 1160px" in css
+    assert "--rl-masthead-pad-x: 32px" in css
+    assert "--report-nav-height: var(--rl-nav-height)" in css  # alias -- scrollspy JS unaffected
+
+
+# ------------------------------------------------------------------------------------------
+# System V5.4 final integration: native-style Back navigation on both report pages.
+# ------------------------------------------------------------------------------------------
+
+
+def test_technical_report_masthead_has_native_back_first(demo_data):
+    result = html(demo_data, mode="full")
+    downloads = result[result.index('class="downloads"'):result.index("</div>", result.index('class="downloads"'))]
+    assert 'onclick="return rlGoBack(event)"' in downloads
+    assert "&larr; Back<" in downloads
+    # Back is the FIRST item in the cluster, ahead of "Back to Red Lab".
+    assert downloads.index("rlGoBack") < downloads.index("Back to Red Lab")
+
+
+def test_demo_results_masthead_has_native_back_first(demo_data):
+    result = html(demo_data, mode="demo")
+    nav = result[result.index("<nav"):result.index("</nav>")]
+    assert 'onclick="return rlGoBack(event)"' in nav
+    assert "&larr; Back<" in nav
+    assert nav.index("rlGoBack") < nav.index("Back to Red Lab")
+
+
+def test_reports_back_uses_shared_history_fallback_behavior(demo_data):
+    for mode in ("demo", "full"):
+        result = html(demo_data, mode=mode)
+        assert "function rlGoBack(event)" in result
+        assert "window.history.back()" in result
+        assert "window.history.length > 1" in result
+        assert "document.referrer" in result
+        # Only ever one real <script> tag per report page (System V5.3 invariant) -- rlGoBack
+        # lives inside it, not a second tag.
+        assert result.count("<script>") == 1
+
+
+def test_demo_report_csp_allows_only_its_own_inline_script(demo_data):
+    result = html(demo_data, mode="demo")
+    csp = re.search(r'Content-Security-Policy" content="([^"]+)"', result).group(1)
+    assert "script-src 'unsafe-inline'" in csp
+    assert "http" not in csp and "eval" not in csp
 
 
 def test_group_key_allows_equal_category_and_subfamily(data):

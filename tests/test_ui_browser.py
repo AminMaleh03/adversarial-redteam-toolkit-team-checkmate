@@ -357,6 +357,32 @@ def test_report_anchors_replace_history_and_back_returns_to_entry(ui, width, ent
     assert state.posts == 0 and state.lab_posts == 0
 
 
+def test_report_internal_nav_is_history_safe_before_main_script_parses(ui):
+    """A reader can click a sidebar link before the end-of-body script has parsed.
+
+    The technical report is a large single document, so over a slow connection the
+    sidebar is interactive well before that script runs. Handling internal navigation
+    only there let the click fall through to native hash navigation, which pushed a
+    page-history entry and kept Back inside the report.
+    """
+    page, state = ui
+    full = (ROOT / 'artifacts/verified_full_report/report.html').read_text(encoding='utf-8')
+    partial = full[:full.rindex('<script>')] + '</body></html>'
+    assert 'window.rlOnInternalNav = function' not in partial
+    page.route(ORIGIN + '/partial-report', lambda route: route.fulfill(
+        content_type='text/html', body=partial))
+    page.goto(ORIGIN)
+    page.goto(ORIGIN + '/partial-report')
+    length = page.evaluate('history.length')
+    page.locator('[data-toc-link][href="#remediation"]').click()
+    assert page.url.endswith('#remediation')
+    assert page.evaluate('history.length') == length
+    assert page.locator('#remediation').bounding_box()['y'] < 200
+    page.go_back()
+    page.wait_for_url(ORIGIN + '/')
+    assert state.posts == 0 and state.lab_posts == 0
+
+
 def test_direct_report_deep_link_keeps_safe_back_fallback(ui):
     page, state = ui
     page.goto(ORIGIN + '/verified-full/report.html#remediation')

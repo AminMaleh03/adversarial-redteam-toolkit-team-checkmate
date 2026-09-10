@@ -129,14 +129,14 @@ def test_xss_and_template_syntax_are_plain_text(data):
     assert payload not in result
     assert "&lt;script&gt;" in result
     assert "{{7*7}}" in result
-    # The one legitimate <script> is report/template.html's own static, repository-owned
-    # sidebar/scrollspy script (System V5.3) -- verify the untrusted payload did not inject
-    # a second, attacker-controlled script tag, and never reached the trusted script's body.
-    assert Document(result).tags.count("script") == 1
+    # The only legitimate scripts are report/template.html's own static, repository-owned
+    # ones: the <head> internal-navigation listener (System V6) and the sidebar/scrollspy
+    # script (System V5.3). Verify the untrusted payload injected no further script tag and
+    # never reached the body of a trusted one.
+    assert Document(result).tags.count("script") == 2
     after_style = result.index("</style>")  # the CSS may itself mention "<script>" in prose
-    script_start = result.index("<script>", after_style)
-    script_end = result.index("</script>", script_start)
-    assert "alert(1)" not in result[script_start:script_end]
+    for start in [i for i in range(len(result)) if result.startswith("<script>", i) and i > after_style]:
+        assert "alert(1)" not in result[start:result.index("</script>", start)]
     # The one legitimate <img> is the trusted, base64-embedded Team Checkmate logo (see
     # report.generate._logo_data_uri) -- verify the untrusted payload did not inject an
     # additional image (e.g. an exfiltration src) alongside it.
@@ -769,9 +769,11 @@ def test_reports_back_uses_shared_history_fallback_behavior(demo_data):
         assert "window.history.back()" in result
         assert "window.history.length > 1" in result
         assert "document.referrer" in result
-        # Only ever one real <script> tag per report page (System V5.3 invariant) -- rlGoBack
-        # lives inside it, not a second tag.
-        assert result.count("<script>") == 1
+        # Only the report's own inline scripts (System V5.3 invariant, extended by V6):
+        # rlGoBack lives inside the end-of-body script, never in a tag of its own. The full
+        # report additionally carries the <head> internal-navigation listener, which must be
+        # in <head> so it is active while this large document is still parsing.
+        assert result.count("<script>") == (2 if mode == "full" else 1)
 
 
 def test_demo_report_csp_allows_only_its_own_inline_script(demo_data):
@@ -977,7 +979,7 @@ def test_full_report_evidence_audit_targets_have_scroll_margin(data):
 
 def test_full_report_scrollspy_tracks_every_toc_link_not_just_top_level(data):
     result = html(data)
-    script = result[result.index("<script>"):result.index("</script>")]
+    script = result[result.rindex("<script>"):]  # the end-of-body sidebar/scrollspy script
     # The observer's target set is built from every [data-toc-link] with no narrowing to
     # top-level sections only -- this is what makes the Evidence & Audit subsections (and
     # every other subsection) participate in the scrollspy at all.

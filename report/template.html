@@ -12,6 +12,32 @@
   <title>Technical Report | Red Lab</title>
   {# Only the repository-owned stylesheet is trusted; all analysis values stay escaped. #}
   <style>{{ css|safe }}</style>
+  {# System V6: internal navigation must never push page history, so the reader's global
+     Back leaves the report instead of walking back through sections. This listener is in
+     <head> on purpose -- this document is large, and over a slow connection a reader can
+     click a sidebar link long before the main script at the end of <body> has parsed.
+     Scroll/hash handling lives here; the sidebar's active state hooks in via
+     window.rlOnInternalNav once that script is ready. #}
+  <script>
+  document.addEventListener("click", function (event) {
+    // Leave modified clicks alone so "open in a new tab" on a deep link still works.
+    if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey ||
+        event.shiftKey || event.altKey) return;
+    var link = event.target.closest ? event.target.closest('a[href^="#"]') : null;
+    if (!link || !link.hash || link.hash === "#") return;
+    var target = document.getElementById(link.hash.slice(1));
+    if (!target) return;
+    event.preventDefault();
+    target.scrollIntoView({ behavior: "instant", block: "start" });
+    // The skip link exists to move keyboard focus; preventDefault would otherwise drop it.
+    if (link.classList.contains("skip-link")) {
+      if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+      target.focus({ preventScroll: true });
+    }
+    window.history.replaceState(window.history.state, "", link.hash);
+    if (typeof window.rlOnInternalNav === "function") window.rlOnInternalNav(link.hash);
+  });
+  </script>
 </head>
 <body class="has-back">
 {% macro ids(label, values) -%}
@@ -365,21 +391,13 @@ function rlGoBack(event) {
     closeDrawer();
     toc.inert = isMobile();
   });
-  document.querySelectorAll('a[href^="#"]').forEach(function (link) {
-    link.addEventListener("click", function (event) {
-      // Internal document navigation stays in one logical report history entry.
-      // Preserve modified clicks so opening a deep link in another tab still works.
-      if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-      var target = document.getElementById(link.hash.slice(1));
-      if (!target) return;
-      event.preventDefault();
-      clickedLink = toc.querySelector('[data-toc-link][href="' + link.hash + '"]');
-      setActive(clickedLink);
-      if (isMobile() && toc.classList.contains("is-open")) { closeDrawer(); }
-      target.scrollIntoView({ behavior: "instant", block: "start" });
-      window.history.replaceState(window.history.state, "", link.hash);
-    });
-  });
+  // Scroll and history for internal links are handled by the <head> listener above; this
+  // only reflects the jump in the sidebar. Before this runs, scrollspy sets the indicator.
+  window.rlOnInternalNav = function (hash) {
+    clickedLink = toc.querySelector('[data-toc-link][href="' + hash + '"]');
+    setActive(clickedLink);
+    if (isMobile() && toc.classList.contains("is-open")) { closeDrawer(); }
+  };
 
   // Desktop collapse: narrows the sidebar to a rail without hiding it (System V5.3 --
   // never an overlay on desktop; content reflows via the CSS grid column width).

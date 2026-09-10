@@ -22,8 +22,8 @@
         <span class="nav-toggle-bar" aria-hidden="true"></span>
       </button>
       <nav id="primary-nav" class="primary-nav" aria-label="Primary">
-        <a href="/">Home</a>
-        <a href="#run">Live Demo</a>
+        <a href="/" aria-current="page">Home</a>
+        <a href="#run" id="nav-live-demo">Live Demo</a>
         {% if verified_full_available %}
         <a href="{{ verified_full_href }}" target="_blank" rel="noopener">Technical Report</a>
         {% endif %}
@@ -32,41 +32,72 @@
   </header>
 
   <main>
-    <section class="hero" id="welcome">
-      <div class="rl-hero-brand">
-        <img src="{{ red_lab_logo_data_uri }}" alt="{{ product_name }} logo" class="rl-logo">
-        <div class="rl-hero-text">
-          <p class="rl-creator">{{ creator_name }}</p>
-          <h1 class="rl-wordmark">{{ product_name }}</h1>
-          <p class="rl-tagline">{{ product_tagline }}</p>
+    <div id="view-home">
+      <section class="hero" id="welcome">
+        <div class="rl-hero-brand">
+          <img src="{{ red_lab_logo_data_uri }}" alt="{{ product_name }} logo" class="rl-logo">
+          <div class="rl-hero-text">
+            <p class="rl-creator">{{ creator_name }}</p>
+            <h1 class="rl-wordmark">{{ product_name }}</h1>
+            <p class="rl-tagline">{{ product_tagline }}</p>
+          </div>
+        </div>
+        <p class="deck">
+          An automated adversarial testing environment for AI inference endpoints. Red Lab
+          executes controlled malformed, boundary, encoding and adversarial inputs against the
+          same model before and after application-layer hardening, then measures how the
+          system responds.
+        </p>
+        <p class="model">Model: j-hartmann/emotion-english-distilroberta-base &middot; 7 emotion labels</p>
+        <div class="cta-row" id="run">
+          <button id="run-btn" class="button primary" type="button">Run Live Demo</button>
+          {% if verified_full_available %}
+          <a class="button secondary" href="{{ verified_full_href }}" target="_blank" rel="noopener">View Technical Report</a>
+          {% endif %}
+        </div>
+        <p id="cta-note" class="caption">Executes a real curated attack subset against both endpoint configurations.</p>
+      </section>
+    </div>
+
+    <section id="view-execution" class="execution-view" hidden>
+      <div class="execution-inner">
+        <p class="exec-identity">{{ creator_name }} / {{ product_version_label }}</p>
+        <p class="exec-kicker">LIVE DEMO</p>
+        <h1 id="exec-heading" class="exec-heading" tabindex="-1" aria-live="polite">Launching adversarial test&hellip;</h1>
+
+        <div id="exec-body">
+          <div id="progress-bar" class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Live demo progress">
+            <div id="progress-fill" class="progress-fill" style="width: 0%;"></div>
+          </div>
+          <p id="exec-percent" class="exec-percent" aria-hidden="true">0%</p>
+
+          <ol class="stage-list" id="stage-list">
+            {% for stage in stage_order %}
+            <li data-stage="{{ stage }}">{{ stage_labels[stage] }}</li>
+            {% endfor %}
+          </ol>
+
+          <div class="version-context">
+            <div class="version-card v1">
+              <p class="version-card-title">V1 &mdash; Unhardened Endpoint</p>
+              <p class="version-card-note">No application-layer hardening.</p>
+            </div>
+            <div class="version-card v2">
+              <p class="version-card-title">V2 &mdash; Hardened Endpoint</p>
+              <p class="version-card-note">Input validation, length controls, exception handling and normalization.</p>
+            </div>
+          </div>
+          <p class="exec-model-note">Same underlying AI model in both cases &mdash; only the endpoint hardening differs.</p>
+        </div>
+
+        <div class="exec-failure" id="exec-failure" hidden>
+          <p id="exec-error" class="exec-error" role="alert"></p>
+          <div class="cta-row">
+            <button id="retry-btn" class="button primary" type="button">Retry Live Demo</button>
+            <a class="button ghost" href="/">Back to Red Lab</a>
+          </div>
         </div>
       </div>
-      <p class="deck">
-        An automated adversarial testing environment for AI inference endpoints. Red Lab
-        executes controlled malformed, boundary, encoding and adversarial inputs against the
-        same model before and after application-layer hardening, then measures how the
-        system responds.
-      </p>
-      <p class="model">Model: j-hartmann/emotion-english-distilroberta-base &middot; 7 emotion labels</p>
-      <div class="cta-row" id="run">
-        <button id="run-btn" class="button primary" type="button">Run Live Demo</button>
-        {% if verified_full_available %}
-        <a class="button secondary" href="{{ verified_full_href }}" target="_blank" rel="noopener">View Technical Report</a>
-        {% endif %}
-      </div>
-      <p id="cta-note" class="caption">Executes a real curated attack subset inside this container.</p>
-    </section>
-
-    <section id="progress-panel" class="panel progress-panel" hidden aria-live="polite">
-      <p class="eyebrow">LIVE RUN IN PROGRESS</p>
-      <h2 id="progress-message">Initializing toolkit</h2>
-      <div class="progress-bar"><div id="progress-fill" class="progress-fill" style="width: 0%;"></div></div>
-      <ol class="stage-list">
-        {% for stage in stage_order %}
-        <li data-stage="{{ stage }}">{{ stage_labels[stage] }}</li>
-        {% endfor %}
-      </ol>
-      <p id="progress-error" class="notice warning" hidden></p>
     </section>
   </main>
 

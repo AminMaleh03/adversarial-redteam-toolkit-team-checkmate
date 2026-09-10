@@ -1,3 +1,310 @@
+## System V5.2 CLOSED - final visual polish - Claude
+
+- Updated: 2026-09-10T06:50:00+04:00, Claude Code; branch `ahsan/v5-redlab`, observed HEAD
+  `64de35f` at session start (the V5.2 commit below, local-only, not pushed anywhere). This
+  session's changes are folded into that same commit via `git commit --amend` once verified
+  (explicit instruction: keep V5.2 as one clean logical commit after V5.1; do not amend V5.1
+  `6b0bc9c`; confirmed `ahsan/v5-redlab` still has no upstream ref on `origin` or `space`
+  before amending).
+- Ahsan's real-browser manual review of V5.2 found four issues to close before V5.2 is done:
+  the execution view leaking onto the idle home page, developer/CLI wording in judge-facing
+  pages, a visually weak completion state, and an inconsistent top navigation. Scope stayed
+  presentation-only: no attack/runner/analysis/severity/remediation/`contract.py` changes,
+  no benchmark rerun; V5.3/V5.4/Hugging Face deployment untouched.
+- **Root-caused and fixed the critical idle-home bug**: `#view-execution` carried the
+  `hidden` attribute in the server-rendered HTML the whole time, but `.execution-view {
+  display: flex; ... }` (an author-stylesheet class rule) has the exact same CSS specificity
+  as the browser's own UA-stylesheet rule `[hidden] { display: none }` -- and any author rule
+  beats a UA rule at equal specificity regardless of the `hidden` attribute being present.
+  So the execution view was rendering, visible, under the hero on every fresh page load.
+  Fixed with one global safeguard in `web/static/app.css` (added right after the `*` reset):
+  `[hidden] { display: none !important; }`, plus a code comment establishing this as the one
+  place "hidden means gone" is decided -- no future element may add a competing `display`
+  override for something toggled via the `hidden` attribute instead. Verified live: fresh
+  `GET /` now serves `<section id="view-execution" ... hidden>` with the safeguard rule
+  present in the served CSS, and the rendered HTML's "Launching adversarial test…" text
+  exists only inside that now-actually-hidden section (this was never a text-presence bug --
+  the markup was always structurally correct; only the CSS cascade was wrong).
+- **Removed all user-facing developer/CLI wording**: `report/demo_template.html` had two
+  literal `<code>python run_all.py --mode full</code>` instructions visible in the rendered
+  Live Demo Results page (the partial-suite banner and the Method section). Both now say
+  "Technical Report" instead, and link to it via the existing `detailed_report` context
+  (`{% if detailed_report and detailed_report.available %}`, the same field the masthead's
+  "View Detailed Report" link already uses -- no new data plumbing) when that artifact is
+  present, plain text otherwise -- never a CLI instruction either way. A source-level Jinja
+  comment on line 10 still says `run_all.py` (`{# ... which run_all.py pre-escapes itself #}`)
+  -- that is a template *comment*, stripped by Jinja before rendering and never reaches a
+  browser, so it was deliberately left alone (developer documentation, not product UI).
+  `web/templates/index.html`'s CTA caption dropped "inside this container" for "against both
+  endpoint configurations" -- product language, no deployment/container internals implied.
+  Grepped every user-facing template (`report/*.html`, `web/templates/*.html`) for
+  `run_all.py`, `python run_all`, "inside this container", `localhost`/`127.0.0.1`,
+  `filesystem` after the fix: zero remaining hits outside that one Jinja comment.
+- **Completion heading hierarchy**: this was already using the same `#exec-heading` element
+  and `.exec-heading` CSS class as every in-progress stage message (`execHeading.textContent
+  = "Experiment complete"`, not a separate/smaller element) -- the "visually weak" impression
+  Ahsan saw was very likely a symptom of the idle-home bug above (the still-visible 60-76px
+  hero wordmark competing with/dwarfing the 34px execution heading in the same viewport).
+  Hardened it anyway with a small, restrained, semantic touch: `#view-execution` gains an
+  `is-complete` class on completion, which colors the heading and the progress fill
+  `var(--rl-success)` green (matching the existing V2/healthy semantic used everywhere else
+  in the product) -- no animation, no confetti. The class is cleared in
+  `activateExecutionView()` so a Retry after a later failure, or a fresh run, doesn't start
+  in a stale "complete" color.
+- **Navbar visual consistency** (explicitly NOT the V5.3 sidebar restructuring): the report
+  masthead (`report/style.css`, both templates) previously showed only "TEAM CHECKMATE" (or
+  "TEAM CHECKMATE / DEMO") with no Red Lab version label, unlike the web app's masthead which
+  already showed both lines. Both report templates' `.brand` now renders a `.brand-lines`
+  column with `.brand-name` ("TEAM CHECKMATE") and `.brand-version` ({{ product_version_label
+  }}, i.e. "Red Lab v5.0") -- reusing the context variable `render_html` already passed in,
+  no Python changes needed. Nav-link hover treatment was unified across the web app and the
+  reports: both now use a charcoal-by-default, `var(--rl-red)`-on-hover-or-`aria-current`
+  text color with a modest 2px bottom border (transparent by default, red on hover/active) --
+  previously the report's nav links inherited the global `a { color: red }` rule and were
+  red-by-default rather than accented-on-interaction, a small but real visual mismatch with
+  the web app's charcoal-default nav. The report's `.button`-class links (Download PDF, View
+  Detailed Report) are explicitly excluded from the new border/color rule via `:not(.button)`
+  so the existing solid dark button styling is untouched. No content-width, nav-height, or
+  logo-size changes were made to the report masthead (all flagged as V5.3-scale restructuring
+  risk, especially given `report/style.css`'s existing print/pagination tuning) -- this was
+  kept to the smallest safe adjustment that unifies identity and interaction color/underline
+  only. The web app's `.primary-nav a` gained the matching bottom-border treatment and
+  `aria-current="page"` on the Home link.
+- **Navbar behavior**: the web app's "Live Demo" nav item no longer just scrolls to `#run`.
+  `web/static/app.js` gained `goToLiveDemo()`, which checks `/api/status` first -- if a run
+  is already active it reattaches via the exact same `activateExecutionView()`/`applyState()`
+  path the reattach-on-load logic already uses (no visible reset to 0%), otherwise it calls
+  the exact same `startRun()` the main CTA and Retry button use. No second, parallel
+  run-launch code path was introduced (single source of truth, per the brief); the backend's
+  existing single-job lock is untouched and remains the authoritative guard against a real
+  second `run_experiment()` call regardless of which UI element triggered the request. The
+  anchor's `href="#run"` is kept as a no-JS graceful-degradation fallback; the JS handler
+  calls `preventDefault()` and takes over when script is available.
+- **Tests**: added 5 to `tests/test_web.py` (the `[hidden] { display: none !important; }`
+  safeguard is present in served CSS; the Home nav link carries `aria-current="page"`; "inside
+  this container" is absent from the home page; exactly one `#exec-heading` element exists
+  server-side and `app.js` writes both the running-stage message and the literal "Experiment
+  complete" string to it, never a second/smaller element; `app.js` defines `goToLiveDemo()`
+  reusing `startRun(triggerEl)` rather than a duplicated run-start path) and 4 to
+  `tests/test_report.py` (the demo report never contains `run_all.py`/`python run_all`; the
+  partial-suite banner and Method section point to "Technical Report" -- with a real link
+  when `detailed_report.available` is set, plain text otherwise -- never a CLI instruction
+  either way; both report masthead brands show "TEAM CHECKMATE" and "Red Lab v5.0"). Full
+  suite: `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .venv/Scripts/python.exe -m pytest -q`:
+  **483 passed** (474 at session start + 9 new), 1 pre-existing Starlette/AnyIO warning.
+- **Preserved verified artifact re-rendered again** (same pattern as V5.1, not a new
+  benchmark): `report/template.html`/`report/style.css` changed (masthead brand + nav
+  styling), so `artifacts/verified_full_report/report.html` was stale relative to them.
+  Re-rendered *only* `report.html` from the same, byte-verified `analysis.json` (SHA-256
+  unchanged) through the current `report.generate.render_html(mode="full")`, then updated
+  only the `report.html` entry in `export_meta.json` to the new file's hash. Confirmed by
+  hash before/after: `analysis.json` and `report.pdf` are byte-for-byte unchanged; only
+  `report.html`'s hash (and the file itself) changed, and `export_meta.json` was updated to
+  match it exactly.
+- **Real local acceptance test** (not mocked): started `uvicorn web.app:app` on
+  `127.0.0.1:7860`. Confirmed over real HTTP, against the actual served files: fresh `GET /`
+  serves `<section id="view-execution" ... hidden>` with the CSS safeguard present in the
+  served `/static/app.css`, no "inside this container" text, and `aria-current="page"` on the
+  Home nav link. Ran one real demo experiment via `POST /api/run` (genuine V1/V2 uvicorn
+  processes, ~36s); the served `report.html` contains zero `run_all.py`/`python run_all`
+  occurrences, two "Technical Report" mentions (banner + Method section), and the masthead
+  brand shows "Red Lab v5.0"; `analysis.json` still returns `application/json; charset=utf-8`
+  with no `content-disposition` (the V5.1 dedicated route, unaffected by this session).
+  Confirmed via `netstat` that ports 8000/8001 had no `LISTENING` socket after completion.
+  Stopped the web app process afterward; deleted the throwaway `results/hf_demo_*` directory.
+- **Manual visual review -- still not performed by this session**: no browser display in this
+  environment. Everything above is structural/HTTP-level verification of the actual root
+  cause and its fix, not a screenshot-level confirmation that the page now *looks* right.
+  Ahsan should re-verify in a real browser: fresh `/` shows nothing but the home hero (no
+  "LIVE DEMO / Launching adversarial test…" ghosting through underneath), the completion
+  state's green accent reads clearly, the navbar looks consistent across the home page, the
+  execution screen, and a generated Live Demo Results / Technical Report page, and that the
+  "Live Demo" nav item behaves sensibly whether idle or mid-run.
+- **Docker**: rebuilt `team-checkmate-v5-redlab:latest` from the unmodified `Dockerfile`. All
+  four expensive layers (`apt-get`, `COPY requirements.txt .`, `pip install`, the pinned-
+  model pre-download) reported `CACHED`; only `COPY . .` and the final `useradd`/`chown` step
+  re-ran. Ran the freshly built image, confirmed `/healthz` and `/` both 200 and the served
+  home page still has the (now correctly hidden) execution view, then removed the container.
+  Did not run a second containerized full demo this session (the local real demo run plus the
+  full test suite were judged sufficient, per the brief's explicit "optional" wording); the
+  image itself was left built. Did not run the full 1,928-case suite.
+- **Files changed this session**: `web/static/app.css` (the `[hidden]` safeguard, nav
+  bottom-border treatment, `is-complete` accent), `web/static/app.js` (`goToLiveDemo()`,
+  `is-complete` class handling), `web/templates/index.html` (`aria-current="page"`, CTA
+  caption wording, `nav-live-demo` id), `report/style.css` (masthead brand-lines/version,
+  unified nav-link hover/active treatment), `report/template.html` and
+  `report/demo_template.html` (masthead brand markup, CLI-wording removal in the demo
+  template), `tests/test_web.py` and `tests/test_report.py` (9 new tests),
+  `artifacts/verified_full_report/report.html` + `export_meta.json` (re-rendered view only,
+  evidence untouched), this file. No changes to `web/app.py`, `run_all.py`, `contract.py`,
+  `endpoint/`, `runner/`, `analysis/`, `baseline/`, or `attacks/` -- confirmed via `git diff`
+  before committing. `git diff --check`: clean (only pre-existing LF/CRLF warnings).
+- **Not done / explicitly out of scope**: V5.3 (technical-report restructuring, V1-left/
+  V2-right layout, interactive-book sidebar -- the report masthead changes here were
+  deliberately limited to brand text and nav-link color, never content-width/nav-height/logo
+  size or a sidebar), V5.4 (Try Your Own Input), V5.5, V5.6. No push to GitHub `origin` or
+  the `space` Hugging Face remote. No merge to `main`. `v4.0.0`/`bba3a7b` and the V5.1 commit
+  `6b0bc9c` are both untouched.
+- Next: Ahsan performs the manual visual/browser review above, then decides whether to
+  proceed to V5.3, V5.4, or push `ahsan/v5-redlab`.
+
+## System V5.2 - full-screen live-demo execution UX - Claude
+
+- Updated: 2026-09-10T06:10:00+04:00, Claude Code; branch `ahsan/v5-redlab`, observed HEAD
+  `6b0bc9c` at session start (the closed V5.1 commit, local-only, not pushed anywhere). This
+  session's changes are a **new** commit after V5.1, per explicit instruction not to amend
+  `6b0bc9c`.
+- Scope: only the dedicated full-screen live-demo execution UX. No attack/runner/analysis/
+  severity/remediation/`contract.py` changes; no re-run of the 1,928-case benchmark; `POST
+  /api/run`, `GET /api/status`, the single-active-job lock, and `run_all.run_experiment()`
+  itself were not touched -- this is a client-side/template presentation change consuming the
+  same existing API. V5.3 (report restructuring/sidebar), V5.4 (custom input), Hugging Face
+  deployment/visibility were explicitly not touched.
+- **Architecture**: `web/templates/index.html` now has two mutually exclusive top-level
+  views inside `<main>`: `#view-home` (the existing hero/CTA, unchanged content) and a new
+  `#view-execution` (`hidden` by default), both rendered server-side on every `GET /`.
+  `web/static/app.js` is the only thing that decides which one is visible, via the `hidden`
+  DOM attribute -- there is no new route and no server-side view state; `/` still always
+  renders both, idle-by-default, matching the existing V4 "never redirect a fresh visitor
+  into a previous result" contract. No React/Vue/Svelte introduced; still FastAPI + Jinja +
+  vanilla JS, per the brief's explicit constraint.
+- **Home -> execution transition** (`startRun()` in `app.js`): on click, immediately (before
+  `POST /api/run` resolves) hides `#view-home`, un-hides `#view-execution`, resets the
+  progress bar/stage list, sets the status heading to "Launching adversarial test…", and
+  moves focus to that heading (`tabindex="-1"` + `.focus()`) -- satisfies the accessibility
+  focus-management requirement and gives an immediate startup state even before the network
+  round-trip completes. A `launching` boolean (not the old disabled-button check, since the
+  button is now hidden) prevents a double-click from firing two `POST /api/run` calls; the
+  backend's existing single-job lock is unchanged and is still the authoritative guard against
+  two overlapping experiments (verified unchanged: `test_second_start_during_active_run_
+  returns_same_job_not_a_new_one` still passes).
+- **Execution screen content** (`#view-execution`): identity line ("Team Checkmate / Red Lab
+  v5.0"), a static "LIVE DEMO" functional-title eyebrow, and one dynamic `<h1 id="exec-heading"
+  aria-live="polite">` that carries the real stage message (`STAGE_LABELS[stage]` from
+  `web/app.py`, unchanged single source of truth -- the template loops `stage_order`/
+  `stage_labels` exactly as V4 did, no second copy of stage names introduced). Below it: a
+  `role="progressbar"` bar with real `aria-valuemin/valuemax/valuenow` (updated from
+  `state.percent`, never a fake incrementing timer), a plain-language percent label, the
+  existing `<ol class="stage-list">` (done/active/future distinguished by both color AND a
+  text glyph via existing `::before` content -- checkmark for done, triangle for active --
+  colorblind-safe, unchanged from V4), and two small "V1 -- Unhardened Endpoint / No
+  application-layer hardening" and "V2 -- Hardened Endpoint / Input validation, length
+  controls, exception handling and normalization" cards plus a "Same underlying AI model in
+  both cases" note -- static product copy (like the report templates' existing "four
+  defenses" list), not derived from the run itself.
+- **Completion transition**: on `status: complete`, the heading becomes "Experiment complete",
+  the bar fills to 100%, and after a fixed `COMPLETE_REDIRECT_DELAY_MS = 900`ms
+  `window.location.href = state.result_url` -- the real backend-returned URL, never
+  constructed or guessed client-side. A `redirectTimer` guard stops a second poll response
+  from scheduling a duplicate navigation.
+- **Failure experience**: on `status: failed`, `showFailure()` hides the progress/stage-list/
+  version-card block (`#exec-body`), shows `#exec-failure` with the heading replaced by
+  "LIVE DEMO FAILED", the backend's existing safe public error string in a `role="alert"`
+  paragraph (unchanged backend message, still never a traceback/path -- see V4's
+  `test_failed_job_exposes_safe_message_not_a_traceback`), a real "Retry Live Demo" button
+  that calls the same `startRun()`/`POST /api/run` path again, and a plain "Back to Red Lab"
+  link (`href="/"`, a full reload, not a SPA route -- simplest safe option per the brief).
+  No cancel button anywhere (verified by a test asserting no "cancel" text/id exists in either
+  the rendered execution view or the served `app.js`).
+- **Reattachment on load**: `app.js`'s existing startup `GET /api/status` fetch now calls
+  `activateExecutionView()` (view switch only, not a fake "Launching…" reset) followed by
+  `applyState(state)` when `status === "running"` -- a mid-run page refresh or a second
+  visitor lands directly in the live execution view showing the *actual* current stage, not
+  a re-synced fake one. `complete`/`failed`/`idle` are left alone on load (no branch handles
+  them) so a fresh visitor after a run has finished still sees the ordinary home page,
+  preserving the V4 "never auto-redirect a fresh visitor into old results" contract exactly.
+- **Accessibility**: `role="progressbar"` + `aria-valuemin`/`aria-valuemax`/`aria-valuenow`
+  (kept live-updated) plus a dynamic `aria-valuetext` ("65%, Testing the hardened endpoint");
+  `aria-live="polite"` on the status heading so stage changes are announced without moving
+  focus repeatedly; `role="alert"` on the failure message so it's announced assertively;
+  focus moves to the status heading exactly once, on the home->execution transition; the
+  mobile hamburger nav's `aria-expanded`/`aria-controls` markup is untouched. A
+  `@media (prefers-reduced-motion: no-preference)` guard wraps the one-off 0.18s fade-in
+  applied when `#view-execution` becomes visible; the fade is CSS-only and never delays the
+  real `POST /api/run` call (the fetch fires synchronously from the same click handler,
+  independent of any CSS animation timing).
+- **Visual system**: reused the existing Red Lab tokens only (`--rl-red`/`--rl-charcoal`/
+  `--rl-paper`/`--rl-surface`/`--rl-muted`/`--rl-border`/`--rl-success`/`--rl-danger`) --
+  no teal, no gradients, no neon. V1 card gets a `var(--rl-danger)` left accent, V2 a
+  `var(--rl-success)` one, matching the same V1=red/V2=green semantic used everywhere else
+  in the product (reports, stage-list `.done` color). The execution view is
+  `min-height: calc(100vh - var(--rl-nav-height))` so the current stage is visible without
+  scrolling on an ordinary desktop viewport, per the brief; on narrow viewports the version
+  cards stack vertically and the heading shrinks (existing 760px breakpoint, no new one
+  introduced).
+- **Mobile navbar**: untouched structurally -- `web/static/app.js`'s hamburger toggle logic
+  and `web/templates/index.html`'s masthead markup are identical to V5.1; the existing
+  `test_home_has_mobile_menu_toggle_markup` test still passes unmodified.
+- **Tests**: added 11 tests to `tests/test_web.py` covering: the home page renders both views
+  with only `#view-execution` carrying `hidden`; the execution view's stage list uses the
+  real `STAGE_ORDER`/`STAGE_LABELS` from `web/app.py` (not a duplicated/hardcoded list); the
+  progressbar's ARIA attributes are present; the V1/V2 context cards and the same-model note
+  are present; no "cancel" text anywhere in the execution view or in the served `app.js`; the
+  failure block exposes Retry + Back-to-Red-Lab; no V5.4 "Try Your Own Input"/`<textarea>`
+  exists yet; and four tests reading the served `app.js` source to confirm it still calls the
+  real `/api/run`/`/api/status` endpoints (never re-implementing runner/analysis logic
+  client-side), still performs the two required view-toggle assignments and the
+  running-only reattachment check, still redirects using `state.result_url` (never a
+  constructed path), and defines no cancel handler. These are deliberately structural/
+  source-level checks, not full-HTML-string or CSS-pixel assertions, per the brief -- this
+  repo has no headless-browser test runner, so JS *execution* itself is not exercised in
+  pytest; the real-HTTP acceptance run below is what actually exercises the click-through
+  behavior end to end (as far as `curl` can, i.e. the API sequence a real click drives, not
+  the pixels). Full suite: `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .venv/Scripts/python.exe
+  -m pytest -q`: **474 passed** (463 at session start + 11 new), 1 pre-existing Starlette/
+  AnyIO warning.
+- **Real local acceptance test** (not mocked): started `uvicorn web.app:app` on
+  `127.0.0.1:7860`, confirmed the freshly served home page still renders `#view-execution`
+  with `hidden` present by default, then ran one real demo experiment via `POST /api/run`
+  (genuine V1/V2 uvicorn processes, ~39s). Polled `/api/status` for real until `complete`,
+  confirmed the exact same eight-stage sequence V4/V5.1 already established still fires
+  unchanged (this session did not touch `run_all.py`). Verified over real HTTP: the served
+  `report.html` 200; `analysis.json` 200 `application/json; charset=utf-8` with no
+  `content-disposition` (the V5.1 dedicated route, unaffected by this session); the copied
+  `detailed/report.html` (verified full report) 200; "Back to Red Lab" present twice in the
+  generated report. Confirmed via `netstat` that ports 8000/8001 had no `LISTENING` socket
+  after completion (only expected `TIME_WAIT`); stopped the web app process afterward and
+  deleted the throwaway `results/hf_demo_*` directory (gitignored regardless).
+- **Manual visual review -- explicitly not performed by this session**: this environment has
+  no browser display, so no screenshot-level visual inspection of the execution screen, the
+  transition, the completion redirect, or mobile layout was possible or is being claimed.
+  Everything above is a structural/HTTP-level check. Ahsan should manually verify, in a real
+  browser: desktop -- home, the instant on-click transition (home hero fully gone, no
+  scrolling needed to see the current stage), the V1 and V2 attack stages, and the completion
+  state's brief pause before redirecting; mobile -- the execution screen at a narrow width
+  (stacked version cards, no horizontal overflow), the progress bar, the stage timeline, and
+  that the hamburger nav still behaves correctly while a run is active.
+- **Docker**: rebuilt `team-checkmate-v5-redlab:latest` from the unmodified `Dockerfile`. All
+  four expensive layers (`apt-get`, `COPY requirements.txt .`, `pip install`, the pinned-
+  model-revision pre-download) reported `CACHED`; only `COPY . .` and the final `useradd`/
+  `chown` layer re-ran. Ran the freshly built image (`docker run -d -p 7863:7860 ...`),
+  confirmed `/healthz` and `/` both 200 and the home page still serves the hidden execution
+  view, then ran one **real containerized** demo end to end via `POST /api/run` (~24s),
+  confirmed the served `report.html` and `analysis.json` (correct headers) over HTTP, and
+  checked `docker exec ... cat /proc/net/tcp` for lingering listeners: only one `LISTEN`
+  entry (`0x1EB4` = 7860, the web app itself); every `0x1F40`/`0x1F41` (8000/8001) entry was
+  `TIME_WAIT`, confirming V1/V2 were shut down cleanly inside the container too. Container
+  removed afterward (`docker rm -f`); the image itself was left built. The pre-existing
+  `team-checkmate-v4:latest` image was not touched. Did not run the full 1,928-case suite
+  (per instruction).
+- **Files changed this session**: `web/templates/index.html` (new `#view-home`/
+  `#view-execution` structure), `web/static/app.js` (rewritten state machine: view
+  activation, launching/redirect guards, failure/retry handling, unchanged mobile-nav
+  toggle code), `web/static/app.css` (new `.execution-view`/`.exec-*`/`.version-card` rules,
+  removed the now-orphaned `.progress-panel`-specific rules, added the reduced-motion-guarded
+  fade), `tests/test_web.py` (11 new tests), this file. **No changes** to `web/app.py`,
+  `run_all.py`, `contract.py`, `report/`, `endpoint/`, `runner/`, `analysis/`, `baseline/`,
+  or `attacks/` -- confirmed via `git diff` before committing. `git diff --check`: clean
+  (only pre-existing LF/CRLF warnings).
+- **Not done / explicitly out of scope**: V5.3 (technical-report restructuring, V1-left/
+  V2-right layout, interactive-book sidebar), V5.4 (Try Your Own Input / custom-input
+  engine), V5.5 (final integration/hardening/responsive acceptance), V5.6 (Hugging Face
+  deployment/public visibility). No push to GitHub `origin` or the `space` Hugging Face
+  remote. No merge to `main`. The V5.1 commit `6b0bc9c` was not amended -- this is a new
+  commit on top of it, per explicit instruction.
+- Next: Ahsan performs the manual visual/browser review above (desktop + mobile), then
+  decides whether to proceed to V5.3, V5.4, or push `ahsan/v5-redlab`.
+
 ## System V5.1 CLOSED - final polish - Claude
 
 - Updated: 2026-09-10T05:55:00+04:00, Claude Code; branch `ahsan/v5-redlab`, observed HEAD

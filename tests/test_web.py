@@ -97,6 +97,143 @@ def test_home_hero_has_secondary_cta_to_technical_report_when_available(client):
     assert 'id="run"' in body
 
 
+# ------------------------------------------------------------------------------------------
+# System V5.2: dedicated full-screen live-demo execution view.
+#
+# The execution state machine itself lives in web/static/app.js (vanilla JS, no test
+# runner in this repo) -- these tests check the server-rendered contract app.js depends on
+# (the two mutually-exclusive views, real stage data, progressbar semantics) plus, for the
+# JS behavior itself, that the served script still wires up the same real endpoints and
+# view-toggling logic rather than re-deriving state client-side. They deliberately avoid
+# asserting exact HTML strings or CSS layout, per the V5.2 brief.
+# ------------------------------------------------------------------------------------------
+
+
+def test_home_initially_shows_landing_view_only(client):
+    body = client.get("/").text
+    assert 'id="view-home"' in body
+    home_hidden = body[body.index('id="view-home"') - 40:body.index('id="view-home"')]
+    assert "hidden" not in home_hidden
+    exec_start = body.index('id="view-execution"')
+    exec_tag = body[body.rindex("<section", 0, exec_start):body.index(">", exec_start) + 1]
+    assert "hidden" in exec_tag
+
+
+def test_execution_view_uses_real_stage_labels(client):
+    body = client.get("/").text
+    exec_section = body[body.index('id="view-execution"'):body.index("</section>", body.index('id="view-execution"'))]
+    for stage in web_app.STAGE_ORDER:
+        assert f'data-stage="{stage}"' in exec_section
+        assert web_app.STAGE_LABELS[stage] in exec_section
+
+
+def test_execution_view_has_progressbar_accessibility_semantics(client):
+    body = client.get("/").text
+    idx = body.index('id="progress-bar"')
+    tag = body[body.rindex("<div", 0, idx):body.index(">", idx) + 1]
+    assert 'role="progressbar"' in tag
+    assert 'aria-valuemin="0"' in tag
+    assert 'aria-valuemax="100"' in tag
+    assert 'aria-valuenow="0"' in tag
+
+
+def test_execution_view_has_v1_v2_context_and_same_model_note(client):
+    body = client.get("/").text
+    exec_section = body[body.index('id="view-execution"'):body.index("</section>", body.index('id="view-execution"'))]
+    assert "V1" in exec_section and "Unhardened Endpoint" in exec_section
+    assert "V2" in exec_section and "Hardened Endpoint" in exec_section
+    assert "Same underlying AI model" in exec_section
+
+
+def test_execution_view_has_no_fake_cancel_button(client):
+    body = client.get("/").text
+    exec_section = body[body.index('id="view-execution"'):body.index("</section>", body.index('id="view-execution"'))]
+    assert "cancel" not in exec_section.lower()
+
+
+def test_execution_view_has_retry_and_home_on_failure(client):
+    body = client.get("/").text
+    failure_section = body[body.index('id="exec-failure"'):body.index("</div>", body.index('id="exec-failure"'))]
+    assert 'id="retry-btn"' in failure_section
+    assert "Retry Live Demo" in failure_section
+    assert 'href="/"' in failure_section
+    assert "Back to Red Lab" in failure_section
+
+
+def test_home_page_has_no_v54_custom_input_ui(client):
+    body = client.get("/").text
+    assert "Try Your Own Input" not in body
+    assert "<textarea" not in body
+
+
+def test_app_js_still_uses_the_existing_run_and_status_endpoints(client):
+    js = client.get("/static/app.js").text
+    assert '"/api/run"' in js
+    assert '"/api/status"' in js
+    # No second source of truth for the run's own runner/scoring/report logic client-side.
+    assert "run_experiment" not in js
+    assert "analysis" not in js.lower()
+
+
+def test_app_js_switches_view_on_run_and_reattach(client):
+    js = client.get("/static/app.js").text
+    assert "activateExecutionView" in js
+    assert "viewHome.hidden = true" in js
+    assert "viewExecution.hidden = false" in js
+    # Reattachment: only a currently-running job pulls a fresh visitor into the execution
+    # view; complete/failed/idle states leave the landing page as the default (System V4/V5.2).
+    assert 'state.status === "running"' in js
+
+
+def test_app_js_uses_backend_result_url_for_completion_redirect(client):
+    js = client.get("/static/app.js").text
+    assert "state.result_url" in js
+    assert "COMPLETE_REDIRECT_DELAY_MS" in js
+
+
+def test_app_js_has_no_cancel_handler(client):
+    js = client.get("/static/app.js").text
+    assert "cancel" not in js.lower()
+
+
+def test_static_css_guarantees_hidden_attribute_wins_the_cascade(client):
+    # The actual root cause of the V5.2 "execution view visible on home" bug: an author rule
+    # with a `display` value (`.execution-view { display: flex }`) has the same specificity
+    # as the UA stylesheet's `[hidden] { display: none }` and wins the cascade regardless of
+    # source order. This global, `!important` safeguard is the fix -- assert it stays present.
+    css = client.get("/static/app.css").text
+    assert "[hidden]" in css
+    assert "display: none !important" in css
+
+
+def test_home_nav_marks_home_as_current_page(client):
+    body = client.get("/").text
+    nav = body[body.index('id="primary-nav"'):body.index("</nav>")]
+    assert 'aria-current="page"' in nav
+
+
+def test_home_page_has_no_container_internals_wording(client):
+    body = client.get("/").text
+    assert "inside this container" not in body
+
+
+def test_app_js_completion_uses_same_heading_element_as_stage_messages(client):
+    body = client.get("/").text
+    js = client.get("/static/app.js").text
+    # Exactly one exec-heading element server-side -- no separate, smaller completion element.
+    assert body.count('id="exec-heading"') == 1
+    assert js.count('execHeading.textContent = "Experiment complete"') == 1
+    assert "execHeading.textContent = state.message" in js
+
+
+def test_app_js_nav_live_demo_reuses_start_run_not_duplicated(client):
+    js = client.get("/static/app.js").text
+    assert "goToLiveDemo" in js
+    assert "startRun(triggerEl)" in js
+    assert "navLiveDemo.addEventListener" in js
+    assert "e.preventDefault()" in js
+
+
 def test_healthz(client):
     resp = client.get("/healthz")
     assert resp.status_code == 200

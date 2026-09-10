@@ -18,7 +18,7 @@
 <p class="coverage-line">Recorded coverage · {% for s in versions %}{{ s.version|upper }} {{ s.coverage.completed }}/{{ s.coverage.planned }} ({{ s.coverage.coverage_rate|percent }}){% if not loop.last %} · {% endif %}{% endfor %}</p>
 {%- endmacro %}
 <header class="masthead">
-  <a class="brand" href="#overview"><img src="{{ logo_data_uri }}" alt="Team Checkmate" class="brand-logo"> TEAM CHECKMATE</a>
+  <a class="brand" href="#overview"><img src="{{ logo_data_uri }}" alt="Team Checkmate" class="brand-logo"><span class="brand-lines"><span class="brand-name">TEAM CHECKMATE</span><span class="brand-version">{{ product_version_label }}</span></span></a>
   <nav aria-label="Report sections"><a class="home-link" href="/">&larr; Back to Red Lab</a><a href="#results">Results</a><a href="#findings">Findings</a><a href="#method">Method</a></nav>
   <div class="downloads"><a href="analysis.json" target="_blank" rel="noopener">Source JSON</a>{% if include_pdf %}<a class="button" href="report.pdf" download>Download PDF <span aria-hidden="true">↓</span></a>{% endif %}</div>
 </header>

@@ -21,9 +21,16 @@ a:focus-visible, summary:focus-visible { outline: 3px solid var(--coral); outlin
 .masthead { position: sticky; top: 0; z-index: 20; background: var(--paper); max-width: 1320px; margin: auto; padding: 25px 48px; display: flex; align-items: center; gap: 36px; border-bottom: 1px solid var(--line); }
 .brand { display: flex; align-items: center; gap: 12px; color: var(--ink); font-size: 11px; letter-spacing: 1.7px; font-weight: 800; text-decoration: none; white-space: nowrap; }
 .brand-logo { height: 30px; width: 30px; object-fit: contain; display: block; border-radius: 6px; }
+.brand-lines { display: flex; flex-direction: column; line-height: 1.35; }
+.brand-version { font-size: 0.8em; font-weight: 700; letter-spacing: 0.4px; text-transform: none; color: var(--muted); margin-top: 2px; }
 .mark { font-size: 31px; line-height: 1; letter-spacing: -3px; }.mark span { color: var(--coral); }
 .masthead nav { display: flex; gap: 25px; margin-left: auto; }
 .masthead nav a, .downloads a { font-size: 12px; font-weight: 600; text-decoration: none; }
+.masthead nav a:not(.button), .downloads a:not(.button) {
+  color: var(--ink); border-bottom: 2px solid transparent; padding-bottom: 2px;
+}
+.masthead nav a:not(.button):hover, .downloads a:not(.button):hover,
+.masthead nav a[aria-current="page"] { color: var(--rl-red); border-bottom-color: var(--rl-red); }
 .downloads { display: flex; align-items: center; gap: 23px; }.button { background: var(--ink); color: white; padding: 11px 17px; border-radius: 4px; }.button:hover { color: white; background: var(--rl-red); }
 main { max-width: 1160px; padding: 0 40px; margin: auto; }
 .hero { padding: 69px 0 49px; position: relative; }

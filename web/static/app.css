@@ -35,6 +35,15 @@
 
 * { box-sizing: border-box; }
 
+/* Any element with a `display` rule of its own (e.g. `.execution-view { display: flex }`)
+   has the same specificity as the UA stylesheet's `[hidden] { display: none }` -- and,
+   being an author rule, wins the cascade regardless of source order. Without this, toggling
+   the `hidden` attribute from app.js does nothing visually for such elements (System V5.2
+   fix: the execution view was rendering on the fresh idle home page for exactly this
+   reason). This must stay the single, global source of truth for "hidden means gone" --
+   never add a competing `display` override for a `[hidden]` element instead. */
+[hidden] { display: none !important; }
+
 html { scroll-behavior: smooth; scroll-padding-top: calc(var(--rl-nav-height) + 12px); }
 
 body {
@@ -119,8 +128,10 @@ a:focus-visible, button:focus-visible { outline: 3px solid var(--rl-red); outlin
   font-weight: 700;
   letter-spacing: 0.3px;
   white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  padding-bottom: 4px;
 }
-.primary-nav a:hover { color: var(--rl-red); }
+.primary-nav a:hover, .primary-nav a[aria-current="page"] { color: var(--rl-red); border-bottom-color: var(--rl-red); }
 
 /* ---- hero --------------------------------------------------------------------------- */
 
@@ -175,7 +186,7 @@ main { max-width: var(--rl-content-width); margin: auto; padding: 0 24px 90px; }
 
 .caption { font-size: 13px; color: var(--rl-muted); margin: 0; }
 
-/* ---- progress panel ------------------------------------------------------------------ */
+/* ---- shared panel utility -------------------------------------------------------------- */
 
 .panel {
   background: var(--rl-surface);
@@ -186,15 +197,12 @@ main { max-width: var(--rl-content-width); margin: auto; padding: 0 24px 90px; }
 }
 
 .eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 1.6px; text-transform: uppercase; color: var(--rl-muted); margin: 0 0 14px; }
-.progress-panel { margin-top: 24px; }
-.progress-panel h2 { margin: 0 0 20px; font-size: 24px; }
 
 .progress-bar {
   height: 10px;
   background: #ece7db;
   border-radius: 5px;
   overflow: hidden;
-  margin-bottom: 24px;
 }
 
 .progress-fill { height: 100%; background: var(--rl-red); transition: width 0.4s ease; }
@@ -214,6 +222,74 @@ main { max-width: var(--rl-content-width); margin: auto; padding: 0 24px 90px; }
   border-radius: 6px;
   margin-top: 20px;
   font-size: 14px;
+}
+
+/* ---- execution view (System V5.2) ------------------------------------------------------
+   A dedicated, viewport-filling application state -- not an appended section below the
+   hero. #view-home and #view-execution are mutually exclusive via the [hidden] attribute,
+   toggled from app.js; nothing here decides which one shows (that's real /api/status-driven
+   state, not CSS). */
+
+.execution-view {
+  min-height: calc(100vh - var(--rl-nav-height));
+  display: flex;
+  align-items: center;
+  padding: 48px 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .execution-view:not([hidden]) { animation: rl-exec-fade 0.18s ease; }
+}
+@keyframes rl-exec-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.execution-inner { width: 100%; max-width: 640px; margin: 0 auto; }
+
+.exec-identity { font-size: 12px; font-weight: 800; letter-spacing: 1.6px; text-transform: uppercase; color: var(--rl-muted); margin: 0 0 10px; }
+.exec-kicker { font-size: 13px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: var(--rl-red); margin: 0 0 12px; }
+.exec-heading {
+  font-size: 34px;
+  line-height: 1.2;
+  letter-spacing: -0.6px;
+  font-weight: 800;
+  color: var(--rl-charcoal);
+  margin: 0 0 28px;
+}
+.exec-heading:focus-visible { outline: none; }
+/* Completion is the final stage of the same experience -- same heading element/class as
+   every in-progress stage message, just a restrained success-color accent. No shrinking to
+   a caption, no confetti/animation (System V5.2 fix). */
+#view-execution.is-complete .exec-heading { color: var(--rl-success); }
+#view-execution.is-complete .progress-fill { background: var(--rl-success); }
+
+#exec-body .progress-bar { margin-bottom: 8px; }
+.exec-percent { font-size: 13px; font-weight: 700; color: var(--rl-muted); margin: 0 0 24px; }
+
+.version-context { display: flex; gap: 16px; margin: 28px 0 12px; }
+.version-card {
+  flex: 1;
+  min-width: 0;
+  background: var(--rl-surface);
+  border: 1px solid var(--rl-border);
+  border-left: 3px solid var(--rl-border);
+  border-radius: var(--rl-radius-sm);
+  padding: 14px 16px;
+}
+.version-card.v1 { border-left-color: var(--rl-danger); }
+.version-card.v2 { border-left-color: var(--rl-success); }
+.version-card-title { font-size: 13px; font-weight: 800; margin: 0 0 4px; color: var(--rl-charcoal); }
+.version-card-note { font-size: 12px; color: var(--rl-muted); margin: 0; }
+
+.exec-model-note { font-size: 12px; color: var(--rl-muted); margin: 0; }
+
+.exec-failure .exec-error {
+  font-size: 15px;
+  color: var(--rl-charcoal);
+  background: #fbeee9;
+  border: 1px solid #e7c3b5;
+  border-left: 3px solid var(--rl-red);
+  padding: 14px 18px;
+  border-radius: 6px;
+  margin: 0 0 20px;
 }
 
 .site-footer {
@@ -259,4 +335,8 @@ main { max-width: var(--rl-content-width); margin: auto; padding: 0 24px 90px; }
   .cta-row { flex-direction: column; align-items: stretch; }
   .button { width: 100%; }
   .panel { padding: 20px; }
+
+  .execution-view { padding: 28px 0; }
+  .exec-heading { font-size: 24px; margin-bottom: 20px; }
+  .version-context { flex-direction: column; gap: 10px; margin: 20px 0 10px; }
 }

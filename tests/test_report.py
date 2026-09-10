@@ -677,6 +677,41 @@ def test_demo_category_bar_width_and_percent_remain_data_derived(demo_data):
     assert 'width: 25.0%' in section
 
 
+# ----------------------------------------------------------------------------------------
+# V5.2 closure: no developer/CLI wording in judge-facing pages; masthead brand consistency.
+# ----------------------------------------------------------------------------------------
+
+
+def test_demo_report_has_no_developer_cli_instructions(demo_data):
+    result = html(demo_data, mode="demo")
+    assert "run_all.py" not in result
+    assert "python run_all" not in result
+
+
+def test_demo_partial_banner_points_to_technical_report_not_cli(demo_data):
+    demo_data["detailed_report"] = {"available": True, "relative_href": "detailed/report.html"}
+    result = html(demo_data, mode="demo")
+    banner = result[result.index('class="partial-banner"'):result.index("</aside>")]
+    assert "Technical Report" in banner
+    assert "run_all.py" not in banner
+    assert 'href="detailed/report.html"' in banner
+
+
+def test_demo_partial_banner_mentions_technical_report_without_cli_when_no_detailed_link(demo_data):
+    result = html(demo_data, mode="demo")  # no detailed_report set on this fixture
+    banner = result[result.index('class="partial-banner"'):result.index("</aside>")]
+    assert "Technical Report" in banner
+    assert "run_all.py" not in banner
+
+
+def test_reports_masthead_brand_shows_version_label(demo_data):
+    for mode in ("demo", "full"):
+        result = html(demo_data, mode=mode)
+        header = result[result.index("<header"):result.index("</header>")]
+        assert "TEAM CHECKMATE" in header
+        assert "Red Lab v5.0" in header
+
+
 def test_group_key_allows_equal_category_and_subfamily(data):
     e = finding(data, subfamily="malformed")
     resolution(data, e)

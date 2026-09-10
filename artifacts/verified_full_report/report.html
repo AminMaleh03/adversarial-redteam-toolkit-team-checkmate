@@ -439,17 +439,29 @@ footer { max-width: 1080px; margin: 35px auto 0; padding: 25px 0 35px; border-to
         event.shiftKey || event.altKey) return;
     var link = event.target.closest ? event.target.closest('a[href^="#"]') : null;
     if (!link || !link.hash || link.hash === "#") return;
-    var target = document.getElementById(link.hash.slice(1));
-    if (!target) return;
+    var hash = link.hash;
     event.preventDefault();
+    // A section deep in this document may not be parsed yet when the reader clicks the
+    // sidebar. Falling through to native navigation there would push a history entry and
+    // scroll nowhere, so record the hash now and jump once the section exists.
+    var target = document.getElementById(hash.slice(1));
+    if (!target) {
+      window.history.replaceState(window.history.state, "", hash);
+      document.addEventListener("DOMContentLoaded", function () {
+        var late = document.getElementById(hash.slice(1));
+        if (late) late.scrollIntoView({ behavior: "instant", block: "start" });
+        if (typeof window.rlOnInternalNav === "function") window.rlOnInternalNav(hash);
+      }, { once: true });
+      return;
+    }
     target.scrollIntoView({ behavior: "instant", block: "start" });
     // The skip link exists to move keyboard focus; preventDefault would otherwise drop it.
     if (link.classList.contains("skip-link")) {
       if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
       target.focus({ preventScroll: true });
     }
-    window.history.replaceState(window.history.state, "", link.hash);
-    if (typeof window.rlOnInternalNav === "function") window.rlOnInternalNav(link.hash);
+    window.history.replaceState(window.history.state, "", hash);
+    if (typeof window.rlOnInternalNav === "function") window.rlOnInternalNav(hash);
   });
   </script>
 </head>

@@ -383,6 +383,31 @@ def test_report_internal_nav_is_history_safe_before_main_script_parses(ui):
     assert state.posts == 0 and state.lab_posts == 0
 
 
+def test_report_internal_nav_is_history_safe_before_target_section_parses(ui):
+    """Clicking a section the browser has not parsed yet must not push page history.
+
+    The sidebar is interactive long before the sections it links to exist in this large
+    document. Cloud acceptance caught the click falling through to native navigation in
+    that window: it scrolled nowhere and left an extra entry, so Back stayed in the report.
+    The hash is recorded immediately and the jump happens once the section is parsed.
+    """
+    page, state = ui
+    full = (ROOT / 'artifacts/verified_full_report/report.html').read_text(encoding='utf-8')
+    partial = full[:full.index('<main')] + '</div></body></html>'  # sidebar parsed, sections not
+    assert 'id="remediation"' not in partial
+    page.route(ORIGIN + '/partial-sections', lambda route: route.fulfill(
+        content_type='text/html', body=partial))
+    page.goto(ORIGIN)
+    page.goto(ORIGIN + '/partial-sections')
+    length = page.evaluate('history.length')
+    page.locator('[data-toc-link][href="#remediation"]').click()
+    assert page.url.endswith('#remediation')
+    assert page.evaluate('history.length') == length
+    page.go_back()
+    page.wait_for_url(ORIGIN + '/')
+    assert state.posts == 0 and state.lab_posts == 0
+
+
 def test_direct_report_deep_link_keeps_safe_back_fallback(ui):
     page, state = ui
     page.goto(ORIGIN + '/verified-full/report.html#remediation')

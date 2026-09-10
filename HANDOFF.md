@@ -1,79 +1,108 @@
-# SYSTEM V6 — DEPLOYMENT RELEASE (IN PROGRESS)
+# SYSTEM V6 — DEPLOYMENT RELEASE (DEPLOYED; ONE USER ACTION LEFT)
 
-2026-09-10, Claude (took over from Codex after its usage limit), Asia/Dubai.
-Branch `ahsan/v5-redlab`, starting HEAD `901cc22`. Ahsan's V6 brief approves the V5.5
-visuals and authorizes the report-history fix, release hygiene/docs, a new V6 commit,
-a release-branch GitHub push, an exact-snapshot upload to the existing HF Space while
-Protected, real local/container/cloud/mobile acceptance, then Public visibility and an
-annotated `v6.0.0` tag. No merge, no V5.5 amendment, no redesign, no core/benchmark change.
+2026-09-10, Claude (took over from Codex at its usage limit), Asia/Dubai.
+Branch `ahsan/v5-redlab`. Starting HEAD `901cc22` (V5.5, human-approved visuals).
+Final V6 HEAD: `4c68d47`, pushed to `origin` and deployed to the existing HF Space.
+Ahsan's V6 brief authorized the report-history fix, release hygiene/docs, new V6
+commits, the release-branch push, an exact-snapshot upload to the existing Space while
+Protected, local/container/cloud/mobile acceptance, then Public visibility and an
+annotated `v6.0.0` tag. No merge, no V5.5 amendment, no redesign, no core change.
 
-## V6 work completed and verified locally
+## V6 commits
 
-- **Report history fix.** `report/template.html`: every internal `a[href^="#"]` now
-  scrolls the target into view and calls `history.replaceState`, so sidebar/rubric/finding
-  navigation updates the deep-link hash without pushing page-history entries. Modified
-  clicks (ctrl/meta/shift/alt/middle) keep native behaviour. Scrollspy, `aria-current`,
-  the mobile drawer and Evidence/Audit ordering are unchanged; the generic Back control
-  was not touched.
-- **Report entry links now open in the same tab** (`web/templates/index.html`,
-  `web/templates/lab.html`, `report/demo_template.html`). Required by the brief's
-  Results -> Report -> Back requirement: a new tab has no previous page to return to.
-  Source JSON keeps its new-tab behaviour. No visual/layout change.
-- Verified report HTML re-rendered from the template (`artifacts/verified_full_report/
-  report.html`, `export_meta.json`). `analysis.json` and `report.pdf` untouched.
-- README deployment section updated to Red Lab V6 / `red-lab-v6:latest`.
-- Tests: 5 new desktop/mobile/direct-entry report-history cases in
-  `tests/test_ui_browser.py`; `tests/test_web.py` entry-link expectation updated.
+- `dc60422` report navigation fix and release docs.
+- `a93479e` byte-exact deployment snapshots for the verified evidence.
+- `d03657a` report internal navigation history-safe during parse.
+- `4c68d47` report internal navigation history-safe for unparsed sections.
 
-Validation (all by this checkout, evidence in ignored `results/`):
-- Full suite **604 passed, 1 pre-existing deprecation warning, 84.71s** —
-  `results/v6-final-tests.txt`.
-- Real local acceptance PASS — `results/v6-local-acceptance/summary.json`.
-  Demo -> Results -> Report -> `#remediation`/`#provenance`/`#v2-findings` ->
-  Back returns to Demo Results with `history.length` constant; second Back reaches Home;
-  mobile drawer flow returns to Home; Custom reload/Test Another; CUSTOM -> DEMO -> CUSTOM;
-  active-Demo rejoin keeps the same run_name; no stale completed execution view.
+## The UX fix as shipped
+
+Internal report navigation (sidebar, mobile drawer, rubric and finding anchors, skip
+link) is handled by a delegated listener in the report's `<head>`: it takes over the
+click, scrolls the target into view and calls `history.replaceState`, so the Technical
+Report occupies one logical page and the global Back control leaves it. The end-of-body
+script keeps scrollspy, drawer and active state through `window.rlOnInternalNav`.
+Two placements were required and both were found by real testing, not review:
+1. the listener must be in `<head>` — this document is ~500KB, so on the hosted Space
+   the sidebar is interactive long before the end-of-body script parses;
+2. it must take over clicks whose target section is not parsed yet — otherwise the
+   click fell through to native navigation, pushed an entry and scrolled nowhere.
+Report entry links from Home, Lab and the demo report now open in the same tab, which
+the brief's Results -> Report -> Back requirement needs. Source JSON keeps its new tab.
+Modified clicks, deep links, `aria-current`, scrollspy, the drawer and Evidence/Audit
+ordering are unchanged. V5.5 visual design untouched; behaviour only.
+
+## Evidence-integrity defect found during deployment
+
+The first upload built and started cleanly, but the anonymous smoke check caught the
+served `/verified-full/analysis.json` hashing to `8a950cad...` instead of the published
+`12d47b35...`. Cause: this checkout has `core.autocrlf=true` and the repo has no
+`.gitattributes`, so `git archive` rewrote text blobs to CRLF — identical content,
+different bytes, invalid published hash. `report.pdf` (binary) was unaffected. The
+release operator now uses `git -c core.autocrlf=false -c core.eol=lf archive` and
+asserts every `export_meta.json` entry before uploading;
+`tests/test_web.py::test_verified_full_served_bytes_match_recorded_evidence_hashes`
+now fails locally instead of shipping. Any future deployment tooling must preserve
+committed bytes exactly.
+
+## Validation (all run in this checkout)
+
+- Full suite **607 passed, 1 pre-existing deprecation warning, 55.53s**
+  (`.\.venv\Scripts\python.exe -m pytest -q` with `REDLAB_BROWSER_TESTS=1`).
+  Baseline was 599 at V5.5; V6 adds 8 report-history/evidence-integrity tests.
+- Real local acceptance PASS (`results/v6-local-acceptance/summary.json`): Demo ->
+  Results -> Report -> sections -> Back returns to Results, second Back to Home,
+  forward/reload, Custom reload and Test Another, CUSTOM -> DEMO -> CUSTOM, active-Demo
+  rejoin keeps the same run_name, no stale completed execution view.
 - Docker `red-lab-v6:latest` built with cached apt/pip/model layers
-  (`results/v6-docker-build.log`); container acceptance PASS with six 200 routes and
-  real CUSTOM -> DEMO -> CUSTOM (`results/v6-docker-acceptance.json`).
-- Hygiene: no tracked `results/`, temporary scripts, logs, caches or credential-shaped
-  values (`results/v6-hygiene.json`). Absolute paths appear only in intentional
-  redaction fixtures in `tests/test_analysis*.py` and are retained.
+  (`results/v6-docker-build.log`); container acceptance PASS, six routes 200, real
+  CUSTOM -> DEMO -> CUSTOM (`results/v6-docker-acceptance.json`).
+- Hygiene (`results/v6-hygiene.json`): nothing tracked from `results/`, no temporary
+  scripts, logs, caches, screenshots or credential-shaped values. Absolute paths appear
+  only in the intentional redaction fixtures in `tests/test_analysis*.py`; retained.
 - No orphan endpoint processes or 8000/8001 listeners after local and container runs.
-- Integrity, before and after all V6 work:
+- Integrity unchanged throughout, locally and as served by the Space:
   `analysis.json` `12d47b35c700c6c172ceff5fc071f78952aef7a8695473dc457e9d69229737da`,
   `report.pdf` `0853108d4939bab1ff2069a1e3dc42b8ad68b14096d12cfd1bfa81fbb56718ca`.
-  No benchmark rerun; contract/endpoint/attacks/analysis frozen paths unchanged.
+  Only the verified `report.html` was re-rendered from the template; no benchmark rerun.
 
-## Remotes and deployment state
+## Deployment
 
-`origin` https://github.com/AminMaleh03/adversarial-redteam-toolkit-team-checkmate.git ;
-`space` https://huggingface.co/spaces/ahsan-141117/team-checkmate-adversarial-redteam-toolkit.
-HF authentication verified as `ahsan-141117`. Space pre-deployment: sha `b11bf79`,
-`private=True` (Protected), stage RUNNING — that is V4. Deployment method: `git archive`
-of the exact release commit plus authenticated `huggingface_hub.upload_folder`, then a
-remote tree hash check (raw HF git protocol-v2 fetch is known to fail here).
-Operator: ignored `results/v6_hf_release.py`.
+GitHub `origin` https://github.com/AminMaleh03/adversarial-redteam-toolkit-team-checkmate.git
+— branch `ahsan/v5-redlab` pushed at `4c68d47`. No merge into `main`.
+HF Space `ahsan-141117/team-checkmate-adversarial-redteam-toolkit`, authenticated as
+`ahsan-141117`. Method: `git archive` of the exact commit (autocrlf disabled) plus
+`huggingface_hub.upload_folder`, then a remote tree blob-hash check of all 77 files
+against the commit; the Space's only extra file is its platform `.gitattributes`.
+Operator `results/v6_hf_release.py` (ignored). Raw HF git protocol-v2 fetch is still
+avoided. Space revision `732faf7` = GitHub `4c68d47`, stage RUNNING, Docker Space
+architecture and 7860-only exposure unchanged; V1/V2 stay internal subprocesses.
 
-## Cloud deployment defect found and fixed (2026-09-10, Claude)
+Cloud validation against https://ahsan-141117-team-checkmate-adversarial-redteam-toolkit.hf.space
+while the Space was still Protected:
+- Smoke PASS: `/healthz`, `/`, `/lab`, verified `report.html`/`analysis.json`/`report.pdf`
+  and all five static assets 200; static and report bytes match local; evidence SHA-256
+  matches the published values; JSON still inline, not an attachment.
+- Startup logs clean, no secrets (`results/v6-hf-run.log`, `results/v6-hf-build.log`).
+- Real cloud acceptance PASS (`results/v6-cloud-acceptance/summary.json`, 64 screenshots):
+  live Demo, custom Lab, CUSTOM -> DEMO -> CUSTOM with no wait, active-Demo rejoin,
+  Report -> `#remediation`/`#provenance`/`#v2-findings` with `history.length` constant,
+  Back returns to Demo Results, unknown lab job 404, zero page errors.
+- Mobile/responsive PASS at 1920/1440/1366/1024/768/390: no horizontal overflow on Home,
+  Lab, Lab metrics, Demo execution/Results, Evidence and the Technical Report; mobile
+  nav drawer and report drawer usable; report Back from mobile returns Home.
+- Result framing correct: cloud Demo reports "V1 162/1928 (8.40%)" and states the numbers
+  describe that demo run only; the Technical Report keeps 1928/1928.
 
-First V6 upload (`dc60422` -> Space `f8841e2`) built and started cleanly, but the
-anonymous smoke check caught the served `/verified-full/analysis.json` hashing to
-`8a950cad...` instead of the published `12d47b35...`. Root cause: this checkout has
-`core.autocrlf=true` and the repo has no `.gitattributes`, so `git archive` rewrote
-text blobs to CRLF. The content was identical; the bytes, and therefore the published
-evidence hash, were not. `report.pdf` (binary) was unaffected.
+## Remaining user action
 
-Fix: the release operator now runs `git -c core.autocrlf=false -c core.eol=lf archive`
-and asserts every file in `export_meta.json` still hashes to its recorded value before
-uploading. Repo-level regression guard added in `tests/test_web.py`:
-`test_verified_full_served_bytes_match_recorded_evidence_hashes` asserts the bytes the
-app actually serves hash to `export_meta.json`. Suite now **605 passed** in 56.72s.
-
-Next: push the V6 commit to `origin`, upload the same snapshot to the Space while it
-stays Protected, then cloud smoke/functional/mobile acceptance, Public visibility and
-the annotated `v6.0.0` tag.
-
+Space visibility is still **Protected** (`private=true`). The automated switch was
+blocked by this session's permission policy, not by Hugging Face — authentication and
+the API call are ready. Either re-run with approval:
+`.\.venv\Scripts\python.exe results/v6_hf_release.py public` (it re-checks cloud
+acceptance, stage and smoke before flipping, then confirms through the unauthenticated
+Hub API), or set the Space to Public in its Hub settings. The unauthenticated
+post-public check and the `v6.0.0` tag push are the only steps after that.
 
 ## Approved V5.5 snapshot (historical)
 

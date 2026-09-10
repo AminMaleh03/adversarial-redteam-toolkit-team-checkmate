@@ -11,27 +11,50 @@
      and the handful of general-brand-accent uses are overridden individually below. */
   --ink: var(--rl-charcoal); --muted: var(--rl-muted); --paper: var(--rl-paper); --line: var(--rl-border);
   --teal: var(--rl-success); --coral: var(--rl-danger);
+  --report-nav-height: 84px;
+  --report-toc-width: 280px;
+  --report-toc-collapsed-width: 56px;
 }
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; scroll-padding-top: 100px; }
+html { scroll-behavior: auto; scroll-padding-top: 100px; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+.skip-link {
+  position: absolute; left: 12px; top: -60px; z-index: 100; background: var(--ink); color: #fff;
+  padding: 10px 16px; border-radius: 4px; font-size: 12px; font-weight: 700; text-decoration: none;
+  transition: top 0.15s ease;
+}
+.skip-link:focus { top: 12px; }
 body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.65 "Segoe UI", Arial, sans-serif; }
 a { color: var(--rl-red); text-decoration-thickness: 1px; text-underline-offset: 3px; }
 a:hover { color: #7e1a23; }
 a:focus-visible, summary:focus-visible { outline: 3px solid var(--coral); outline-offset: 4px; }
-.masthead { position: sticky; top: 0; z-index: 20; background: var(--paper); max-width: 1320px; margin: auto; padding: 25px 48px; display: flex; align-items: center; gap: 36px; border-bottom: 1px solid var(--line); }
+.masthead { position: sticky; top: 0; z-index: 20; background: var(--paper); max-width: 1320px; margin: auto; min-height: var(--report-nav-height); padding: 25px 48px; display: flex; align-items: center; gap: 36px; border-bottom: 1px solid var(--line); }
 .brand { display: flex; align-items: center; gap: 12px; color: var(--ink); font-size: 11px; letter-spacing: 1.7px; font-weight: 800; text-decoration: none; white-space: nowrap; }
 .brand-logo { height: 30px; width: 30px; object-fit: contain; display: block; border-radius: 6px; }
 .brand-lines { display: flex; flex-direction: column; line-height: 1.35; }
 .brand-version { font-size: 0.8em; font-weight: 700; letter-spacing: 0.4px; text-transform: none; color: var(--muted); margin-top: 2px; }
 .mark { font-size: 31px; line-height: 1; letter-spacing: -3px; }.mark span { color: var(--coral); }
-.masthead nav { display: flex; gap: 25px; margin-left: auto; }
+.masthead nav { display: flex; align-items: center; flex-wrap: wrap; gap: 18px 25px; margin-left: auto; }
 .masthead nav a, .downloads a { font-size: 12px; font-weight: 600; text-decoration: none; }
 .masthead nav a:not(.button), .downloads a:not(.button) {
   color: var(--ink); border-bottom: 2px solid transparent; padding-bottom: 2px;
 }
 .masthead nav a:not(.button):hover, .downloads a:not(.button):hover,
 .masthead nav a[aria-current="page"] { color: var(--rl-red); border-bottom-color: var(--rl-red); }
-.downloads { display: flex; align-items: center; gap: 23px; }.button { background: var(--ink); color: white; padding: 11px 17px; border-radius: 4px; }.button:hover { color: white; background: var(--rl-red); }
+.downloads { display: flex; align-items: center; gap: 23px; margin-left: auto; }.button { background: var(--ink); color: white; padding: 11px 17px; border-radius: 4px; }.button:hover { color: white; background: var(--rl-red); }
+
+/* ---- report contents toggle (mobile-only top-bar button; System V5.3) ------------------ */
+.toc-toggle {
+  display: none; align-items: center; gap: 8px; font: inherit; font-size: 12px; font-weight: 700;
+  color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 4px;
+  padding: 9px 13px; cursor: pointer;
+}
+.toc-toggle-bars, .toc-toggle-bars::before, .toc-toggle-bars::after {
+  display: block; width: 16px; height: 2px; background: var(--ink); position: relative;
+}
+.toc-toggle-bars::before, .toc-toggle-bars::after { content: ""; position: absolute; left: 0; }
+.toc-toggle-bars::before { top: -5px; }
+.toc-toggle-bars::after { top: 5px; }
 main { max-width: 1160px; padding: 0 40px; margin: auto; }
 .hero { padding: 69px 0 49px; position: relative; }
 .eyebrow { font-size: 10px; font-weight: 800; letter-spacing: 2px; line-height: 1.5; margin: 0 0 16px; color: var(--muted); }
@@ -53,7 +76,7 @@ h2 { font-size: 29px; line-height: 1.2; letter-spacing: -.8px; margin: 0 0 15px;
 table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }th, td { padding: 11px 12px; border-bottom: 1px solid #e5e9e5; text-align: left; overflow-wrap: anywhere; vertical-align: top; }th:first-child, td:first-child { padding-left: 0; }thead th { color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; }tbody th { font-weight: 600; }table th:first-child { width: 48%; }.category-table th:first-child { width: 25%; }.category-table td { padding: 15px 22px; }.category-table tbody th { padding-top: 19px; }.rate-label { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 8px; }.rate-label span { color: var(--muted); font-size: 10px; }.bar-track { height: 6px; background: #edf0eb; border-radius: 1px; }.bar { height: 6px; }.bar.v1 { background: var(--coral); }.bar.v2 { background: var(--teal); }
 .version-section { margin-top: 30px; }.badge.v1 { background: #f5e6dd; color: #893b27; }.badge.v2 { background: #dfeee8; color: #135f53; }.two-up { display: flex; gap: 20px; }.two-up > .panel { width: 50%; }.big-stat { font-size: 38px; letter-spacing: -1px; line-height: 1.2; margin-bottom: 8px; font-weight: 650; }.big-stat span { color: var(--muted); font-size: 20px; font-weight: 400; }.drift-panel .big-stat { color: var(--teal); }.denominator { font-size: 12px; background: #edf4ee; border-left: 2px solid var(--teal); padding: 8px 10px; }
 .facts { font-size: 11px; margin: 18px 0 0; }.facts div { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid #e5e9e5; padding: 5px 0; }.facts dd { margin: 0; font-weight: 650; }.facts dt { color: var(--muted); }
-.audit-details { background: #eeeee6; border: 1px solid var(--line); padding: 15px 20px; border-radius: 4px; margin: 16px 0; font-size: 12px; }.audit-details > summary { font-weight: 650; cursor: pointer; }.audit-details[open] > summary { margin-bottom: 20px; }.evidence { margin: 10px 0; font-size: 10px; }.evidence summary { cursor: pointer; color: var(--rl-red); font-weight: 600; }.evidence[open] summary { margin-bottom: 9px; }
+.audit-details { background: #eeeee6; border: 1px solid var(--line); padding: 15px 20px; border-radius: 4px; margin: 16px 0; font-size: 12px; scroll-margin-top: var(--report-nav-height); }.audit-details > summary { font-weight: 650; cursor: pointer; }.audit-details[open] > summary { margin-bottom: 20px; }.evidence { margin: 10px 0; font-size: 10px; }.evidence summary { cursor: pointer; color: var(--rl-red); font-weight: 600; }.evidence[open] summary { margin-bottom: 9px; }
 .compact { font-size: 10px; }.compact th, .compact td { padding: 6px; }.compact th:first-child { width: 26%; }.compact code { font-size: 9px; }.confidence-table th:first-child, .baseline-table th:first-child, .diagnostic-table th:first-child { width: 65%; }.diagnostic-table th:nth-child(2) { width: 15%; }
 .id-list { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0; }.id-list code { background: #eff2ee; border: 1px solid #e0e6df; padding: 2px 5px; font-size: 9px; max-width: 100%; }code { font-family: Consolas, "Courier New", monospace; overflow-wrap: anywhere; word-break: break-word; unicode-bidi: plaintext; }
 .version-title { margin: 30px 0 16px; }.version-title span { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 10px; }.finding-index { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 20px; margin-bottom: 24px; }.finding-index a { font-size: 10px; overflow-wrap: anywhere; }
@@ -65,13 +88,128 @@ table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: f
 mark.demo-mark { background: #f6c453; color: #3a2c05; padding: 0 1px; border-radius: 2px; font-weight: 700; unicode-bidi: plaintext; }
 .partial-banner { background: var(--rl-surface); border: 1px solid var(--line); border-left: 4px solid var(--rl-red); padding: 22px 27px; border-radius: 6px; margin: 22px 0; }.partial-banner .eyebrow { color: var(--rl-warning); margin-bottom: 8px; }.partial-banner h2 { font-size: 22px; margin-bottom: 10px; color: var(--ink); }.partial-banner p { color: var(--muted); font-size: 12px; max-width: 760px; }.partial-banner code { background: #efece2; color: var(--ink); padding: 1px 5px; border-radius: 3px; }.partial-banner .coverage-line { color: var(--muted); margin: 8px 0 0; }
 .metrics-row { display: flex; gap: 18px; margin: 18px 0; flex-wrap: wrap; }.metric-tile { flex: 1; min-width: 130px; background: #fff; border: 1px solid var(--line); border-radius: 5px; padding: 16px 18px; }.metric-tile strong { display: block; font-size: 34px; letter-spacing: -1px; font-weight: 650; }.metric-tile span { font-size: 11px; color: var(--muted); font-weight: 600; }
-.pipeline { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 26px; }.pipeline span { font-size: 10px; border-bottom: 2px solid #a7c2b7; padding: 8px; }.pipeline span:not(:last-child)::after { content: " →"; color: var(--muted); margin-left: 8px; }.defenses, .limitations { padding-left: 20px; font-size: 12px; }.defenses li, .limitations li { margin: 12px 0; }.provenance { padding: 28px 0; border-top: 1px solid var(--line); margin-top: 30px; font-size: 12px; }.hash { font-size: 10px; display: block; margin-bottom: 20px; }
+.pipeline { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 26px; }.pipeline span { font-size: 10px; border-bottom: 2px solid #a7c2b7; padding: 8px; }.pipeline span:not(:last-child)::after { content: " →"; color: var(--muted); margin-left: 8px; }.defenses, .limitations { padding-left: 20px; font-size: 12px; }.defenses li, .limitations li { margin: 12px 0; }.provenance { padding: 28px 0; border-top: 1px solid var(--line); margin-top: 30px; font-size: 12px; scroll-margin-top: var(--report-nav-height); }.hash { font-size: 10px; display: block; margin-bottom: 20px; }
 footer { max-width: 1080px; margin: 35px auto 0; padding: 25px 0 35px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; font-size: 9px; letter-spacing: 1px; color: var(--muted); }.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+/* ---- experiment / endpoint-intro (System V5.3) ------------------------------------------ */
+.report-kicker { font-size: 13px; font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase; color: var(--rl-red); margin: 0 0 16px; }
+.same-model-note { font-size: 14px; margin: 0 0 20px; }
+.endpoint-pair { display: flex; gap: 20px; }
+.endpoint-card { flex: 1; min-width: 0; border-top: 3px solid var(--line); }
+.endpoint-card.v1 { border-top-color: var(--rl-danger); }
+.endpoint-card.v2 { border-top-color: var(--rl-success); }
+.endpoint-card .version-id { display: inline-block; margin-bottom: 16px; }
+.endpoint-traits { list-style: none; margin: 0 0 20px; padding: 0; font-size: 13px; }
+.endpoint-traits li { padding: 7px 0 7px 20px; border-bottom: 1px solid #eef0ec; position: relative; }
+.endpoint-traits li::before { content: "\2022"; position: absolute; left: 4px; color: var(--muted); }
+.endpoint-metrics { display: flex; gap: 20px; }
+.endpoint-metric strong { display: block; font-size: 26px; font-weight: 650; letter-spacing: -0.5px; }
+.endpoint-metric span { display: block; font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+/* ---- remediation summary ------------------------------------------------------------------ */
+.remediation-list { list-style: none; margin: 0; padding: 0; }
+.remediation-list li { background: #f0f5f1; border-left: 3px solid var(--rl-success); padding: 12px 16px; margin-bottom: 10px; font-size: 13px; border-radius: 0 4px 4px 0; }
+
+/* ---- report contents sidebar / mobile drawer (System V5.3) ------------------------------
+   Desktop: a real sticky grid column -- collapsing narrows it to a rail, it never overlays
+   the report. Mobile/tablet: a slide-out drawer with a backdrop, controlled by the top bar's
+   Contents button. Both states share the same markup; only .report-shell/.report-toc classes
+   (toggled from the inline script at the end of the document) decide which behavior applies. */
+.report-shell { max-width: 1320px; margin: auto; display: grid; grid-template-columns: var(--report-toc-width) 1fr; align-items: start; gap: 0; }
+.report-shell > main { min-width: 0; }
+.report-shell.toc-collapsed { grid-template-columns: var(--report-toc-collapsed-width) 1fr; }
+
+/* The sidebar is a flex column so the collapse control (and, on mobile, the drawer's
+   title/close bar) stays pinned in a non-scrolling head region regardless of how tall the
+   Report Contents list gets -- only .toc-scroll scrolls internally (System V5.3 fix: the
+   collapse button used to live at the bottom of the whole scrolling area and could require
+   scrolling a long TOC to reach). */
+.report-toc {
+  position: sticky; top: var(--report-nav-height); align-self: start;
+  height: calc(100vh - var(--report-nav-height));
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--line); background: var(--paper);
+}
+.toc-sticky-head { flex: none; padding: 18px 18px 14px 48px; border-bottom: 1px solid var(--line); }
+.toc-head { display: none; }
+.toc-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 18px 18px 24px 48px; }
+.toc-title { font-size: 11px; font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted); margin: 0 0 16px; }
+.toc-list { list-style: none; margin: 0; padding: 0; }
+.toc-group { margin-bottom: 6px; }
+.toc-group-toggle {
+  display: flex; align-items: center; width: 100%; text-align: left; font: inherit; font-size: 11px;
+  font-weight: 800; letter-spacing: 0.6px; text-transform: uppercase; color: var(--ink);
+  background: none; border: none; cursor: pointer; padding: 8px 4px;
+}
+.toc-group-toggle::before { content: "\25BE"; display: inline-block; margin-right: 8px; color: var(--muted); transition: transform 0.15s ease; }
+.toc-group-toggle[aria-expanded="false"]::before { transform: rotate(-90deg); }
+.toc-sublist { list-style: none; margin: 0 0 8px; padding: 0; }
+.toc-sublist a {
+  display: block; padding: 7px 4px 7px 20px; font-size: 12.5px; font-weight: 600; color: var(--ink);
+  text-decoration: none; border-left: 2px solid transparent; overflow-wrap: anywhere;
+}
+.toc-sublist a:hover { color: var(--rl-red); }
+.toc-sublist a.is-active { color: var(--rl-red); border-left-color: var(--rl-red); font-weight: 800; }
+.toc-collapse-btn {
+  display: flex; align-items: center; gap: 8px; font: inherit; font-size: 11px;
+  font-weight: 700; color: var(--muted); background: none; border: 1px solid var(--line); border-radius: 4px;
+  padding: 8px 10px; cursor: pointer;
+}
+.toc-collapse-btn:hover { color: var(--ink); border-color: var(--muted); }
+.toc-collapse-icon { transition: transform 0.15s ease; }
+
+/* Collapsed rail: hide the label text, keep the toggle (in the sticky head, always visible
+   regardless of scroll position) reachable/labelled for AT. */
+.report-shell.toc-collapsed .toc-title,
+.report-shell.toc-collapsed .toc-list,
+.report-shell.toc-collapsed .toc-collapse-label { display: none; }
+.report-shell.toc-collapsed .toc-sticky-head { padding: 18px 8px 14px; }
+.report-shell.toc-collapsed .toc-scroll { padding: 18px 8px 24px; }
+.report-shell.toc-collapsed .toc-collapse-icon { transform: rotate(180deg); }
+
+.toc-close, .toc-toggle-inline { display: none; }
+.toc-backdrop { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .report-toc, .toc-group-toggle::before, .toc-collapse-icon { transition: none !important; }
+}
+
 @media (max-width: 760px) {
-  .masthead { padding: 18px 22px; flex-wrap: wrap; gap: 16px; }.masthead nav { order: 3; width: 100%; margin: 0; }.brand-logo { height: 24px; width: 24px; }.downloads { margin-left: auto; gap: 13px; }.downloads a { font-size: 10px; }.brand { font-size: 9px; letter-spacing: 1px; }main { padding: 0 22px; }.hero { padding-top: 42px; }h1 { font-size: 53px; letter-spacing: -2.5px; }h1.page-title { font-size: 30px; letter-spacing: -1px; }.deck { font-size: 17px; }.verdict { padding: 24px; }.verdict-heading { display: block; }.verdict-heading .badge { margin-bottom: 14px; }.metrics { flex-wrap: wrap; gap: 23px 0; }.metric { flex-basis: 50%; padding-right: 10px; }.metric:nth-child(3) { border: 0; padding-left: 0; }.metric strong { font-size: 40px; }.two-up { display: block; }.two-up > .panel { width: 100%; }.panel { padding: 19px; }h2 { font-size: 24px; }.category-table td { padding: 14px 8px; }.category-table th:first-child { width: 29%; }.rate-label { display: block; }.rate-label span { display: block; }.compact { font-size: 9px; }.compact th, .compact td { padding: 4px; }.compact thead th { letter-spacing: 0; font-size: 8px; }.finding-index { grid-template-columns: 1fr; }.finding { padding: 20px; }footer { margin: 25px 22px 0; display: block; }footer a { display: block; margin-top: 10px; }
+  .masthead { padding: 18px 22px; flex-wrap: wrap; gap: 16px; }.masthead nav { order: 3; width: 100%; margin: 0; gap: 14px 20px; }.brand-logo { height: 24px; width: 24px; }.downloads a { font-size: 10px; }.brand { font-size: 9px; letter-spacing: 1px; }main { padding: 0 22px; }.hero { padding-top: 42px; }h1 { font-size: 53px; letter-spacing: -2.5px; }h1.page-title { font-size: 30px; letter-spacing: -1px; }.deck { font-size: 17px; }.verdict { padding: 24px; }.verdict-heading { display: block; }.verdict-heading .badge { margin-bottom: 14px; }.metrics { flex-wrap: wrap; gap: 23px 0; }.metric { flex-basis: 50%; padding-right: 10px; }.metric:nth-child(3) { border: 0; padding-left: 0; }.metric strong { font-size: 40px; }.two-up { display: block; }.two-up > .panel { width: 100%; }.panel { padding: 19px; }h2 { font-size: 24px; }.category-table td { padding: 14px 8px; }.category-table th:first-child { width: 29%; }.rate-label { display: block; }.rate-label span { display: block; }.compact { font-size: 9px; }.compact th, .compact td { padding: 4px; }.compact thead th { letter-spacing: 0; font-size: 8px; }.finding-index { grid-template-columns: 1fr; }.finding { padding: 20px; }footer { margin: 25px 22px 0; display: block; }footer a { display: block; margin-top: 10px; }
+  .endpoint-pair { flex-direction: column; }
+
+  .report-shell { display: block; }
+  .report-shell.toc-collapsed { display: block; }
+  .toc-toggle { display: inline-flex; order: 2; }
+  .downloads { order: 3; width: 100%; margin: 0; justify-content: flex-end; gap: 13px; }
+  .toc-collapse-btn { display: none; }
+  .report-toc {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 60; width: 84vw; max-width: 320px;
+    height: 100vh; box-shadow: 4px 0 24px rgba(23, 25, 29, 0.25);
+    transform: translateX(-100%); transition: transform 0.2s ease;
+  }
+  .report-toc.is-open { transform: translateX(0); }
+  .toc-sticky-head { padding: 20px 20px 16px; }
+  .toc-scroll { padding: 16px 20px 24px; }
+  .toc-head { display: flex; align-items: center; justify-content: space-between; }
+  .toc-close {
+    display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+    font-size: 18px; background: none; border: 1px solid var(--line); border-radius: 4px; cursor: pointer;
+  }
+  .toc-backdrop {
+    display: block; position: fixed; inset: 0; background: rgba(23, 25, 29, 0.45); z-index: 55;
+  }
+}
+@media (prefers-reduced-motion: reduce) and (max-width: 760px) {
+  .report-toc { transition: none !important; }
 }
 @page { size: A4; margin: 17mm 16mm 18mm; @bottom-left { content: "TEAM CHECKMATE  /  ROBUSTNESS REPORT"; font: 8px "Segoe UI", sans-serif; color: #53676b; } @bottom-right { content: counter(page) " / " counter(pages); font: 9px "Segoe UI", sans-serif; color: #53676b; } }
 @media print {
-  html { scroll-behavior: auto; }body { background: white; font-size: 10px; line-height: 1.5; }main { max-width: none; padding: 0; }.masthead { position: static; padding: 0 0 12px; }.masthead nav, .downloads, footer { display: none; }.brand-logo { height: 22px; width: 22px; }.brand { font-size: 9px; }.hero { padding: 30px 0 20px; }h1 { font-size: 53px; letter-spacing: -2px; }h1.page-title { font-size: 26px; }.page-identity { font-size: 9px; }.version-id-row { gap: 6px; }.version-id { font-size: 10px; padding: 4px 8px; }.deck { font-size: 14px; max-width: 450px; }.hero-meta span, .model { font-size: 9px; }.eyebrow { font-size: 8px; }.verdict { padding: 22px; }.verdict h2 { font-size: 20px; }.metrics { gap: 15px; }.metric { padding-left: 14px; }.metric strong { font-size: 36px; }.metric span { font-size: 10px; }.metric small { font-size: 8px; }.caption, .coverage-line { font-size: 9px; }.report-section { padding-top: 28px; break-before: page; }h2 { font-size: 23px; }h3 { font-size: 15px; }h4 { font-size: 12px; }.section-heading { margin-bottom: 16px; }.panel { padding: 17px; margin-bottom: 14px; }.panel, .two-up, .verdict, .partial-banner, .metric-tile { break-inside: avoid; }.partial-banner { padding: 16px; margin: 14px 0; }.partial-banner h2 { font-size: 18px; }.metrics-row { gap: 12px; }.metric-tile { padding: 10px 12px; }.metric-tile strong { font-size: 26px; }.demo-preview { max-height: 90px; }.panel-heading { display: block; }.legend { margin-bottom: 8px; }.two-up { gap: 14px; }.big-stat { font-size: 30px; }.facts { font-size: 9px; }.denominator { font-size: 10px; }table { font-size: 10px; }thead { display: table-header-group; }tr { break-inside: avoid; }th, td { padding: 7px; }thead th { font-size: 8px; }.category-table td { padding: 10px 16px; }.rate-label span { font-size: 9px; }.section-intro { font-size: 10px; }
+  html { scroll-behavior: auto; }body { background: white; font-size: 10px; line-height: 1.5; }main { max-width: none; padding: 0; }.masthead { position: static; padding: 0 0 12px; }.masthead nav, .downloads, footer { display: none; }
+  /* System V5.3: the interactive sidebar/drawer is a web-only feature -- print returns to
+     the original single-column, full-width report layout with no interactive chrome. */
+  .skip-link, .toc-toggle, .report-toc, .toc-backdrop { display: none !important; }
+  .report-shell, .report-shell.toc-collapsed { display: block; max-width: none; }
+  .report-shell > main { min-width: 0; }.brand-logo { height: 22px; width: 22px; }.brand { font-size: 9px; }.hero { padding: 30px 0 20px; }h1 { font-size: 53px; letter-spacing: -2px; }h1.page-title { font-size: 26px; }.page-identity { font-size: 9px; }.version-id-row { gap: 6px; }.version-id { font-size: 10px; padding: 4px 8px; }.deck { font-size: 14px; max-width: 450px; }.hero-meta span, .model { font-size: 9px; }.eyebrow { font-size: 8px; }.verdict { padding: 22px; }.verdict h2 { font-size: 20px; }.metrics { gap: 15px; }.metric { padding-left: 14px; }.metric strong { font-size: 36px; }.metric span { font-size: 10px; }.metric small { font-size: 8px; }.caption, .coverage-line { font-size: 9px; }.report-section { padding-top: 28px; break-before: page; }h2 { font-size: 23px; }h3 { font-size: 15px; }h4 { font-size: 12px; }.section-heading { margin-bottom: 16px; }.panel { padding: 17px; margin-bottom: 14px; }.panel, .two-up, .verdict, .partial-banner, .metric-tile { break-inside: avoid; }.partial-banner { padding: 16px; margin: 14px 0; }.partial-banner h2 { font-size: 18px; }.metrics-row { gap: 12px; }.metric-tile { padding: 10px 12px; }.metric-tile strong { font-size: 26px; }.demo-preview { max-height: 90px; }.panel-heading { display: block; }.legend { margin-bottom: 8px; }.two-up { gap: 14px; }.big-stat { font-size: 30px; }.facts { font-size: 9px; }.denominator { font-size: 10px; }table { font-size: 10px; }thead { display: table-header-group; }tr { break-inside: avoid; }th, td { padding: 7px; }thead th { font-size: 8px; }.category-table td { padding: 10px 16px; }.rate-label span { font-size: 9px; }.section-intro { font-size: 10px; }
   details { display: block; }details > :not(summary) { display: block !important; }summary { display: block; list-style: none; break-after: avoid; }summary::before { content: "+ "; }details[open] summary::before { content: ""; }.audit-details { padding: 13px; font-size: 10px; background: #f5f5f0; }.audit-details > summary { margin-bottom: 10px; }.evidence { font-size: 9px; }.compact { font-size: 8px; }.compact th, .compact td { padding: 4px; }.compact code { font-size: 7.5px; }.compact thead th { font-size: 7px; letter-spacing: 0; }.audit-details table { display: table !important; }.id-list { display: block; }.id-list code { display: inline; border: 0; background: none; font-size: 7.5px; padding: 0; }.id-list code::after { content: "; "; }.finding-index { display: block; columns: 2; column-gap: 20px; }.finding-index a { display: block; font-size: 8px; margin-bottom: 4px; }.finding { padding: 17px; font-size: 10px; break-inside: auto; }.finding-top, .finding h4, .finding-tags, h2, h3, h4, h5 { break-after: avoid; }.finding h4 { font-size: 14px; }.finding-tags { font-size: 8px; }.finding-id { font-size: 9px; }.badge { font-size: 8px; }.qualification { font-size: 9px; padding: 8px; }.remediation { break-inside: avoid; padding: 10px; }.remediation h5 { font-size: 9px; }.case-comparison { margin-top: 10px; padding-top: 8px; }.pipeline { gap: 0; }.pipeline span { font-size: 8px; }.limitations, .defenses { font-size: 10px; }.notice { font-size: 10px; }.provenance { font-size: 10px; }.hash { font-size: 8px; }a { text-decoration: none; }.version-title { break-after: avoid; }
 }

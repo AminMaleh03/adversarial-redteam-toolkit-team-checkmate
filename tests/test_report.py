@@ -5,6 +5,7 @@ import hashlib
 from html.parser import HTMLParser
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -128,7 +129,14 @@ def test_xss_and_template_syntax_are_plain_text(data):
     assert payload not in result
     assert "&lt;script&gt;" in result
     assert "{{7*7}}" in result
-    assert "script" not in Document(result).tags
+    # The one legitimate <script> is report/template.html's own static, repository-owned
+    # sidebar/scrollspy script (System V5.3) -- verify the untrusted payload did not inject
+    # a second, attacker-controlled script tag, and never reached the trusted script's body.
+    assert Document(result).tags.count("script") == 1
+    after_style = result.index("</style>")  # the CSS may itself mention "<script>" in prose
+    script_start = result.index("<script>", after_style)
+    script_end = result.index("</script>", script_start)
+    assert "alert(1)" not in result[script_start:script_end]
     # The one legitimate <img> is the trusted, base64-embedded Team Checkmate logo (see
     # report.generate._logo_data_uri) -- verify the untrusted payload did not inject an
     # additional image (e.g. an exfiltration src) alongside it.
@@ -751,6 +759,229 @@ def test_operational_categories_preserve_error_health_separation(data):
     text = html(data)
     for label, n in (("Unhandled HTTP 5xx", 2), ("Request timeouts", 3), ("Connection failures", 4), ("Failed health checks", 5)):
         assert f'{label}</th><td>{n}</td><td>{n}</td>' in text
+
+
+# ----------------------------------------------------------------------------------------
+# System V5.3: interactive technical report -- restructured opening, complete sidebar/TOC,
+# desktop collapse + mobile drawer, scrollspy, print safety. Full mode (report/template.html)
+# only -- the demo report is untouched by this session.
+# ----------------------------------------------------------------------------------------
+
+
+def test_full_report_no_old_marketing_hero_or_cli_instructions(data):
+    result = html(data)
+    assert "Robustness" not in result
+    assert "run_all.py" not in result
+    assert "python run_all" not in result
+
+
+def test_full_report_introduces_v1_and_v2_before_the_comparison(data):
+    result = html(data)
+    assert result.index('id="v1-intro"') < result.index('id="comparison"')
+    assert result.index('id="v2-intro"') < result.index('id="comparison"')
+    # ...and both endpoints are introduced before the "what changed" narrative reads them.
+    assert result.index('id="overview"') < result.index('id="v1-intro"') < result.index('id="v2-intro"')
+
+
+def test_full_report_states_same_underlying_model(data):
+    result = html(data)
+    assert "Same underlying AI model" in result
+
+
+def test_full_report_v1_v2_labels_are_consistent(data):
+    result = html(data)
+    assert result.count("V1 &mdash; Unhardened Endpoint") == 2  # hero pill + intro card
+    assert result.count("V2 &mdash; Hardened Endpoint") == 2
+    assert "Hardened version" not in result
+    assert "Protected API" not in result
+
+
+def test_full_report_pipeline_lives_in_method_not_the_opening(data):
+    result = html(data)
+    assert result.index('id="overview"') < result.index('id="experiment"') < result.index('id="method"')
+    assert result.index('id="method"') < result.index('id="pipeline"') < result.index('id="appendix"')
+    assert result.count('aria-label="System data flow"') == 1  # not duplicated anywhere
+
+
+def test_full_report_has_findings_and_evidence_navigation(data):
+    result = html(data)
+    toc = result[result.index('class="toc-nav"'):result.index("</nav>", result.index('class="toc-nav"'))]
+    assert "Findings" in toc and 'href="#v1-findings"' in toc and 'href="#v2-findings"' in toc
+    assert "Evidence" in toc and 'href="#v1-audit"' in toc and 'href="#provenance"' in toc
+
+
+def test_full_report_toc_is_complete_and_every_target_resolves(data):
+    e = finding(data, tiers=("SILVER",), ids=("attack-one",))
+    resolution(data, e)
+    result = html(data)
+    doc = Document(result)
+    all_ids = doc.ids
+    assert len(all_ids) == len(set(all_ids)), "duplicate section/element IDs in the rendered report"
+    toc = result[result.index('class="toc-nav"'):result.index("</nav>", result.index('class="toc-nav"'))]
+    toc_targets = re.findall(r'href="#([^"]+)"', toc)
+    assert len(toc_targets) >= 15  # a real, complete TOC -- not just Results/Findings/Method
+    missing = [t for t in toc_targets if f'id="{t}"' not in result]
+    assert not missing, f"sidebar links to nonexistent anchors: {missing}"
+    # Every top-level report section referenced in the brief is represented.
+    for label in ("Overview", "Measured Outcomes", "Findings", "Remediation", "Method", "Evidence"):
+        assert label in toc
+
+
+def test_full_report_sidebar_desktop_and_mobile_controls_exist(data):
+    result = html(data)
+    assert 'id="toc-collapse"' in result and 'aria-controls="report-toc"' in result
+    assert 'id="toc-toggle"' in result and 'aria-controls="report-toc"' in result and 'aria-expanded="false"' in result
+    assert 'id="toc-close"' in result
+    assert 'aria-label="Report contents"' in result  # accessible label on the <aside>
+
+
+def test_full_report_sidebar_hidden_and_content_full_width_in_print(data):
+    css = report.HERE.joinpath("style.css").read_text(encoding="utf-8")
+    print_css = css.split("@media print", 1)[1]
+    assert ".report-toc, .toc-backdrop { display: none !important; }" in print_css.replace("\n", " ") or \
+        (".report-toc" in print_css and "display: none" in print_css)
+    assert ".toc-toggle" in print_css
+    assert ".report-shell, .report-shell.toc-collapsed { display: block" in print_css.replace("\n  ", " ")
+
+
+def test_full_report_source_json_home_and_pdf_preserved(data):
+    result = html(data, include_pdf=True)
+    header = result[result.index("<header"):result.index("</header>")]
+    assert 'href="analysis.json" target="_blank" rel="noopener"' in header
+    assert 'class="home-link" href="/"' in header
+    assert 'href="report.pdf" download' in header
+
+
+def test_full_report_grid_layout_has_no_horizontal_overflow_escape_hatch(data):
+    css = report.HERE.joinpath("style.css").read_text(encoding="utf-8")
+    assert ".report-shell > main { min-width: 0; }" in css
+
+
+def test_full_report_scrollspy_uses_red_accent_not_teal(data):
+    css = report.HERE.joinpath("style.css").read_text(encoding="utf-8")
+    assert ".toc-sublist a.is-active" in css
+    active_rule = css[css.index(".toc-sublist a.is-active"):css.index("}", css.index(".toc-sublist a.is-active"))]
+    assert "var(--rl-red)" in active_rule
+
+
+def test_full_report_csp_allows_only_its_own_inline_script(data):
+    result = html(data)
+    csp = re.search(r'Content-Security-Policy" content="([^"]+)"', result).group(1)
+    assert "script-src 'unsafe-inline'" in csp
+    assert "http" not in csp and "eval" not in csp
+
+
+# ----------------------------------------------------------------------------------------
+# V5.3 final polish: demo masthead spacing, sidebar collapse-at-top, Evidence & Audit
+# reading-order fix, and the scrollspy root-cause fix (robust document-order tracking).
+# ----------------------------------------------------------------------------------------
+
+
+def test_demo_masthead_nav_items_are_structurally_separated(demo_data):
+    result = html(demo_data, mode="demo")
+    css = result[result.index("<style>"):result.index("</style>")]
+    rule = css[css.index(".masthead nav {"):css.index("}", css.index(".masthead nav {")) + 1]
+    assert "display: flex" in rule
+    assert "gap:" in rule  # the actual bug: without this, <a> tags render with zero gap
+
+
+def test_full_report_evidence_audit_sidebar_matches_dom_reading_order(data):
+    result = html(data)
+    appendix_html = result[result.index('id="appendix"'):]
+    expected = ("v1-audit", "v1-validity", "v2-audit", "v2-validity", "provenance")
+    dom_order = sorted(expected, key=lambda aid: appendix_html.index(f'id="{aid}"'))
+    assert dom_order == list(expected)  # confirms the real DOM order this test asserts against
+
+    sidebar_start = result.index('id="toc-group-appendix"')
+    sidebar_end = result.index("</ul>", sidebar_start)
+    sidebar = result[sidebar_start:sidebar_end]
+    sidebar_order = re.findall(r'href="#([^"]+)"', sidebar)
+    assert sidebar_order == list(expected)
+
+
+def test_full_report_evidence_audit_anchors_exist_and_are_unique(data):
+    result = html(data)
+    doc = Document(result)
+    for aid in ("v1-audit", "v1-validity", "v2-audit", "v2-validity", "provenance"):
+        assert doc.ids.count(aid) == 1
+
+
+def test_full_report_evidence_audit_targets_have_scroll_margin(data):
+    css = report.HERE.joinpath("style.css").read_text(encoding="utf-8")
+    audit_rule = css[css.index(".audit-details {"):css.index("}", css.index(".audit-details {"))]
+    assert "scroll-margin-top: var(--report-nav-height)" in audit_rule
+    provenance_rule = css[css.index(".provenance {"):css.index("}", css.index(".provenance {"))]
+    assert "scroll-margin-top: var(--report-nav-height)" in provenance_rule
+
+
+def test_full_report_scrollspy_tracks_every_toc_link_not_just_top_level(data):
+    result = html(data)
+    script = result[result.index("<script>"):result.index("</script>")]
+    # The observer's target set is built from every [data-toc-link] with no narrowing to
+    # top-level sections only -- this is what makes the Evidence & Audit subsections (and
+    # every other subsection) participate in the scrollspy at all.
+    assert 'toc.querySelectorAll("[data-toc-link]")' in script
+    # The actual root-cause fix: track intersection state per target and resolve to the
+    # document-order-last currently-intersecting one, rather than reacting to a single
+    # IntersectionObserver batch entry (which broke for closed <details> elements).
+    assert "intersecting.set(entry.target, entry.isIntersecting)" in script
+    assert "compareDocumentPosition" in script
+    assert "aria-current" in script.split("setActive")[1][:200]
+
+
+def test_full_report_toc_collapse_is_above_the_scrollable_toc_area(data):
+    result = html(data)
+    sticky_head_start = result.index('class="toc-sticky-head"')
+    sticky_head_end = result.index("</div>", sticky_head_start)
+    scroll_start = result.index('id="toc-scroll"')
+    collapse_idx = result.index('id="toc-collapse"')
+    # The collapse control lives inside the sticky head, and the sticky head closes before
+    # the independently-scrollable TOC area begins -- it can never be scrolled out of view.
+    assert sticky_head_start < collapse_idx < sticky_head_end < scroll_start
+
+
+def test_full_report_toc_scroll_is_independently_scrollable(data):
+    css = report.HERE.joinpath("style.css").read_text(encoding="utf-8")
+    scroll_rule = css[css.index(".toc-scroll {"):css.index("}", css.index(".toc-scroll {"))]
+    assert "overflow-y: auto" in scroll_rule
+    toc_rule = css[css.index(".report-toc {"):css.index("}", css.index(".report-toc {"))]
+    assert "overflow-y: auto" not in toc_rule  # only the inner region scrolls, not the whole aside
+
+
+def test_full_report_mobile_drawer_markup_intact(data):
+    result = html(data)
+    assert 'id="toc-toggle"' in result and 'aria-controls="report-toc"' in result
+    assert 'id="toc-backdrop"' in result
+    assert 'id="toc-close"' in result
+
+
+def test_full_report_no_v54_custom_input_ui(data):
+    result = html(data)
+    assert "Try Your Own Input" not in result
+    assert "<textarea" not in result
+
+
+def test_full_report_analysis_schema_not_a_hero_badge(data):
+    result = html(data)
+    hero = result[result.index('id="overview"'):result.index('id="experiment"')]
+    assert "Analysis schema" not in hero  # moved out of the hero entirely
+    provenance = result[result.index('id="provenance"'):result.index("</section>", result.index('id="provenance"'))]
+    assert "Analysis schema v2" in provenance
+    assert "Red Lab v5.0" in provenance  # product version, a distinct concept, still present
+
+
+def test_full_report_remediation_architecture_preserved(data):
+    e = finding(data, tiers=("GOLD",), ids=("attack-one",))
+    resolution(data, e)
+    result = html(data)
+    # Finding-level remediation is untouched.
+    finding_section = result[result.index('id="findings"'):result.index('id="remediation"')]
+    assert '<div class="remediation"><h5>Recommended remediation</h5>' in finding_section
+    # The collected section still exists, still explains itself as a reference view, and
+    # still contains the same (unaltered) remediation text.
+    remediation_section = result[result.index('id="remediation"'):result.index('id="method"')]
+    assert "Validate input before inference." in remediation_section
+    assert "collected" in remediation_section.lower()
 
 
 def test_long_unbroken_evidence_stays_on_pdf_page(data):

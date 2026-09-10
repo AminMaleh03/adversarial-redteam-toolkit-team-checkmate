@@ -1,3 +1,386 @@
+## System V5.3 CLOSED - final manual-review fixes - Claude
+
+- Updated: 2026-09-10T07:35:00+04:00, Claude Code; branch `ahsan/v5-redlab`, observed HEAD
+  `497d239` at session start (the V5.3 commit below, local-only, not pushed anywhere). This
+  session's changes are folded into that same commit via `git commit --amend` once verified
+  (explicit instruction: keep V5.3 as one clean logical commit after V5.2; do not amend
+  `5eb8735` (V5.2) or `6b0bc9c` (V5.1); confirmed `ahsan/v5-redlab` still unpushed before
+  amending).
+- Ahsan's real-browser manual review of V5.3 found several concrete bugs and presentation
+  issues to close before V5.3 is done. All were root-caused against the actual rendered
+  output before fixing, not patched by guesswork.
+- **Demo Results masthead concatenation -- root cause found**: this session's own V5.3 edit
+  had deleted `.masthead nav { display: flex; gap: 25px; margin-left: auto; }` from
+  `report/style.css` (it looked unused after the Technical Report's masthead dropped its
+  `<nav>` element in favor of the sidebar toggle) -- but `report/demo_template.html` still
+  uses a `<nav>` with four `<a>` tags written back-to-back with no whitespace between them
+  in the source (`</a><a href=...>`, relying entirely on flex `gap` for spacing). Without
+  `display: flex`, a `<nav>` defaults to block and its inline `<a>` children render flush
+  against each other with zero space -- exactly the "Back to Red LabDemoResultsMethod"
+  concatenation Ahsan saw. Restored the rule (plus `flex-wrap: wrap` and a two-value `gap:
+  18px 25px` for row/column spacing if it wraps) and the matching mobile override
+  (`.masthead nav { order: 3; width: 100%; margin: 0; }`, also accidentally deleted). Both
+  were only ever needed by the demo report -- the Technical Report's masthead has no `<nav>`
+  element at all since V5.3 started, so this change has zero effect there.
+- **Sidebar collapse control moved to a sticky, non-scrolling header**: `<aside id=
+  "report-toc">` is now a flex column with two children -- `.toc-sticky-head` (the collapse
+  button on desktop, the drawer's title/close bar on mobile; `flex: none`, never scrolls)
+  and `#toc-scroll` (`flex: 1 1 auto; min-height: 0; overflow-y: auto`, holding the actual
+  `<nav class="toc-nav">`). The outer `<aside>` itself changed from `max-height` +
+  `overflow-y: auto` directly on it to a fixed `height: calc(100vh - var(--report-nav-
+  height))` with `display: flex; flex-direction: column` -- so the collapse button (desktop)
+  and the drawer's close button (mobile) are always visible regardless of how long the TOC
+  list is or how far it's been scrolled internally, while the report itself scrolling still
+  keeps the whole sidebar pinned via the existing `position: sticky` on the aside. No JS
+  changes were needed for this -- `#toc-collapse` and `#toc-close` are still the same IDs,
+  only their position in the DOM/layout moved.
+- **Evidence & Audit reading order -- actual DOM order inspected, not assumed**: read
+  `report/template.html`'s real `{% for s in versions %}` loop in the `#appendix` section
+  before touching anything. It emits, per version, the audit `<details>` immediately
+  followed by that same version's validity `<details>`, and only then moves to the next
+  version -- i.e. the real order is `v1-audit, v1-validity, v2-audit, v2-validity,
+  provenance` (confirmed by index-position in a real rendered report, and now pinned by a
+  test that independently sorts those five IDs by their actual position and asserts that
+  order). The sidebar's Evidence & Audit group previously listed `v1-audit, v2-audit,
+  v1-validity, v2-validity` -- reordered to match reading order exactly. Nothing in
+  `audit.html` or the underlying data changed.
+- **Evidence & Audit scrollspy -- real root cause found, not patched around**: the observer
+  callback used to do `entries.forEach(entry => { if (entry.isIntersecting) { ... setActive
+  ... } })`, which overwrites the active link for *every* intersecting entry in whatever
+  order a single `IntersectionObserver` callback batch happens to deliver them -- not
+  necessarily reading order. The five Evidence & Audit targets are collapsed `<details>`
+  elements (only their `<summary>` line tall, since none carry the `open` attribute) sitting
+  close together, so several of them can legitimately be simultaneously intersecting the
+  trigger band at once; whichever one the browser listed last in that batch silently won,
+  which does not reliably correspond to the one actually nearest the top of the viewport.
+  Rewrote the observer to track a persistent `Map` of `target -> isIntersecting` and, on
+  every callback, resolve the active link to the **document-order-last currently-
+  intersecting** target -- a standard, robust scrollspy pattern that is correct regardless
+  of batch delivery order or how many short targets overlap. Also replaced the old
+  viewport-percentage `rootMargin: "-15% 0px -70% 0px"` with a fixed pixel offset read from
+  the same `--report-nav-height` custom property the sticky masthead uses
+  (`getComputedStyle(...).getPropertyValue("--report-nav-height")`, falling back to 84 if
+  unavailable) so the trigger line sits right under the actual top bar instead of an
+  arbitrary viewport fraction -- addressing the brief's "sticky-header offset" hypothesis as
+  a contributing factor. `targets` are now also sorted by real DOM position
+  (`compareDocumentPosition`) rather than trusting sidebar-list order to already match it,
+  so this class of bug (sidebar order silently drifting from DOM order, as literally just
+  happened above) can't quietly break the scrollspy again. `aria-current="location"` moves
+  with the resolved active link exactly as before; nothing about *what* triggers a false
+  positive was patched with a hack (no "force the clicked element permanently active").
+- **Evidence & Audit anchor quality**: all five targets (`v1-audit`, `v1-validity`,
+  `v2-audit`, `v2-validity`, `provenance`) already lived on real, content-bearing, unique
+  container elements (the `<details>` themselves and the `.provenance` div) -- no ID needed
+  moving to a different element. Added `scroll-margin-top: var(--report-nav-height)`
+  directly to `.audit-details` and `.provenance` (belt-and-suspenders alongside the existing
+  document-level `scroll-padding-top: 100px`) so anchor-jumping to any of them, including
+  via the browser's native `<details>`-reveal behavior, always clears the sticky top bar.
+- **Analysis Schema 2 presentation cleaned up**: removed the `<div class="hero-meta">
+  <span>Analysis schema 2</span></div>` pill that sat directly in the report's hero next to
+  the big title -- exactly the "marketing badge" treatment the brief flagged. The schema
+  version is still recorded, once, as plain metadata text in the Evidence Bundle
+  (`#provenance`): reworded from "Analysis schema 2 · Report format 1" to "Analysis schema
+  v2 · Report format v1" (same change applied to the demo report's equivalent Source
+  section). "Red Lab v5.0" (the product version) is unaffected and remains wherever it
+  already appeared -- the two concepts were never conflated in code, only in that one
+  hero-badge's visual prominence, which is now gone.
+- **Remediation architecture confirmed preserved, not altered**: both layers are untouched
+  -- each finding card's own `<div class="remediation">` (unchanged, unchanged text) and the
+  V5.3-added collected `#remediation` section (still the same deduplicated, verbatim list).
+  The collected section's intro paragraph already explained the relationship ("repeated
+  verbatim from the finding it supports... collected here for a single reference list") from
+  when it was first added, so no further wording change was needed -- verified this session
+  with a new test that renders both, from the same finding data, and confirms the
+  finding-level block appears before `#remediation` and the exact remediation text appears
+  in both places unaltered.
+- **No broader visual redesign performed**: the Red Lab red/charcoal/paper/success/warning
+  token system, the existing panel/table/finding-card visual language, and the overall V5
+  aesthetic direction were not touched beyond the specific fixes above. No new color
+  balance, decorative motif, animation, or "more premium" visual direction was introduced or
+  inferred. **Broader Red Lab visual polish remains intentionally deferred. Do not infer or
+  implement a new visual direction until a future explicit implementation brief defines it.**
+- **Tests**: added 11 tests to `tests/test_report.py` -- the demo masthead's `.masthead nav`
+  rule has `display: flex` and a `gap`; the Evidence & Audit sidebar order is asserted
+  against an independently-computed real DOM order (not hardcoded to "what the sidebar
+  already says"); all five Evidence & Audit anchor IDs exist exactly once; both
+  `.audit-details` and `.provenance` carry `scroll-margin-top: var(--report-nav-height)`;
+  the scrollspy's target set comes from *every* `[data-toc-link]` (not a top-level-only
+  subset) and the script contains the persistent-Map/`compareDocumentPosition` fix, with
+  `aria-current` wired into the same `setActive` function used for everything else; the
+  collapse control sits inside `.toc-sticky-head`, which closes in the DOM before `#toc-
+  scroll` opens; `.toc-scroll` alone carries `overflow-y: auto` (the outer `.report-toc`
+  does not); mobile drawer markup (`toc-toggle`/`toc-backdrop`/`toc-close`) is intact; no
+  V5.4 UI exists; the hero no longer contains "Analysis schema" text at all, while the
+  Evidence Bundle contains "Analysis schema v2" and "Red Lab v5.0" (both, correctly, as
+  distinct concepts); the remediation architecture test above. Full suite:
+  `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .venv/Scripts/python.exe -m pytest -q`:
+  **507 passed** (496 at session start + 11 new), 1 pre-existing Starlette/AnyIO warning.
+- **Verified full-report re-render** (same pattern as every prior V5.x session, not a new
+  benchmark): `analysis.json`'s SHA-256 recorded before rendering and re-checked after --
+  byte-identical. Only `report.html` was regenerated and copied into
+  `artifacts/verified_full_report/`; `export_meta.json` got only that one hash field
+  updated; `report.pdf`'s hash was independently re-checked against `export_meta.json`
+  afterward and still matches (never opened for writing). Confirmed on the real updated
+  artifact: zero duplicate IDs, sidebar Evidence & Audit order matches real DOM order, no
+  `<div class="hero-meta">` element remains, exactly one "Analysis schema v2" occurrence.
+- **Real local acceptance test** (not mocked): started `uvicorn web.app:app` on
+  `127.0.0.1:7860`; confirmed `/` 200. Verified over real HTTP against the actual served
+  bytes: `GET /verified-full/report.html` 200 with `id="toc-collapse"` appearing before
+  `id="toc-scroll"` in the document and the sidebar's Evidence & Audit anchors in the
+  corrected order; `GET /verified-full/analysis.json` 200 `application/json; charset=utf-8`
+  with no `content-disposition`; `GET /verified-full/report.pdf` 200. Stopped the web app
+  afterward.
+- **Manual visual review -- not performed by this session**: no browser display in this
+  environment. The demo masthead spacing, the sidebar's sticky-header behavior at a
+  realistic laptop viewport height, and the scrollspy actually highlighting the correct
+  Evidence & Audit item as you scroll past it (or click it) were all fixed at the root cause
+  and verified structurally/via CSS and JS source, not confirmed by looking at the page.
+  Ahsan should manually re-verify: the demo report's masthead links read cleanly with real
+  spacing; the sidebar's Collapse button stays visible at the top of the sidebar area as the
+  report and the TOC list are scrolled independently; clicking through all five Evidence &
+  Audit items (and scrolling past them) correctly moves the active/current indicator each
+  time, in both directions.
+- **Docker**: rebuilt `team-checkmate-v5-redlab:latest` from the unmodified `Dockerfile`. All
+  four expensive layers reported `CACHED`; only `COPY . .` and the final `useradd`/`chown`
+  step re-ran. Confirmed over real HTTP: `/healthz` 200, `/` 200, `/verified-full/
+  report.html` 200, `/verified-full/analysis.json` inline JSON with correct headers.
+  Container removed afterward; did not run the full 1,928-case suite.
+- **Files changed this session**: `report/style.css` (restored `.masthead nav` rules,
+  sidebar sticky-head/scroll split, `scroll-margin-top` on Evidence & Audit targets),
+  `report/template.html` (sidebar markup restructure, Evidence & Audit sidebar reorder,
+  scrollspy rewrite, hero-meta badge removal, schema-wording fix), `report/demo_template.html`
+  (schema-wording fix only), `tests/test_report.py` (11 new tests),
+  `artifacts/verified_full_report/report.html` + `export_meta.json` (re-rendered view only,
+  evidence untouched), this file. **No changes** to `web/app.py`, `web/static/`,
+  `web/templates/`, `run_all.py`, `contract.py`, `report/generate.py`, `report/audit.html`,
+  `endpoint/`, `runner/`, `analysis/`, `baseline/`, or `attacks/` -- confirmed via `git diff`
+  before committing. `git diff --check`: clean (only pre-existing LF/CRLF warnings).
+- **Not done / explicitly out of scope**: V5.4 (Try Your Own Input), V5.5, V5.6, and any
+  broader Red Lab visual redesign (color balance, new decorative motifs, motion/animation,
+  a more "premium" identity) -- all intentionally deferred; none of it was inferred or
+  speculatively implemented this session. No push to GitHub `origin` or the `space` Hugging
+  Face remote. No merge to `main`. `v4.0.0`/`bba3a7b`, the V5.1 commit `6b0bc9c`, and the
+  V5.2 commit `5eb8735` are all untouched.
+- Next: Ahsan performs the manual visual/browser review above, then decides whether to
+  proceed to V5.4, V5.5, a future visual-polish brief, or push `ahsan/v5-redlab`.
+
+## System V5.3 - interactive technical report / complete sidebar - Claude
+
+- Updated: 2026-09-10T07:20:00+04:00, Claude Code; branch `ahsan/v5-redlab`, observed HEAD
+  `5eb8735` at session start (the closed V5.2 commit, local-only, not pushed anywhere). This
+  session's changes are a **new** commit after V5.2, per explicit instruction not to amend
+  `6b0bc9c` (V5.1) or `5eb8735` (V5.2).
+- Scope: restructure the *presentation and navigation* of `report/template.html` (the full
+  Technical Report only -- `report/demo_template.html` untouched) around the same evidence.
+  No attack/runner/analysis/severity/finding-grouping/remediation-semantics/`contract.py`
+  changes; no benchmark rerun; no change to any calculated number. V5.2's live-demo
+  execution UX (`web/app.py`, `/api/run`, `/api/status`, reattachment, retry, redirect) was
+  not touched. V5.4 (custom input) and V5.6 (HF deployment) untouched.
+- **Information architecture** (inspected the actual current `report/template.html` and
+  `report/audit.html` before designing anything -- the sidebar below covers exactly what
+  already exists, nothing invented): Overview (the hero, then a new `#experiment` section
+  introducing V1 and V2 individually **before** the comparison) -> Measured Outcomes ->
+  Findings -> a new Remediation section -> Method -> Evidence & Audit. 22 real sidebar
+  anchors total; every one was verified (by a test and by inspecting a real rendered report)
+  to resolve to an actual `id` in the document, and every `id` in the whole page is unique.
+- **Opening restructure**: the hero is unchanged in spirit (`TECHNICAL REPORT`, no
+  "Robustness under pressure" -- that phrase has been gone since V3) but gained a
+  `.report-kicker` tagline ("Adversarial Input Red-Teaming Toolkit") and a tighter one-
+  sentence deck. Immediately after it, a new `#experiment` section states **"Same underlying
+  AI model"** in bold, then a `.endpoint-pair` of two cards -- `#v1-intro` (rust/red accent,
+  its real limitations: no length guard, no strict types, no exception hardening, no
+  normalization) and `#v2-intro` (green accent, the real four defenses) -- each showing two
+  genuine top-line stats pulled from the *existing* per-version context
+  (`versions[0]`/`versions[1]`: `coverage.coverage_rate`, `drift.flip_rate` -- no new Python,
+  no invented numbers). The "What changed after hardening?" verdict/withheld block (now
+  `id="comparison"`, previously no id) comes strictly after both intro cards, both in DOM
+  order and via a test asserting exactly that (`overview < v1-intro < v2-intro < comparison`
+  as byte offsets in the rendered HTML). "V1 — Unhardened Endpoint" / "V2 — Hardened
+  Endpoint" now appear as the *only* two label strings used anywhere for each endpoint
+  (verified: `Hardened version`/`Protected API` phrasing tested absent).
+- **Pipeline relocated**: the `Clean baseline → Attack library → V1/V2 runner → Manifest +
+  results → Analysis → This report` flow diagram moved from the old opening straight into a
+  new `#pipeline` panel inside Method (`#method`), first of three Method panels (Pipeline,
+  Four Defenses `#defenses`, Interpretation Limits `#interpretation-limits`). It appears
+  exactly once (tested). No Method subsections beyond these three were invented -- the brief
+  explicitly required grounding the sidebar in what genuinely exists, and Method currently
+  has no separate written content on baseline/dataset internals, attack-library internals,
+  runner internals, or confidence/flip logic as distinct sections (that logic is explained
+  inline in the drift-panel captions, unchanged), so no fabricated sidebar entries were added
+  for them.
+- **New Remediation section** (`#remediation`, between Findings and Method): a Jinja-only,
+  zero-Python-change addition. Walks every finding across both versions
+  (`{% for s in versions %}{% for e in s.entries %}`) and collects `e.finding.remediation`
+  strings into a deduplicated list (`{% set remediations = [] %}` + the standard Jinja
+  `list.append()`-inside-a-loop pattern, which works because the list *object* is mutated,
+  not rebound), rendered verbatim -- the exact same text already shown per-finding, just
+  collected once for reference. An empty-findings run renders a calm fallback sentence
+  instead of an empty list (covered by the `data` fixture's default zero-findings case).
+- **Findings navigation**: `#findings` gained per-version wrapper `<div id="v1-findings">`/
+  `<div id="v2-findings">` around the existing (unmodified, still severity/score-sorted)
+  register and finding-index nav, so the sidebar can link straight to each version's
+  register. Individual finding cards keep their existing stable `id="{{ e.anchor }}"`
+  (`finding-v1-1`, etc., unchanged). Deliberately did **not** restructure the finding list
+  into resolved/remaining sub-groups in the DOM -- that would require re-deriving which of
+  two independent status-tagging code paths (`e.comparison.status` for V1's own groups vs.
+  V2 groups that also matched V1) applies to a given card, and a subtle mistake there risks
+  silently dropping or duplicating a finding in a "verified" artifact. The existing verdict
+  block already shows the authoritative resolved/remaining/new/inconclusive counts; the
+  sidebar's "Findings" entry points there via `#comparison`, and the register itself is one
+  click away, unchanged.
+- **Evidence & Audit** (`#appendix`, renamed heading text from "Audit Appendix"): the second,
+  previously-un-anchored `<details>` per version ("evidence validity and unscored
+  observations": review queue, diagnostic observations) gained `id="v1-validity"`/
+  `id="v2-validity"`; the existing `id="{{ s.version }}-audit"` details (category eligibility,
+  baseline exclusions, per-flip evidence) and the provenance/hashes block (now
+  `id="provenance"`, previously un-anchored) round out this group. Nothing in `audit.html`
+  or the actual data shown was changed.
+- **Desktop sidebar**: `.report-shell` is a real two-column CSS grid
+  (`grid-template-columns: 280px 1fr`), not an overlay -- `<aside id="report-toc">` and
+  `<main id="report-main">` are its two grid children, so the sidebar can never cover the
+  report; toggling `.toc-collapsed` on `.report-shell` switches the first column to 56px and
+  the main column reflows to fill the rest (`.report-shell > main { min-width: 0; }`
+  prevents a long attack-ID/hash from forcing grid blowout and horizontal scroll). The
+  sidebar is `position: sticky; top: var(--report-nav-height)` (a new, explicit
+  `--report-nav-height: 84px` custom property, paired with `.masthead { min-height:
+  var(--report-nav-height) }` so the sticky offset is deterministic rather than guessed) and
+  scrolls its own contents independently once taller than the viewport
+  (`max-height: calc(100vh - var(--report-nav-height)); overflow-y: auto`).
+- **Mobile drawer** (`<=760px`, the stylesheet's existing breakpoint -- no new one
+  introduced): `.report-shell` drops to `display: block`; `.report-toc` becomes `position:
+  fixed`, off-canvas (`transform: translateX(-100%)`), toggled by the top bar's new
+  `#toc-toggle` "Contents" button (`aria-expanded`/`aria-controls="report-toc"`, mobile-only
+  via `display:none` outside the breakpoint) with a `#toc-backdrop` behind it and a
+  `#toc-close` button inside. Selecting a link closes the drawer (desktop clicks do not).
+  Escape closes it from anywhere on the page. Focus moves into the drawer (`#toc-close`) on
+  open and back to the toggle button on close. Report tables/finding cards/evidence hashes
+  were not touched by this -- their existing `overflow-wrap: anywhere` / responsive rules
+  from V4/V5.1 are unaffected since the drawer only exists in the sidebar's own fixed layer.
+- **Collapsible TOC groups**: each of the six top-level groups (Overview / Measured Outcomes
+  / Findings / Remediation / Method / Evidence & Audit) has its own `.toc-group-toggle`
+  button (`aria-expanded`/`aria-controls`) independent of the mobile drawer's open/closed
+  state; all default expanded. Subsection counts were kept deliberately modest (2-5 real
+  entries per group, 22 total) rather than one entry per finding card, per the brief's
+  explicit "meaningful grouped navigation, not hundreds of entries" instruction.
+- **Scrollspy**: a single `IntersectionObserver` (rootMargin `-15% 0px -70% 0px`, no
+  polling/scroll-event listener) watches every element the sidebar actually links to;
+  whichever one is nearest the top of the viewport gets `.is-active` **and**
+  `aria-current="location"` on its sidebar link -- the accent is `var(--rl-red)` (tested
+  directly against the CSS rule, not just eyeballed) plus a bold-weight/left-border change,
+  never color alone. Clicking a sidebar link relies on the browser's native same-page anchor
+  navigation (unchanged `href="#id"`) plus the page's existing `scroll-behavior: smooth`,
+  which is now gated behind `@media (prefers-reduced-motion: no-preference)` (previously
+  unconditional -- a small, safe, correctness fix made while already touching this rule for
+  the brief's explicit reduced-motion requirement). The drawer's slide transition and the
+  TOC-group chevron rotation are separately neutralized under `prefers-reduced-motion: reduce`.
+- **CSP change (deliberate, necessary, narrowly scoped)**: the report's
+  `<meta http-equiv="Content-Security-Policy">` previously had no `script-src` at all, so
+  `default-src 'none'` blocked *any* script execution -- correct when the report had no
+  script. Since V5.3 adds one, the CSP now includes `script-src 'unsafe-inline'` alongside
+  the existing `style-src 'unsafe-inline'`. Still no external script (or style, or anything
+  else) source of any kind, no `eval`, nothing else in the policy changed (tested: the CSP
+  string contains no `http` and no `eval`). WeasyPrint never executes `<script>` when
+  rendering `report.pdf` -- confirmed by a real PDF render (see below) producing the same
+  49-page output as before this session, script tag present in the source but inert.
+- **Visual system**: reused the established Red Lab tokens only; V1 accents stayed
+  rust/red (`var(--rl-danger)`), V2 green (`var(--rl-success)`), the new endpoint-intro
+  cards and remediation list reuse the existing `.panel`/`.notice` visual language rather
+  than introducing a new component style. No existing data component (category-table,
+  finding cards, bar charts, audit `<details>`) was redesigned.
+- **Tests**: added 14 tests to `tests/test_report.py` (old marketing hero/CLI wording
+  absent; V1 and V2 introduced before `#comparison`, in that DOM order; the "Same underlying
+  AI model" statement exists; V1/V2 labels are the *only* phrasing used, exactly twice each;
+  the pipeline lives inside Method, once, never in the opening; Findings and Evidence
+  sidebar entries exist; the sidebar has >=15 entries and **every** `href="#x"` resolves to a
+  real `id="x"` in the same rendered document, with no duplicate IDs anywhere on the page --
+  checked against a real finding-populated fixture, not just the empty default; desktop
+  collapse and mobile drawer controls exist with correct `aria-*` wiring; the print CSS
+  hides the sidebar/backdrop/toggle and returns `.report-shell` to `display: block`; Source
+  JSON/Home/Download PDF remain present and correctly attributed; the grid's
+  `min-width: 0` overflow guard is present; the active-nav-link rule uses
+  `var(--rl-red)`, not teal; the CSP contains `script-src 'unsafe-inline'` and nothing
+  externally reachable). One **pre-existing** test needed updating for the same reason the
+  V3 session once updated the "zero `<img>` tags" XSS test for the new legitimate logo:
+  `test_xss_and_template_syntax_are_plain_text` used to assert zero `<script>` tags
+  anywhere; it now asserts exactly one (the report's own, static, repository-owned script),
+  and separately asserts the untrusted `<script>alert(1)</script>` payload never appears
+  inside that one real script's body (only inside its own HTML-escaped rendering elsewhere
+  on the page). While fixing this I also caught and fixed a real self-inflicted bug: a CSS
+  comment I wrote literally contained the text `<script>` as prose, which made the test's
+  first naive `result.index("<script>")` match the *comment*, not the real tag -- reworded
+  the comment and made the test search only after `</style>` so this class of mistake can't
+  silently recur. Full suite: `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
+  .venv/Scripts/python.exe -m pytest -q`: **496 passed** (483 at session start + 13 net new
+  in the V5.3 block), 1 pre-existing Starlette/AnyIO warning.
+- **Verified full-report re-render** (same pattern as V5.1/V5.2, not a new benchmark):
+  `analysis.json`'s SHA-256 was recorded (`12d47b3...`) **before** rendering and re-checked
+  **after** -- byte-identical, confirmed by reading the file fresh from disk post-render, not
+  assumed. Only `report.html` was regenerated (via `report.generate.render_html(mode="full")`
+  against that same, untouched `analysis.json`) and copied into
+  `artifacts/verified_full_report/`; `export_meta.json` got only its `report.html` hash
+  field updated. `report.pdf`'s SHA-256 was independently re-checked against
+  `export_meta.json` after the HTML swap and still matches -- the original verified PDF was
+  never opened for writing. Confirmed on the real updated artifact (not just the test
+  fixture): 22 sidebar targets, all resolving, zero duplicate IDs, zero occurrences of
+  "Robustness" or "run_all.py".
+- **PDF safety check**: separately rendered a full bundle (HTML **and** PDF) from
+  `results/repro_1/report/analysis.json` to a **temporary scratch location** (never touching
+  the preserved verified PDF) to confirm the new grid/sidebar/script markup doesn't break
+  WeasyPrint -- succeeded, 49 pages, matching prior sessions' page counts for this same
+  source data; the print media query's `display: block` override was exercised for real
+  here, not just asserted in a unit test.
+- **Real local acceptance test** (not mocked): started `uvicorn web.app:app` on
+  `127.0.0.1:7860`; confirmed `/` and `/healthz` 200. Ran a live-demo smoke check via a real
+  `POST /api/run` (no execution code changed this session, so a full run wasn't strictly
+  required by the brief, but one was already in flight by the time of the smoke check and
+  was let finish rather than abandoned mid-job) -- completed normally, V5.2's stage sequence
+  unaffected. Verified over real HTTP: `GET /verified-full/report.html` 200 with the sidebar
+  (`id="report-toc"`), the Home link (present twice), and the `#experiment` section all
+  present in the actually-served bytes; `GET /verified-full/analysis.json` 200
+  `application/json; charset=utf-8` with no `content-disposition` (the V5.1 route,
+  unaffected); `GET /verified-full/report.pdf` 200. Confirmed via `netstat` that ports
+  8000/8001 had no `LISTENING` socket after the run; stopped the web app; deleted the
+  throwaway `results/hf_demo_*` directory.
+- **Manual visual review -- not performed by this session**: no browser display in this
+  environment. Everything above (sidebar grid columns not overlaying content, the drawer's
+  actual slide animation, scrollspy highlighting as you scroll, the collapse rail's visual
+  width) is structural/CSS-source/HTTP-level verification, not a screenshot-level
+  confirmation of how it *looks*. Ahsan should manually check, in a real browser: desktop --
+  the sidebar sits beside the report and collapses to a narrow rail without covering
+  content, clicking a sidebar link highlights it as you scroll past that section; mobile --
+  the Contents button opens a drawer over a backdrop, closes on Escape/backdrop-click/link-
+  click, and the report's tables/finding cards still read fine with the drawer closed;
+  print/PDF preview -- confirm the sidebar and Contents button genuinely disappear and the
+  report reads full-width.
+- **Docker**: rebuilt `team-checkmate-v5-redlab:latest` from the unmodified `Dockerfile`. All
+  four expensive layers (`apt-get`, `COPY requirements.txt .`, `pip install`, the pinned-
+  model pre-download) reported `CACHED`; only `COPY . .` and the final `useradd`/`chown` step
+  re-ran. Ran the freshly built image and confirmed over real HTTP: `/healthz` 200, `/` 200,
+  `/verified-full/report.html` 200, `/verified-full/analysis.json` 200
+  `application/json; charset=utf-8` (no attachment header), `/verified-full/report.pdf` 200.
+  Container removed afterward; did not run the full 1,928-case suite; the image itself was
+  left built.
+- **Files changed this session**: `report/template.html` (full restructure -- sidebar,
+  masthead simplification, experiment/remediation sections, wrapper IDs, inline script),
+  `report/style.css` (sidebar/drawer/scrollspy rules, endpoint-intro/remediation styles,
+  reduced-motion guards, print-safety additions -- original mobile-breakpoint rules were
+  preserved, merged alongside the new mobile-drawer rules in the same `@media (max-width:
+  760px)` block, not replaced), `tests/test_report.py` (14 new tests + 1 updated pre-existing
+  test + a `re` import), `artifacts/verified_full_report/report.html` +
+  `export_meta.json` (re-rendered view only, evidence untouched), this file. **No changes**
+  to `report/demo_template.html`, `report/generate.py`, `report/audit.html`, `web/app.py`,
+  `web/static/`, `web/templates/`, `run_all.py`, `contract.py`, `endpoint/`, `runner/`,
+  `analysis/`, `baseline/`, or `attacks/` -- confirmed via `git diff` before committing.
+  `git diff --check`: clean (only pre-existing LF/CRLF warnings).
+- **Not done / explicitly out of scope**: V5.4 (Try Your Own Input), V5.5 (final
+  integration/hardening/responsive acceptance), V5.6 (Hugging Face deployment/public
+  visibility). No push to GitHub `origin` or the `space` Hugging Face remote. No merge to
+  `main`. `v4.0.0`/`bba3a7b`, the V5.1 commit `6b0bc9c`, and the V5.2 commit `5eb8735` are
+  all untouched.
+- Next: Ahsan performs the manual visual/browser review above (desktop sidebar behavior,
+  mobile drawer, print/PDF preview), then decides whether to proceed to V5.4, V5.5, or push
+  `ahsan/v5-redlab`.
+
 ## System V5.2 CLOSED - final visual polish - Claude
 
 - Updated: 2026-09-10T06:50:00+04:00, Claude Code; branch `ahsan/v5-redlab`, observed HEAD

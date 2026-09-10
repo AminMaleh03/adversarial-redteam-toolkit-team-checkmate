@@ -8,6 +8,8 @@ covered separately in tests/test_run_all.py.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import sys
 import threading
@@ -540,3 +542,20 @@ def test_version_card_v1_v2_are_distinguished_by_text_and_color_not_color_alone(
     css = (ROOT / "web" / "static" / "app.css").read_text(encoding="utf-8")
     assert ".version-card.v1 { border-left-color: var(--rl-danger)" in css
     assert ".version-card.v2 { border-left-color: var(--rl-success)" in css
+
+
+def test_verified_full_served_bytes_match_recorded_evidence_hashes(client):
+    """The served evidence must hash to the values recorded in export_meta.json.
+
+    A deployment snapshot that normalises line endings changes analysis.json's bytes
+    without changing its content, which silently invalidates the published SHA-256.
+    """
+    meta_path = run_all.VERIFIED_FULL_REPORT_DIR / "export_meta.json"
+    if not meta_path.exists():
+        pytest.skip("verified_full_report artifact not present in this checkout")
+    recorded = json.loads(meta_path.read_text(encoding="utf-8"))["files"]
+
+    for name in ("analysis.json", "report.pdf"):
+        resp = client.get(f"/verified-full/{name}")
+        assert resp.status_code == 200
+        assert hashlib.sha256(resp.content).hexdigest() == recorded[name], name

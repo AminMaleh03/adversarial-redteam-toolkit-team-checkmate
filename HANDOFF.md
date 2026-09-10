@@ -55,6 +55,21 @@ of the exact release commit plus authenticated `huggingface_hub.upload_folder`, 
 remote tree hash check (raw HF git protocol-v2 fetch is known to fail here).
 Operator: ignored `results/v6_hf_release.py`.
 
+## Cloud deployment defect found and fixed (2026-09-10, Claude)
+
+First V6 upload (`dc60422` -> Space `f8841e2`) built and started cleanly, but the
+anonymous smoke check caught the served `/verified-full/analysis.json` hashing to
+`8a950cad...` instead of the published `12d47b35...`. Root cause: this checkout has
+`core.autocrlf=true` and the repo has no `.gitattributes`, so `git archive` rewrote
+text blobs to CRLF. The content was identical; the bytes, and therefore the published
+evidence hash, were not. `report.pdf` (binary) was unaffected.
+
+Fix: the release operator now runs `git -c core.autocrlf=false -c core.eol=lf archive`
+and asserts every file in `export_meta.json` still hashes to its recorded value before
+uploading. Repo-level regression guard added in `tests/test_web.py`:
+`test_verified_full_served_bytes_match_recorded_evidence_hashes` asserts the bytes the
+app actually serves hash to `export_meta.json`. Suite now **605 passed** in 56.72s.
+
 Next: push the V6 commit to `origin`, upload the same snapshot to the Space while it
 stays Protected, then cloud smoke/functional/mobile acceptance, Public visibility and
 the annotated `v6.0.0` tag.

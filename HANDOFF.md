@@ -1,3 +1,57 @@
+# STAGE 3 FOUNDATION — EVIDENCE LAYER DONE, CONTRACT LAYER BLOCKED
+
+2026-09-15, Claude Opus 5, Asia/Dubai. Worktree `C:/Users/ahsan/OneDrive/Desktop/stage3-foundation`,
+branch `stage3/foundation`, HEAD after this commit; tested tree = tag
+`stage3-foundation-evidence` = `9386d75a535ed26007379c3e2af5b930d6698015`. Base
+`a17fc5b3d06f1a069ebfa0b85a95f14fe01d344e` (`ahsan/v5-redlab`, tag `v6.0.0`) — the
+validated release, not `main` (`c507033`, four releases behind).
+
+Task: Task 5 only, prepare the shared Stage 3 foundation. Status: **NOT_READY**, reported
+in `docs/stage3/FOUNDATION_READINESS.md`.
+
+**Blocker (unresolved, 2026-09-15, source: the task message itself).** The "Final reviewed
+implementation plan" and the Task 1–4 descriptions were referenced as supplied but are not
+in the conversation and not in the repository (searched the tree, all branches, HANDOFF,
+AGENTS, CLAUDE, `.claude/`). That blocks `FINAL_PLAN.md`, the task files, `CONTRACTS.md`
+3.0.0, the `RunResult` field defaults, the two OCES `baseline_file` names in the registry,
+the stage3 fixtures, and publishing the four member branches. Not guessed, not invented.
+
+**Verified and committed (three commits on `stage3/foundation`):**
+- `artifacts/benchmark_v6/` — `results/repro_1` preserved byte-exact (9 files) with
+  `PROVENANCE.md`. `repro_1`'s analysis.json is byte-identical to the published
+  `artifacts/verified_full_report/analysis.json` (`12d47b35…37da`). Suite fingerprint
+  `7fcccf16…a430` and manifest `0471bccb…a717` both re-derived from source; the published
+  summaries and comparison reproduce from the preserved bytes, from a clean clone.
+- `analysis/case_sets/ci_core_v1.json` + `analysis/policy_reference/ci_core_v1_clean_reference.json`
+  — 42 + 32 + 88 = 162 cases, sole exclusion `malformed.oversized_10mb`, real clean labels
+  from the verified emotion_v2 rows. No unresolvable hashes; draft policy must error.
+- `docs/stage3/MODEL_IDENTITY.md` — sentiment pinned to
+  `distilbert/distilbert-base-uncased-finetuned-sst-2-english` @
+  `714eb0fa89d2f80546fda750413ed43d93601a13`, labels NEGATIVE/POSITIVE, limit 512; dataset
+  `stanfordnlp/sst2` @ `8d51e7e4887a4caaa95b3fbebbf53c0490b58bbb`, validation, 872 rows.
+  Emotion pin re-verified against the cache. No weights loaded.
+- `.gitattributes` (`artifacts/** binary`) — fixes a **pre-existing** failure:
+  `tests/test_web.py::test_verified_full_served_bytes_match_recorded_evidence_hashes` fails
+  on any fresh Windows clone of `v6.0.0` because `verified_full_report/analysis.json` checks
+  out CRLF (`8a950cad…`). Confirmed on an unmodified clone of `a17fc5b`. Published bytes
+  unchanged; project-wide text rules unchanged.
+
+**Validation by Claude (not historical):** `.venv` Python 3.11.9; `python -m pytest -q` in
+the worktree = 580 passed, 27 skipped; the same from a clean `--no-local` clone = 580
+passed, 27 skipped; `git diff --check --cached` clean. 27 skips are pre-existing
+(Playwright/WeasyPrint). No deployment, no new inference, no OCES authored or run.
+
+**Preserved:** the uncommitted `HANDOFF.md` edit (Codex reference audit) is untouched in the
+main checkout on `ahsan/v5-redlab`. No branch reset, stash or discard. **Nothing pushed** —
+`stage3/integration` and the four member branches are deliberately not created, because they
+must all come from one complete foundation commit.
+
+**Next actionable step:** obtain the final plan text and Task 1–4 descriptions, then
+complete Steps 2, 3, 6 and 8, re-verify, cut a new tag, and publish.
+
+**Temporary files:** clean-clone checkouts under the session scratchpad only; nothing left
+running.
+
 # SYSTEM V6 — DEPLOYMENT RELEASE (DEPLOYED; ONE USER ACTION LEFT)
 
 2026-09-10, Claude (took over from Codex at its usage limit), Asia/Dubai.

@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "outcome": "policy_failure",
+  "exit_code": 1,
+  "policy_id": "ci_emotion_v2_core_selection",
+  "policy_version": "1.0.0",
+  "policy_sha256": "feb3fc0b78b50983c3334b40de4cd944ded0c693187bef71c875a13a15fbe540",
+  "candidate": {
+    "target_id": "emotion_v2",
+    "commit": "9386d75a535ed26007379c3e2af5b930d6698015",
+    "model_id": "j-hartmann/emotion-english-distilroberta-base",
+    "model_revision": "0e1cd914e3d46199ed785853e12b57304e04178b"
+  },
+  "reference": {
+    "reference_id": "ci_core_v1_clean_reference",
+    "sha256": "19ea965fc988fa10238e148e0ef934c22290a762bf177aa4e05260535d3c4034"
+  },
+  "suite_id": "core",
+  "case_set_id": "ci_core_v1",
+  "selection_sha256": "25573a71931259a3da4241af4ee507314544fd783f796c74c32d0fa88c56ec9d",
+  "checks": [
+    {
+      "check_id": "candidate_identity",
+      "status": "pass",
+      "reason": "Candidate target, commit and model revision match the policy.",
+      "evidence_refs": [],
+      "observed": {
+        "target_id": "emotion_v2",
+        "commit": "9386d75a535ed26007379c3e2af5b930d6698015",
+        "model_id": "j-hartmann/emotion-english-distilroberta-base",
+        "model_revision": "0e1cd914e3d46199ed785853e12b57304e04178b"
+      },
+      "threshold": {
+        "target_id": "emotion_v2",
+        "commit": "9386d75a535ed26007379c3e2af5b930d6698015",
+        "model_id": "j-hartmann/emotion-english-distilroberta-base",
+        "model_revision": "0e1cd914e3d46199ed785853e12b57304e04178b"
+      },
+      "blocking": true
+    },
+    {
+      "check_id": "selection_integrity",
+      "status": "pass",
+      "reason": "All 162 selected cases are present, unique and accounted for.",
+      "evidence_refs": [],
+      "observed": 162,
+      "threshold": 162,
+      "blocking": true
+    },
+    {
+      "check_id": "execution_completion",
+      "status": "pass",
+      "reason": "Every selected case completed with a valid response record.",
+      "evidence_refs": [],
+      "observed": {
+        "selected": 162,
+        "completed": 162,
+        "missing": 0
+      },
+      "threshold": null,
+      "blocking": true
+    },
+    {
+      "check_id": "clean_response_coherence",
+      "status": "fail",
+      "reason": "0 of 42 selected baselines returned HTTP 200: the candidate rejected every request, including valid clean input. A candidate that rejects everything trivially produces zero 5xx and zero flips, which is why clean-response coherence is checked before any robustness signal.",
+      "evidence_refs": [
+        "attack:none",
+        "baseline:dataset-anger-0"
+      ],
+      "observed": {
+        "baselines": 42,
+        "coherent": 0
+      },
+      "threshold": {
+        "coherent": 42
+      },
+      "blocking": true
+    },
+    {
+      "check_id": "approved_clean_label_agreement",
+      "status": "fail",
+      "reason": "No clean predictions were produced, so agreement cannot be established. Absent predictions are not counted as agreement.",
+      "evidence_refs": [],
+      "observed": {
+        "numerator": 0,
+        "denominator": 0,
+        "rate": null
+      },
+      "threshold": null,
+      "blocking": true
+    },
+    {
+      "check_id": "no_server_errors",
+      "status": "pass",
+      "reason": "Zero observed 5xx, timeouts, transport failures or failed post-request health checks across the selected cases.",
+      "evidence_refs": [],
+      "observed": {
+        "http_5xx": 0,
+        "timeouts": 0,
+        "transport": 0,
+        "health_failures": 0
+      },
+      "threshold": 0,
+      "blocking": true
+    },
+    {
+      "check_id": "no_leak_signatures",
+      "status": "pass",
+      "reason": "No leak signature matched. The detector looks for stack-trace markers, absolute filesystem paths and internal module names; it cannot prove the absence of all information disclosure.",
+      "evidence_refs": [],
+      "observed": 0,
+      "threshold": 0,
+      "blocking": true
+    },
+    {
+      "check_id": "documented_rejection_behavior",
+      "status": "pass",
+      "reason": "Every case whose oracle requires clean rejection returned an allowed rejection status. A missing response is never counted as a rejection.",
+      "evidence_refs": [],
+      "observed": {
+        "required": 12,
+        "rejected_cleanly": 12
+      },
+      "threshold": null,
+      "blocking": true
+    },
+    {
+      "check_id": "attack_flip_rate",
+      "status": "pass",
+      "reason": "Informational in this first policy. Reported, never blocking.",
+      "evidence_refs": [],
+      "observed": {
+        "numerator": 9,
+        "denominator": 88,
+        "rate": 0.102273
+      },
+      "threshold": null,
+      "blocking": false
+    },
+    {
+      "check_id": "slow_responses",
+      "status": "pass",
+      "reason": "Informational. Slow responses are reported and do not gate the release.",
+      "evidence_refs": [],
+      "observed": 0,
+      "threshold": null,
+      "blocking": false
+    }
+  ],
+  "summary": {
+    "blocking_checks": 8,
+    "passed": 6,
+    "failed": 2,
+    "errored": 0,
+    "claim": "Degenerate all-rejecting candidate caught by the coherence checks."
+  },
+  "artifacts": {
+    "analysis_json": "results/ci/analysis.json",
+    "report_html": "results/ci/report.html",
+    "raw_results": "results/ci/emotion_v2/results.jsonl",
+    "gate_result": "results/ci/gate_result.json"
+  },
+  "exclusions": [],
+  "_synthetic": {
+    "is_synthetic": true,
+    "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+    "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+  }
+}

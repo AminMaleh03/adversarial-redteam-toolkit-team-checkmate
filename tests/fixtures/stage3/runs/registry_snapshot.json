@@ -1,0 +1,6 @@
+{
+  "registry_version": "3.0.0",
+  "source_path": "endpoint/targets.json",
+  "source_sha256": "3212f30cde643ba6e53e8ef514ecce870f212b1a88bfa208876136cc9b8a0136",
+  "note": "Real hash of the real registry file at foundation time, copied into the run so a later registry edit cannot silently change what a past run claimed."
+}

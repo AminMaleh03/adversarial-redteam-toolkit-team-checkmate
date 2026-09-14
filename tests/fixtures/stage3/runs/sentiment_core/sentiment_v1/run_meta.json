@@ -1,0 +1,112 @@
+{
+  "run_id": "fixturerun0001-sentiment.core-sentiment_v1",
+  "evaluation_run_id": "fixturerun0001",
+  "evaluation_id": "sentiment.core",
+  "version": "v1",
+  "target_id": "sentiment_v1",
+  "task_id": "sentiment_2",
+  "suite_id": "core",
+  "target": "http://127.0.0.1:8000",
+  "started_at": "2026-09-15T00:00:00+00:00",
+  "ended_at": "2026-09-15T00:00:00+00:00",
+  "run_type": "full",
+  "limit": null,
+  "termination_reason": "completed",
+  "model": {
+    "model_id": "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+    "revision": "714eb0fa89d2f80546fda750413ed43d93601a13",
+    "tokenizer_id": "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+    "tokenizer_revision": "714eb0fa89d2f80546fda750413ed43d93601a13",
+    "labels": [
+      "NEGATIVE",
+      "POSITIVE"
+    ]
+  },
+  "baseline": {
+    "path": "baseline/sentiment_baseline.json",
+    "sha256": "5d680b450d9e01a73214e47c2c4894ea533d8e56cc81a8c517c863af6056fda6"
+  },
+  "fingerprints": {
+    "planned_suite_sha256": "e2a81f3b8ae567934f6c8876fd05bb463e01a42a56d46428b14ecf639e5e749d",
+    "manifest_sha256": "b6b620adcee82c8226fc19b51d0247f5bffaa04d364da17fa2a3487774e4994b",
+    "results_sha256": "df794d78962bfb4f96d546342381da58666fb3a5bc865185c4a16406ea5e7bc4",
+    "selection_sha256": null
+  },
+  "case_set_id": null,
+  "code_provenance": {
+    "app_commit": "9386d75a535ed26007379c3e2af5b930d6698015",
+    "dirty": false
+  },
+  "suite": {
+    "baselines": 3,
+    "attacks": 7,
+    "total_cases": 10
+  },
+  "coverage": {
+    "planned": 10,
+    "skipped": 0,
+    "limit_excluded": 0,
+    "selected": 10,
+    "completed": 10,
+    "missing": 0,
+    "coverage_rate": 1.0
+  },
+  "case_ids": {
+    "planned": [
+      "baseline:fx-sentiment-0",
+      "baseline:fx-sentiment-1",
+      "baseline:fx-sentiment-2",
+      "attack:fx-sentiment-0.perturbation.keyboard_typo",
+      "attack:fx-sentiment-0.encoding.homoglyph",
+      "attack:fx-sentiment-1.perturbation.keyboard_typo",
+      "attack:fx-sentiment-1.encoding.homoglyph",
+      "attack:fx-sentiment-2.perturbation.keyboard_typo",
+      "attack:fx-sentiment-2.encoding.homoglyph",
+      "attack:malformed.oversized_100kb"
+    ],
+    "selected": [
+      "baseline:fx-sentiment-0",
+      "baseline:fx-sentiment-1",
+      "baseline:fx-sentiment-2",
+      "attack:fx-sentiment-0.perturbation.keyboard_typo",
+      "attack:fx-sentiment-0.encoding.homoglyph",
+      "attack:fx-sentiment-1.perturbation.keyboard_typo",
+      "attack:fx-sentiment-1.encoding.homoglyph",
+      "attack:fx-sentiment-2.perturbation.keyboard_typo",
+      "attack:fx-sentiment-2.encoding.homoglyph",
+      "attack:malformed.oversized_100kb"
+    ],
+    "completed": [
+      "baseline:fx-sentiment-0",
+      "baseline:fx-sentiment-1",
+      "baseline:fx-sentiment-2",
+      "attack:fx-sentiment-0.perturbation.keyboard_typo",
+      "attack:fx-sentiment-0.encoding.homoglyph",
+      "attack:fx-sentiment-1.perturbation.keyboard_typo",
+      "attack:fx-sentiment-1.encoding.homoglyph",
+      "attack:fx-sentiment-2.perturbation.keyboard_typo",
+      "attack:fx-sentiment-2.encoding.homoglyph",
+      "attack:malformed.oversized_100kb"
+    ],
+    "skipped": [],
+    "limit_excluded": [],
+    "missing": []
+  },
+  "transport_counts": {
+    "timeouts": 0,
+    "connection_errors": 0,
+    "server_errors_5xx": 0,
+    "health_ping_retries": 0,
+    "health_failures": 0
+  },
+  "runner_settings": {
+    "request_timeout_s": 10.0,
+    "health_timeout_s": 2.0,
+    "slow_band_from_ms": 2000.0
+  },
+  "_synthetic": {
+    "is_synthetic": true,
+    "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+    "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+  }
+}

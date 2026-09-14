@@ -1,0 +1,20 @@
+{
+  "status_code": 422,
+  "body": {
+    "detail": [
+      {
+        "loc": [
+          "body",
+          "target_id"
+        ],
+        "msg": "unknown target_id 'gpt_v9'; configured: ['emotion_v1', 'emotion_v2', 'sentiment_v1']",
+        "type": "value_error.unknown_target"
+      }
+    ]
+  },
+  "_synthetic": {
+    "is_synthetic": true,
+    "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+    "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+  }
+}

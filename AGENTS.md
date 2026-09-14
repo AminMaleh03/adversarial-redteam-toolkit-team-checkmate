@@ -4,6 +4,13 @@ Shared instructions for Codex and Claude Code in this repository. Project rules 
 `CLAUDE.md` live here, including its pending manifest clarification. `CLAUDE.md` is the Claude
 entry point; `HANDOFF.md` holds changing session state. Edit rules here once, not in two copies.
 
+**Stage 3 work starts from these four documents, and they take precedence over any earlier
+proposal:** [`CONTRACTS.md`](CONTRACTS.md) (version 3.0.0 — the shapes and signatures),
+[`docs/stage3/FINAL_PLAN.md`](docs/stage3/FINAL_PLAN.md) (the reviewed plan and its binding
+corrections), [`docs/stage3/tasks/`](docs/stage3/tasks/) (the exact task descriptions), and
+[`docs/stage3/FOUNDATION_READINESS.md`](docs/stage3/FOUNDATION_READINESS.md) (what is
+verified and what is not). Everything else in this file still applies.
+
 ## Start or Resume a Session
 
 1. Read this file and `HANDOFF.md` before project work, including after context compaction or
@@ -86,18 +93,45 @@ Cross-component imports are limited to the documented integration points:
   imports from `attacks/`.**
 - Same-package imports are allowed. Any other cross-component dependency needs team agreement.
 
+Stage 3 adds these approved edges, and no others:
+
+- `runner.run` may import `endpoint.targets` (the static registry). It is model-free: it
+  imports no endpoint app, no `transformers` and no `torch`, and `TargetSpec.module` is a
+  recorded string that the registry never imports. A test enforces this.
+- `runner.gate` may import `run_all` and `analysis.policy`.
+- **`run_all` must never import `runner.gate`.** The gate calls the orchestrator, not the
+  reverse; that edge would be a circular orchestration dependency.
+- Analysis reads coverage overlays and manifests from run **artifacts**, exactly as it
+  already reads results and run metadata. The prohibition on importing `attacks/` is
+  unchanged and now covers coverage data too.
+
+Shared files have exactly one owner (see the table below). To change anything in
+`contract.py` or `CONTRACTS.md`, do not edit it on your branch: name the field or signature
+and what it blocks, Ahsan lands a single foundation amendment (`contract.py`,
+`CONTRACTS.md`, the fixture pack, `CONTRACTS_VERSION`, a dated entry in
+`docs/stage3/DECISIONS.md`), and everyone rebases onto that same amendment. Two definitions
+of one contract is the failure this structure exists to prevent.
+
 ## File Ownership
 
 | Path | Owner |
 | --- | --- |
-| `contract.py` | Ahsan |
+| `contract.py`, `CONTRACTS.md` | Ahsan |
 | `endpoint/` | Rayyan |
-| `baseline/` | Khalid |
+| `runner/` | Rayyan |
+| `baseline/` | Lamei |
 | `attacks/` | Lamei |
-| `runner/` | Amin |
-| `analysis/` | Khalid |
+| `analysis/` (incl. `policies/`, `case_sets/`) | Khalid |
 | `report/` | Ahsan |
+| `run_all.py`, `web/` | Ahsan |
+| `.github/`, `Dockerfile`, `requirements.txt`, `artifacts/` | Ahsan |
+| `docs/stage3/` | Ahsan, except `docs/stage3/handoffs/<name>.md` (each member owns their own) |
 | `AGENTS.md`, `CLAUDE.md`, `HANDOFF.md` | Ahsan; both agents maintain handoff state |
+
+Stage 3 has **four implementing members: Ahsan, Rayyan, Khalid, Lamei.** There is no work
+or handover dependency on Amin. `runner/` moved from Amin to Rayyan and `baseline/` from
+Khalid to Lamei. The full table, including per-test owners and the one-time foundation
+ownership transfers, is in [`docs/stage3/OWNERSHIP.md`](docs/stage3/OWNERSHIP.md).
 
 Rules:
 

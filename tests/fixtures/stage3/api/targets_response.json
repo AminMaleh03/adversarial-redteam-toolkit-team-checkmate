@@ -1,0 +1,40 @@
+{
+  "targets": [
+    {
+      "target_id": "emotion_v1",
+      "task_id": "emotion_7",
+      "label": "Emotion (unhardened)",
+      "hardened": false
+    },
+    {
+      "target_id": "emotion_v2",
+      "task_id": "emotion_7",
+      "label": "Emotion (hardened)",
+      "hardened": true
+    },
+    {
+      "target_id": "sentiment_v1",
+      "task_id": "sentiment_2",
+      "label": "Sentiment",
+      "hardened": false
+    }
+  ],
+  "evaluations": [
+    {
+      "evaluation_id": "emotion.core",
+      "kind": "paired",
+      "suite_id": "core"
+    },
+    {
+      "evaluation_id": "sentiment.core",
+      "kind": "single",
+      "suite_id": "core"
+    }
+  ],
+  "note": "Only trusted configured choices are offered. There is no free-form URL entry.",
+  "_synthetic": {
+    "is_synthetic": true,
+    "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+    "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+  }
+}

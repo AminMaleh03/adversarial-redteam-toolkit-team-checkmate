@@ -1,18 +1,32 @@
-# Narrowly scoped to artifacts/: preserved evidence must stay byte-exact on every
-# platform. Without this, core.autocrlf rewrites the line endings on checkout and
-# every recorded SHA-256 stops matching -- including the verified_full_report
-# bytes the web app serves and checks against its own export_meta.json.
+# Line-ending policy for files whose BYTES are hashed and checked.
+#
+# The project default (core.autocrlf) rewrites line endings on checkout. For ordinary
+# source that is harmless. For any file whose SHA-256 is recorded somewhere, it silently
+# invalidates the recording on every fresh clone, and the failure looks like data
+# corruption rather than like a checkout setting.
+#
+# Two different problems, two different attributes:
+#
+# `binary` (= -text -diff -merge) for preserved evidence. Those files genuinely contain
+# CRLF, written by the runner. Pinning the bytes is required; suppressing the diff also
+# stops `git diff --check` reading each preserved CR as trailing whitespace, which would
+# otherwise fail on every line of frozen evidence. They are never hand-edited.
 #
 # This was a live bug, not a hypothetical: on a fresh Windows clone of v6.0.0,
 # tests/test_web.py::test_verified_full_served_bytes_match_recorded_evidence_hashes
-# fails, because artifacts/verified_full_report/analysis.json checks out as CRLF
-# (8a950cad...) instead of the recorded 12d47b35.... It passed only in the working
-# copy where the report generator had written the file directly.
-#
-# `binary` is `-text -diff -merge`: it pins the bytes AND stops Git from reading the
-# preserved CR line endings as trailing whitespace, which would make `git diff --check`
-# fail on every line of frozen evidence. These files are never hand-edited, so losing
-# textual diffs on them costs nothing.
-#
-# This deliberately does NOT change the project's text rules for any other path.
+# failed, because artifacts/verified_full_report/analysis.json checked out as CRLF
+# (8a950cad...) instead of the 12d47b35... recorded in its own export_meta.json. It
+# passed only in the working copy where the report generator had written the file.
 artifacts/** binary
+
+# `-text` for generated LF artifacts whose hashes are recorded and asserted: the fixture
+# pack indexes itself in MANIFEST.json, gate fixtures cite the real hashes of the frozen
+# CI inputs, and the registry snapshot cites the registry. These stay readable and
+# diffable -- they are LF already, so there is no CR for `git diff --check` to flag.
+# Without this, four foundation tests fail on any fresh Windows clone.
+tests/fixtures/stage3/** -text
+analysis/case_sets/*.json -text
+analysis/policies/*.json -text
+endpoint/targets.json -text
+
+# Everything else keeps the project's existing text rules, unchanged.

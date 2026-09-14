@@ -1,0 +1,27 @@
+{
+  "run_id": "neg-wrong-revision",
+  "evaluation_run_id": "fixturerun0001",
+  "target_id": "emotion_v2",
+  "task_id": "emotion_7",
+  "model": {
+    "model_id": "j-hartmann/emotion-english-distilroberta-base",
+    "revision": "1111111111111111111111111111111111111111",
+    "tokenizer_id": "j-hartmann/emotion-english-distilroberta-base",
+    "tokenizer_revision": "0e1cd914e3d46199ed785853e12b57304e04178b",
+    "labels": [
+      "anger",
+      "disgust",
+      "fear",
+      "joy",
+      "neutral",
+      "sadness",
+      "surprise"
+    ]
+  },
+  "_expected_rejection": "model revision does not match the registry pin",
+  "_synthetic": {
+    "is_synthetic": true,
+    "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+    "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+  }
+}

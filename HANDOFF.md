@@ -1,55 +1,61 @@
-# STAGE 3 FOUNDATION — EVIDENCE LAYER DONE, CONTRACT LAYER BLOCKED
+# STAGE 3 FOUNDATION — COMPLETE AND PUBLISHED
 
 2026-09-15, Claude Opus 5, Asia/Dubai. Worktree `C:/Users/ahsan/OneDrive/Desktop/stage3-foundation`,
-branch `stage3/foundation`, HEAD after this commit; tested tree = tag
-`stage3-foundation-evidence` = `9386d75a535ed26007379c3e2af5b930d6698015`. Base
-`a17fc5b3d06f1a069ebfa0b85a95f14fe01d344e` (`ahsan/v5-redlab`, tag `v6.0.0`) — the
-validated release, not `main` (`c507033`, four releases behind).
+branch `stage3/foundation`. Tested tree = tag `stage3-foundation-v1`. Base
+`a17fc5b3d06f1a069ebfa0b85a95f14fe01d344e` (`ahsan/v5-redlab`, tag `v6.0.0`) — the validated
+release, not `main` (`c507033`, four releases behind).
 
-Task: Task 5 only, prepare the shared Stage 3 foundation. Status: **NOT_READY**, reported
-in `docs/stage3/FOUNDATION_READINESS.md`.
+Task: Task 5 only, from the supplied reviewed task pack. Status: **FOUNDATION_READY**. Full
+report in `docs/stage3/FOUNDATION_READINESS.md`. Tasks 1-4 are NOT started.
 
-**Blocker (unresolved, 2026-09-15, source: the task message itself).** The "Final reviewed
-implementation plan" and the Task 1–4 descriptions were referenced as supplied but are not
-in the conversation and not in the repository (searched the tree, all branches, HANDOFF,
-AGENTS, CLAUDE, `.claude/`). That blocks `FINAL_PLAN.md`, the task files, `CONTRACTS.md`
-3.0.0, the `RunResult` field defaults, the two OCES `baseline_file` names in the registry,
-the stage3 fixtures, and publishing the four member branches. Not guessed, not invented.
+The earlier NOT_READY verdict was raised because the reviewed plan and Task 1-4 descriptions
+had not been supplied. They were then supplied, are checked in verbatim under `docs/stage3/`
+(the five task sections were verified byte-identical to the standalone files), and the
+blocker is resolved.
 
-**Verified and committed (three commits on `stage3/foundation`):**
-- `artifacts/benchmark_v6/` — `results/repro_1` preserved byte-exact (9 files) with
-  `PROVENANCE.md`. `repro_1`'s analysis.json is byte-identical to the published
-  `artifacts/verified_full_report/analysis.json` (`12d47b35…37da`). Suite fingerprint
-  `7fcccf16…a430` and manifest `0471bccb…a717` both re-derived from source; the published
-  summaries and comparison reproduce from the preserved bytes, from a clean clone.
-- `analysis/case_sets/ci_core_v1.json` + `analysis/policy_reference/ci_core_v1_clean_reference.json`
-  — 42 + 32 + 88 = 162 cases, sole exclusion `malformed.oversized_10mb`, real clean labels
-  from the verified emotion_v2 rows. No unresolvable hashes; draft policy must error.
-- `docs/stage3/MODEL_IDENTITY.md` — sentiment pinned to
-  `distilbert/distilbert-base-uncased-finetuned-sst-2-english` @
-  `714eb0fa89d2f80546fda750413ed43d93601a13`, labels NEGATIVE/POSITIVE, limit 512; dataset
-  `stanfordnlp/sst2` @ `8d51e7e4887a4caaa95b3fbebbf53c0490b58bbb`, validation, 872 rows.
-  Emotion pin re-verified against the cache. No weights loaded.
-- `.gitattributes` (`artifacts/** binary`) — fixes a **pre-existing** failure:
-  `tests/test_web.py::test_verified_full_served_bytes_match_recorded_evidence_hashes` fails
-  on any fresh Windows clone of `v6.0.0` because `verified_full_report/analysis.json` checks
-  out CRLF (`8a950cad…`). Confirmed on an unmodified clone of `a17fc5b`. Published bytes
-  unchanged; project-wide text rules unchanged.
+**Delivered.** `CONTRACTS.md` 3.0.0 · `contract.py` gains four appended `RunResult` fields
+(`target_id`, `suite_id`, `request_body_bytes`, `request_body_sha256`) plus model-free
+`ModelSpec`/`TaskSpec`/`TargetSpec`/`EvaluationSpec`/`Registry`/`CheckResult`/`GateOutcome`;
+`BaselineCase`/`AttackCase`/`Finding` structurally unchanged · `endpoint/targets.py` +
+`targets.json` with the five agreed evaluations and real pins · `attacks.metadata.scoped_registry`
+(snapshot->clear->yield->restore; no existing caller changed) · `artifacts/benchmark_v6/`
+byte-exact with `PROVENANCE.md` · frozen `ci_core_v1` (162 cases) and the approved clean
+reference · `tests/fixtures/stage3/` (53 files, deterministic builder) · ownership, decisions
+and model identity docs · narrow `AGENTS.md`/`CLAUDE.md` updates preserving all unrelated rules.
 
-**Validation by Claude (not historical):** `.venv` Python 3.11.9; `python -m pytest -q` in
-the worktree = 580 passed, 27 skipped; the same from a clean `--no-local` clone = 580
-passed, 27 skipped; `git diff --check --cached` clean. 27 skips are pre-existing
-(Playwright/WeasyPrint). No deployment, no new inference, no OCES authored or run.
+**Pins.** emotion `0e1cd914e3d46199ed785853e12b57304e04178b`; sentiment
+`distilbert/distilbert-base-uncased-finetuned-sst-2-english` @
+`714eb0fa89d2f80546fda750413ed43d93601a13`, labels NEGATIVE/POSITIVE, limit 512; dataset
+`stanfordnlp/sst2` @ `8d51e7e4887a4caaa95b3fbebbf53c0490b58bbb`, validation, 872 rows. No
+model weights were downloaded or loaded at any point.
 
-**Preserved:** the uncommitted `HANDOFF.md` edit (Codex reference audit) is untouched in the
-main checkout on `ahsan/v5-redlab`. No branch reset, stash or discard. **Nothing pushed** —
-`stage3/integration` and the four member branches are deliberately not created, because they
-must all come from one complete foundation commit.
+**Validation by Claude (not historical).** `.venv` Python 3.11.9. `python -m pytest -q` =
+681 passed, 27 skipped (580 pre-existing + 101 new foundation tests); the same from a clean
+`--no-local` clone; `git diff --check` clean; fixture builder self-validates and rebuilds
+byte-identically; registry import subprocess confirms no torch/transformers/endpoint.model.
+27 skips are pre-existing (Playwright, WeasyPrint). The historical "607 passed" was not used
+as evidence. No deployment, no new inference, no OCES authored or run.
 
-**Next actionable step:** obtain the final plan text and Task 1–4 descriptions, then
-complete Steps 2, 3, 6 and 8, re-verify, cut a new tag, and publish.
+**Two real bugs found and fixed, both pre-existing or latent.** (1) `test_web.py::test_verified_full_served_bytes_match_recorded_evidence_hashes`
+failed on any fresh Windows clone of `v6.0.0` (CRLF-mangled `verified_full_report`);
+confirmed on an unmodified clone of `a17fc5b`. (2) Four new foundation tests failed on a
+fresh clone because fixture/CI-input hashes are taken from on-disk bytes. Both fixed by a
+`.gitattributes` scoped to `artifacts/**` (binary) and the hash-bearing LF paths (`-text`).
+Published bytes unchanged; project-wide text rules unchanged.
 
-**Temporary files:** clean-clone checkouts under the session scratchpad only; nothing left
+**Preserved.** The uncommitted `HANDOFF.md` edit (Codex reference audit) is untouched in the
+main checkout on `ahsan/v5-redlab`. No reset, stash, discard or force-push; no existing
+branch overwritten.
+
+**Published.** `stage3/foundation`, `stage3/integration`, and `stage3/ahsan`,
+`stage3/rayyan`, `stage3/khalid`, `stage3/lamei` — all six tips at the same foundation SHA
+on `origin`. Member checkout commands are in `docs/stage3/FOUNDATION_READINESS.md` section 9.
+
+**Next.** Ahsan distributes Tasks 1-4. Remaining runtime checks belonging to those tasks are
+listed in the readiness report section 4; nothing in this foundation is evidence that any
+feature works.
+
+**Temporary files.** Clean-clone checkouts under the session scratchpad only; nothing left
 running.
 
 # SYSTEM V6 — DEPLOYMENT RELEASE (DEPLOYED; ONE USER ACTION LEFT)

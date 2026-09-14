@@ -4,19 +4,16 @@
 first frozen selection and its clean reference once, from real artifacts. Every later
 change is Khalid's, and nothing here is auto-approved.
 
-**Path assumption (unresolved).** The foundation task specified "their agreed
-`analysis/case_sets` and policy-reference locations". `analysis/case_sets/` is named
-literally; the policy-reference location was not, so the clean reference was placed at
-`analysis/policy_reference/ci_core_v1_clean_reference.json`. If the final plan names a
-different path, move the file and update every reference to it — the contents do not
-change.
+Paths follow the ownership table in `docs/stage3/FINAL_PLAN.md`, which assigns
+`analysis/policies/**` and `analysis/case_sets/**` to Khalid: the frozen selection lives
+in `analysis/case_sets/` and the approved clean-output reference in `analysis/policies/`.
 
 ## Files
 
 | File | What it is |
 | --- | --- |
 | `ci_core_v1.json` | The frozen CI case selection, `case_set_id` `ci_core_v1`, `suite_id` `core`. |
-| `../policy_reference/ci_core_v1_clean_reference.json` | Approved clean-reference top labels, for regression detection only. |
+| `../policies/ci_core_v1_clean_reference.json` | Approved clean-reference top labels, for regression detection only. |
 
 ## How `ci_core_v1` was frozen
 

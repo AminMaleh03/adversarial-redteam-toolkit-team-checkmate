@@ -29,6 +29,7 @@ working while leaving a clean migration path.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 from dataclasses import asdict, dataclass, field
@@ -246,6 +247,47 @@ def reset() -> None:
     _MANIFEST.clear()
     _FINGERPRINTS.clear()
 
+
+
+@contextlib.contextmanager
+def scoped_registry():
+    """Build a suite against an EMPTY manifest, then restore the previous state exactly.
+
+    Added by the Stage 3 foundation. Existing callers are untouched: this is opt-in, and
+    `register`/`manifest`/`reset` behave exactly as before outside the context.
+
+    Snapshot, then **clear**, then yield, then restore in `finally`. The clearing step is
+    the point and it is the part that is easy to leave out. Without it, a suite built
+    inside the block inherits every case already registered in this process, so
+    `write_manifest` for an emotion run would also stamp in the sentiment cases built a
+    moment earlier -- and the analysis would then be scoring results against an oracle set
+    describing different cases. Snapshot-and-restore alone does not give you that
+    isolation; it only protects what came before.
+
+    Both module dictionaries are restored, not just the manifest. `_FINGERPRINTS` is what
+    catches an attack_id reused for a different payload; leaving it polluted would either
+    hide a real collision or invent one.
+
+    Nesting works, because each entry keeps its own snapshot on the stack. An exception
+    inside the block still restores, because the restore is in `finally`. Concurrent
+    mutation from another thread is out of scope here and is handled by the existing
+    global job lock -- this is a re-entrant scope, not a mutex.
+
+        with scoped_registry():
+            cases = library.build_suite(baselines, suite="oces", task_id="sentiment_2")
+            library.write_manifest(out_dir / "manifest.json")   # same isolated build
+    """
+    manifest_snapshot = dict(_MANIFEST)
+    fingerprint_snapshot = dict(_FINGERPRINTS)
+    _MANIFEST.clear()
+    _FINGERPRINTS.clear()
+    try:
+        yield
+    finally:
+        _MANIFEST.clear()
+        _MANIFEST.update(manifest_snapshot)
+        _FINGERPRINTS.clear()
+        _FINGERPRINTS.update(fingerprint_snapshot)
 
 def write_manifest(path: str) -> None:
     """Dump the manifest to JSON for the report and for analysis to join against."""

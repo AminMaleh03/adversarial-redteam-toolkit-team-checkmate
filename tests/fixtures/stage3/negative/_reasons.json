@@ -1,0 +1,20 @@
+{
+  "purpose": "Every file in this directory must be REJECTED by a correct implementation. A fixture that loads cleanly here is a bug in the consumer, not a bug here.",
+  "reasons": {
+    "mixed_identity.jsonl": "Two different target_ids in one results file. A results file may contain exactly one target/suite/version; mixing them makes every per-target number ambiguous.",
+    "wrong_model_revision.json": "run_meta declares a model revision that differs from the registry pin. Pairing or gating across different weights is not a like-for-like comparison.",
+    "wrong_label_space.jsonl": "Lowercase sentiment labels. The declared space is NEGATIVE/POSITIVE; nothing may case-fold it into a match, and nothing may map it onto emotion labels.",
+    "duplicate_case.jsonl": "The same case key appears twice. Silently keeping one changes every denominator.",
+    "orphan_derived.jsonl": "A derived attack whose baseline was never sent. There is no clean prediction to compare against, so it cannot enter drift scoring and must not be dropped silently either.",
+    "altered_hash.json": "run_meta records a results_sha256 that does not match the results bytes. The artifact set cannot be trusted.",
+    "zero_denominator.json": "Every eligible comparison was excluded, so the flip rate has no denominator. Correct handling is rate=null rendered as N/A. Emitting 0.0 would read as 'nothing failed', which is a different and unsupported claim.",
+    "incomplete_execution.json": "The run stopped after a health failure. Missing cases must stay visible as missing; a missing V2 result must never read as 'V2 fixed it'.",
+    "truncated.jsonl": "The final JSON line is cut off mid-object. Loading must raise, not skip the bad line and quietly analyse a short run.",
+    "ambiguous_legacy.json": "A document with no schema_version and no recognised legacy layout. It must be rejected as unrecognised. It must NOT be assumed to be emotion, and target_id must not be inferred from 'version'."
+  },
+  "_synthetic": {
+    "is_synthetic": true,
+    "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+    "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+  }
+}

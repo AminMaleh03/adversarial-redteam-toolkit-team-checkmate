@@ -1,0 +1,13 @@
+{
+  "summary": {
+    "version": "v2",
+    "findings": []
+  },
+  "_expected_rejection": "unrecognised analysis layout; explicit legacy routing only",
+  "_must_not_happen": "silently adopting the emotion label space or target_id=version",
+  "_synthetic": {
+    "is_synthetic": true,
+    "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+    "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+  }
+}

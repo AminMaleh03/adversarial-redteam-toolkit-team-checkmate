@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "outcome": "execution_error",
+  "exit_code": 2,
+  "policy_id": "ci_emotion_v2_core_selection",
+  "policy_version": "1.0.0",
+  "policy_sha256": "feb3fc0b78b50983c3334b40de4cd944ded0c693187bef71c875a13a15fbe540",
+  "candidate": {
+    "target_id": "emotion_v2",
+    "commit": "9386d75a535ed26007379c3e2af5b930d6698015",
+    "model_id": "j-hartmann/emotion-english-distilroberta-base",
+    "model_revision": "0e1cd914e3d46199ed785853e12b57304e04178b"
+  },
+  "reference": {
+    "reference_id": "ci_core_v1_clean_reference",
+    "sha256": "19ea965fc988fa10238e148e0ef934c22290a762bf177aa4e05260535d3c4034"
+  },
+  "suite_id": "core",
+  "case_set_id": "ci_core_v1",
+  "selection_sha256": "25573a71931259a3da4241af4ee507314544fd783f796c74c32d0fa88c56ec9d",
+  "checks": [
+    {
+      "check_id": "policy_validity",
+      "status": "error",
+      "reason": "The policy is still marked status=draft. A draft policy has no frozen selection or reference hash to score against, so it cannot pass and cannot fail; it has failed to run.",
+      "evidence_refs": [],
+      "observed": "draft",
+      "threshold": "frozen",
+      "blocking": true
+    },
+    {
+      "check_id": "candidate_identity",
+      "status": "not_applicable",
+      "reason": "Not evaluated: the policy did not validate.",
+      "evidence_refs": [],
+      "observed": null,
+      "threshold": null,
+      "blocking": true
+    },
+    {
+      "check_id": "selection_integrity",
+      "status": "not_applicable",
+      "reason": "Not evaluated: the policy did not validate.",
+      "evidence_refs": [],
+      "observed": null,
+      "threshold": null,
+      "blocking": true
+    }
+  ],
+  "summary": {
+    "blocking_checks": 3,
+    "passed": 0,
+    "failed": 0,
+    "errored": 1,
+    "claim": "Structural error takes precedence; results cannot be trusted."
+  },
+  "artifacts": {
+    "analysis_json": "results/ci/analysis.json",
+    "report_html": "results/ci/report.html",
+    "raw_results": "results/ci/emotion_v2/results.jsonl",
+    "gate_result": "results/ci/gate_result.json"
+  },
+  "exclusions": [],
+  "_synthetic": {
+    "is_synthetic": true,
+    "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+    "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+  }
+}

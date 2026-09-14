@@ -1,0 +1,37 @@
+{
+  "case_set_id": "fx_core_v1",
+  "selection_version": 1,
+  "suite_id": "core",
+  "baseline_ids": [
+    "fx-emotion-0",
+    "fx-emotion-1",
+    "fx-emotion-2"
+  ],
+  "attack_ids": [
+    "fx-emotion-0.perturbation.keyboard_typo",
+    "fx-emotion-0.encoding.homoglyph",
+    "fx-emotion-1.perturbation.keyboard_typo",
+    "fx-emotion-1.encoding.homoglyph",
+    "fx-emotion-2.perturbation.keyboard_typo",
+    "fx-emotion-2.encoding.homoglyph",
+    "malformed.oversized_100kb"
+  ],
+  "order": [
+    "baseline:fx-emotion-0",
+    "baseline:fx-emotion-1",
+    "baseline:fx-emotion-2",
+    "attack:fx-emotion-0.perturbation.keyboard_typo",
+    "attack:fx-emotion-0.encoding.homoglyph",
+    "attack:fx-emotion-1.perturbation.keyboard_typo",
+    "attack:fx-emotion-1.encoding.homoglyph",
+    "attack:fx-emotion-2.perturbation.keyboard_typo",
+    "attack:fx-emotion-2.encoding.homoglyph",
+    "attack:malformed.oversized_100kb"
+  ],
+  "exclusions": [],
+  "_synthetic": {
+    "is_synthetic": true,
+    "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+    "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+  }
+}

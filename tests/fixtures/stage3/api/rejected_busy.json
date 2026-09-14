@@ -1,0 +1,13 @@
+{
+  "status_code": 409,
+  "body": {
+    "detail": "A run is already in progress.",
+    "run_id": "fixturerun0001"
+  },
+  "note": "One global job lock is shared by Demo and Lab.",
+  "_synthetic": {
+    "is_synthetic": true,
+    "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+    "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+  }
+}

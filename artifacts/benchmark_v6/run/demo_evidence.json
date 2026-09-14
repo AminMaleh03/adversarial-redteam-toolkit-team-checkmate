@@ -1,0 +1,69 @@
+{
+  "literal_crash_case_available": false,
+  "featured_failure": {
+    "attack_id": "malformed.oversized_100kb",
+    "category": "malformed",
+    "subfamily": "oversized_100kb",
+    "failure_mode": "unhandled_5xx",
+    "failure_label": "unhandled server error",
+    "input_description": "malformed/oversized_100kb",
+    "payload_bytes": 102400,
+    "preview": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA... [truncated, 102,400 bytes total]",
+    "v1": {
+      "status_code": 500,
+      "outcome": "Unhandled server error",
+      "error": null,
+      "latency_ms": 53.89,
+      "latency_band": "normal",
+      "endpoint_alive_after": true
+    },
+    "v2": {
+      "status_code": 422,
+      "outcome": "Rejected safely",
+      "error": null,
+      "latency_ms": 59.13,
+      "latency_band": "normal",
+      "endpoint_alive_after": true
+    },
+    "technical_interpretation": "The endpoint returned an unhandled 5xx response, and the service remained available afterward. This is an unhandled server error, not a process crash.",
+    "remediation": "Reject requests above a defined body/input size limit before expensive model inference or downstream processing begins."
+  },
+  "featured_prediction_flip": {
+    "attack_id": "dataset-sadness-3.encoding.homoglyph.leading.d5",
+    "baseline_id": "dataset-sadness-3",
+    "category": "encoding",
+    "subfamily": "homoglyph",
+    "validity_tiers": [
+      "SILVER"
+    ],
+    "original_text": "i feel all depressed",
+    "attacked_text": "і fееl аll dеpressed",
+    "modification": "position 0: 'i' (U+0069 LATIN SMALL LETTER I) -> 'і' (U+0456 CYRILLIC SMALL LETTER BYELORUSSIAN-UKRAINIAN I); position 3: 'ee' -> 'ее'; position 7: 'a' (U+0061 LATIN SMALL LETTER A) -> 'а' (U+0430 CYRILLIC SMALL LETTER A) (+1 more)",
+    "original_label": "sadness",
+    "original_confidence": 0.9940454959869385,
+    "attacked_label": "fear",
+    "attacked_confidence": 0.281809538602829,
+    "confidence_change": -0.7122359573841095,
+    "v1": {
+      "status_code": 200,
+      "outcome": "Accepted",
+      "error": null,
+      "latency_ms": 20.2,
+      "latency_band": "normal",
+      "endpoint_alive_after": true
+    },
+    "v2": {
+      "status_code": 200,
+      "outcome": "Accepted",
+      "error": null,
+      "latency_ms": 16.72,
+      "latency_band": "normal",
+      "endpoint_alive_after": true
+    },
+    "v2_still_flipped": true,
+    "remediation": "This is a model-level robustness gap, not an endpoint defect. V2's application-layer defenses (length limit, strict types, exception handling, Unicode normalization) do not reach it -- NFKC normalization does not fold cross-script homoglyphs or fix typo sensitivity. Closing it needs adversarial/perturbation-aware evaluation, training-data augmentation with this perturbation family, or robustness fine-tuning, not endpoint-level exception handling."
+  },
+  "notes": [
+    "No request in this run caused observed service unavailability (a failed post-request health check). The featured failure below is the strongest legitimate example found in this run's data and is reported accurately as an unhandled server error, not a process crash."
+  ]
+}

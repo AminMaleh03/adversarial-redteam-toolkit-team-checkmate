@@ -1,0 +1,11 @@
+# Narrowly scoped: preserved benchmark evidence must stay byte-exact on every
+# platform. Without this, core.autocrlf normalises the CRLF line endings these
+# files were written with and every recorded SHA-256 stops matching.
+#
+# `binary` is `-text -diff -merge`: it pins the bytes AND stops Git from treating
+# the preserved CR line endings as trailing whitespace, which would make
+# `git diff --check` fail on every line of frozen evidence. These files are never
+# edited, so losing textual diffs on them costs nothing.
+#
+# This deliberately does NOT change the project's text rules for any other path.
+artifacts/benchmark_v6/** binary

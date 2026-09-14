@@ -1,11 +1,18 @@
-# Narrowly scoped: preserved benchmark evidence must stay byte-exact on every
-# platform. Without this, core.autocrlf normalises the CRLF line endings these
-# files were written with and every recorded SHA-256 stops matching.
+# Narrowly scoped to artifacts/: preserved evidence must stay byte-exact on every
+# platform. Without this, core.autocrlf rewrites the line endings on checkout and
+# every recorded SHA-256 stops matching -- including the verified_full_report
+# bytes the web app serves and checks against its own export_meta.json.
 #
-# `binary` is `-text -diff -merge`: it pins the bytes AND stops Git from treating
-# the preserved CR line endings as trailing whitespace, which would make
-# `git diff --check` fail on every line of frozen evidence. These files are never
-# edited, so losing textual diffs on them costs nothing.
+# This was a live bug, not a hypothetical: on a fresh Windows clone of v6.0.0,
+# tests/test_web.py::test_verified_full_served_bytes_match_recorded_evidence_hashes
+# fails, because artifacts/verified_full_report/analysis.json checks out as CRLF
+# (8a950cad...) instead of the recorded 12d47b35.... It passed only in the working
+# copy where the report generator had written the file directly.
+#
+# `binary` is `-text -diff -merge`: it pins the bytes AND stops Git from reading the
+# preserved CR line endings as trailing whitespace, which would make `git diff --check`
+# fail on every line of frozen evidence. These files are never hand-edited, so losing
+# textual diffs on them costs nothing.
 #
 # This deliberately does NOT change the project's text rules for any other path.
-artifacts/benchmark_v6/** binary
+artifacts/** binary

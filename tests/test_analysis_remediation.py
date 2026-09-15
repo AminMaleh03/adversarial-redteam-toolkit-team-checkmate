@@ -220,7 +220,7 @@ def test_legitimate_partial_run_keeps_inconclusive_evidence(artifacts):
             "".join(json.dumps(dataclasses.asdict(r)) + "\n" for r in rows), encoding="utf8")
         digest = hashlib.sha256(artifacts["manifest_path"].read_bytes()).hexdigest()
         artifacts[f"meta_{version}_path"].write_text(json.dumps(metadata(rows, version, digest)), encoding="utf8")
-    result = analyze.run_analysis(**artifacts)
+    result = analyze.legacy_v2_view(analyze.run_analysis(**artifacts))
     assert result["comparison"]["findings_resolved"] == []
     assert result["comparison"]["findings_unavailable"][0]["unavailable_ids"] == ["a1"]
 
@@ -281,15 +281,19 @@ def test_valid_files_produce_deterministic_serializable_report_input(artifacts):
     first = analyze.run_analysis(**artifacts)
     second = analyze.run_analysis(**artifacts)
     assert first == second
-    assert first["schema_version"] == 2
+    assert first["schema_version"] == 3
+    assert first["contracts_version"] == "3.0.0"
     json.dumps(first, default=dataclasses.asdict, allow_nan=False)
-    for version in ("v1", "v2"):
-        assert first[f"summary_{version}"]["version"] == version
+    block = first["evaluations"][0]
+    assert block["targets"] == ["emotion_v1", "emotion_v2"]
+    for target, version in (("emotion_v1", "v1"), ("emotion_v2", "v2")):
+        assert block["summaries"][target]["version"] == version
+        assert block["summaries"][target]["target_id"] == target
 
 
 def test_different_planned_fingerprints_withhold_all_comparison_claims(artifacts):
     update_json(artifacts["meta_v2_path"], lambda m: m["fingerprints"].update(planned_suite_sha256="c" * 64))
-    comparison = analyze.run_analysis(**artifacts)["comparison"]
+    comparison = analyze.legacy_v2_view(analyze.run_analysis(**artifacts))["comparison"]
     assert "comparison_withheld_reason" in comparison
     for key in ("finding_comparisons", "new_finding_evidence", "inconclusive_new_findings", "category_failure_rates"):
         assert key not in comparison
@@ -300,8 +304,9 @@ def test_flat_cli_emits_report_schema(artifacts):
                               str(artifacts["manifest_path"].parent)],
                              check=True, capture_output=True, text=True)
     output = json.loads(process.stdout)
-    assert set(output) == {"schema_version", "summary_v1", "summary_v2", "comparison"}
-    assert output["schema_version"] == 2
+    assert set(output) == {"schema_version", "contracts_version", "run_identity",
+                           "evaluations", "limitations"}
+    assert output["schema_version"] == 3
 
 
 def test_nested_runner_layout_checks_both_manifests(artifacts, tmp_path):
@@ -327,7 +332,7 @@ def test_valid_limit_and_skip_metadata_is_supported(artifacts):
                             limit_excluded=["attack:a2"])
     meta["coverage"].update(selected=1, missing=0, skipped=1, limit_excluded=1)
     artifacts["meta_v2_path"].write_text(json.dumps(meta), encoding="utf8")
-    result = analyze.run_analysis(**artifacts)
+    result = analyze.legacy_v2_view(analyze.run_analysis(**artifacts))
     assert result["comparison"]["coverage"]["unavailable"] == ["attack:a1", "attack:a2"]
 
 
@@ -335,7 +340,7 @@ def test_empty_recorded_run_is_labelled_with_its_expected_version(artifacts):
     artifacts["results_v2_path"].write_text("", encoding="utf8")
     digest = hashlib.sha256(artifacts["manifest_path"].read_bytes()).hexdigest()
     artifacts["meta_v2_path"].write_text(json.dumps(metadata([], "v2", digest)), encoding="utf8")
-    result = analyze.run_analysis(**artifacts)
+    result = analyze.legacy_v2_view(analyze.run_analysis(**artifacts))
     assert result["summary_v2"]["version"] == "v2"
     assert result["summary_v2"]["drift"]["flip_rate"] == "N/A"
 

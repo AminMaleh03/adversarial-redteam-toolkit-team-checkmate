@@ -211,14 +211,24 @@ def evaluate_pair(
     )
 
 
-def compute_drift(results: list[RunResult], manifest: dict[str, dict]) -> DriftSummary:
+def compute_drift(
+    results: list[RunResult],
+    manifest: dict[str, dict],
+    *,
+    labels=None,
+    identity=None,
+) -> DriftSummary:
     """Compute drift over one version's results (baseline rows + attack rows mixed).
 
     Mixed versions and duplicate keys are rejected. References are indexed by version
     and baseline ID. Standalone attacks (no baseline_id) are skipped cleanly -- they
     never enter any counter, eligible or excluded.
+
+    ``labels``/``identity`` carry the run's declared label space through to validation.
+    Drift is the second entry point into the row checks, so fixing only the top-level
+    caller would still reject a legitimate uppercase sentiment prediction here.
     """
-    validate_rows(results)
+    validate_rows(results, labels=labels, identity=identity)
     clean_by_baseline: dict[tuple[str, str], RunResult] = {}
     for result in results:
         if result.case_type == "baseline":

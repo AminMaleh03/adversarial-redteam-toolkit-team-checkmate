@@ -35,7 +35,22 @@ import json
 from dataclasses import asdict, dataclass, field
 from typing import Optional
 
-from contract import AttackCase
+from contract import (
+    AttackCase,
+    COVERAGE_CLASSES,
+    OCES_FAMILIES,
+    SUITES,
+    SUITE_CORE,
+)
+
+# The three declared application-layer input controls V2 adds. `controls_targeted` is a
+# subset of these; the scoped exception handler (C3) is deliberately NOT here because it is
+# cross-cutting and must never be attributed as causal coverage. Frozen values match the
+# CONTRACTS wording ("length, strict_type_schema, normalization").
+CONTROL_LENGTH = "length"
+CONTROL_STRICT_TYPE_SCHEMA = "strict_type_schema"
+CONTROL_NORMALIZATION = "normalization"
+CONTROLS = frozenset({CONTROL_LENGTH, CONTROL_STRICT_TYPE_SCHEMA, CONTROL_NORMALIZATION})
 
 # --------------------------------------------------------------------------------------
 # Controlled vocabularies (module constants so a typo is an ImportError, not a silent join
@@ -146,6 +161,17 @@ class AttackMetadata:
     expected_sanitizer_behavior: str = SAN_NOT_APPLICABLE
     expected_http_behavior: str = HTTP_MEASURE
     notes: str = ""
+    # --- Stage 3 coverage + suite/OCES fields (CONTRACTS.md 4.4, frozen names) ---
+    # suite the case belongs to; `coverage_*` are the outcome-INDEPENDENT declaration of
+    # which declared control (if any) governs this case, resolved from attacks/coverage_map.json
+    # by attacks.coverage. `exposure`/`declared_family` are populated for OCES cases (Phase 2+).
+    suite_id: str = SUITE_CORE
+    coverage_class: Optional[str] = None          # one of COVERAGE_CLASSES once resolved
+    controls_targeted: list[str] = field(default_factory=list)  # subset of CONTROLS
+    coverage_rationale: str = ""
+    coverage_map_version: Optional[str] = None
+    exposure: str = ""
+    declared_family: Optional[str] = None         # oces.paraphrase | oces.distractor
 
     def __post_init__(self) -> None:
         if self.relation not in RELATIONS:
@@ -162,6 +188,21 @@ class AttackMetadata:
             raise ValueError(
                 f"unknown boundary_source {self.boundary_source!r} for {self.attack_id}"
             )
+        if self.suite_id not in SUITES:
+            raise ValueError(f"unknown suite_id {self.suite_id!r} for {self.attack_id}")
+        if self.coverage_class is not None and self.coverage_class not in COVERAGE_CLASSES:
+            raise ValueError(
+                f"unknown coverage_class {self.coverage_class!r} for {self.attack_id}"
+            )
+        for control in self.controls_targeted:
+            if control not in CONTROLS:
+                raise ValueError(
+                    f"unknown control {control!r} in controls_targeted for {self.attack_id}"
+                )
+        if self.declared_family is not None and self.declared_family not in OCES_FAMILIES:
+            raise ValueError(
+                f"unknown declared_family {self.declared_family!r} for {self.attack_id}"
+            )
 
 
 # --------------------------------------------------------------------------------------
@@ -170,6 +211,30 @@ class AttackMetadata:
 
 _MANIFEST: dict[str, AttackMetadata] = {}
 _FINGERPRINTS: dict[str, str] = {}
+
+# Coverage fields are STAMPED ONTO a case after it is registered (by
+# attacks.coverage.stamp_manifest, called at the end of library.build_suite), never supplied
+# at registration. They are derived annotations, not part of a case's identity, so
+# re-registering the same case (e.g. a second build_suite pass in a shared, non-cleared
+# registry -- as run_all does across a Demo/Full run and then a Lab job) must not trip the
+# "different metadata" guard just because the earlier pass has since been stamped. The
+# subsequent build re-stamps them, so the end state stays correct. The guard still fires on
+# any genuine identity difference (relation, oracle, source, tier, dose, suite_id, ...).
+#
+# suite_id is deliberately NOT here: it is supplied at registration (the sub-builders default
+# it to SUITE_CORE; an OCES author would set it explicitly) and is part of a case's identity,
+# so the same attack_id/payload registered under two different suites must be rejected.
+_POST_REGISTRATION_FIELDS = frozenset({
+    "coverage_class",
+    "controls_targeted",
+    "coverage_rationale",
+    "coverage_map_version",
+})
+
+
+def _registration_identity(meta: "AttackMetadata") -> dict:
+    """The metadata as supplied at registration, minus post-registration stamped fields."""
+    return {k: v for k, v in asdict(meta).items() if k not in _POST_REGISTRATION_FIELDS}
 
 
 def _fingerprint(case: AttackCase) -> str:
@@ -224,7 +289,9 @@ def register(case: AttackCase, meta: AttackMetadata) -> AttackCase:
     if existing_fp is not None and existing_fp != fp:
         raise ValueError(f"attack_id {case.attack_id!r} reused for a DIFFERENT payload")
     existing_meta = _MANIFEST.get(case.attack_id)
-    if existing_meta is not None and existing_meta != meta:
+    if existing_meta is not None and (
+        _registration_identity(existing_meta) != _registration_identity(meta)
+    ):
         raise ValueError(f"attack_id {case.attack_id!r} reused with DIFFERENT metadata")
 
     _MANIFEST[case.attack_id] = meta
@@ -290,7 +357,21 @@ def scoped_registry():
         _FINGERPRINTS.update(fingerprint_snapshot)
 
 def write_manifest(path: str) -> None:
-    """Dump the manifest to JSON for the report and for analysis to join against."""
+    """Dump the manifest to JSON for the report and for analysis to join against.
+
+    ``newline="\\n"`` disables Python's universal-newline translation on write, so a
+    manifest generated on Windows and one generated on Linux/macOS hash to the same
+    bytes. Without it, text mode substitutes the platform line separator (CRLF on
+    Windows) for every ``\\n`` ``json.dump`` writes. The manifest lives under
+    ``results/`` (gitignored, generated per run), so ``.gitattributes`` cannot fix
+    this the way it fixes a checked-in file -- the bytes depend on whichever platform
+    produced them, not on how the repository is checked out. A policy that asserts
+    ``manifest_sha256`` against a Windows-generated value would then fail on every
+    other platform, and vice versa. Found during PR #10 integration review (Rayyan's
+    handover, section 9.2): a manifest generated here hashed to the CRLF-translated
+    value recorded as ``analysis/case_sets/ci_core_v1.json``'s
+    ``frozen_from.manifest_sha256``, not the canonical LF value.
+    """
     payload = {aid: asdict(meta) for aid, meta in sorted(_MANIFEST.items())}
-    with open(path, "w", encoding="utf-8") as handle:
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
         json.dump(payload, handle, indent=2, ensure_ascii=False)

@@ -151,6 +151,14 @@ def load_registry(path: Optional[Union[str, Path]] = None) -> Registry:
             f"{where}.model_ref {model_ref!r} is not a configured model; "
             f"configured: {sorted(models)}",
         )
+        expected_labels = {
+            "emotion_7": ("anger", "disgust", "fear", "joy", "neutral", "sadness", "surprise"),
+            "sentiment_2": ("NEGATIVE", "POSITIVE"),
+        }.get(key)
+        _require(
+            expected_labels is None or models[model_ref].labels == expected_labels,
+            f"{where}: task/model label mismatch for {model_ref!r}",
+        )
         _check_path_syntax(baseline_file, f"{where}.baseline_file")
         tasks[key] = TaskSpec(
             task_id=key,

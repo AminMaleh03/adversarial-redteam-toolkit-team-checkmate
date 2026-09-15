@@ -186,7 +186,8 @@ class TestRegistry:
             "from endpoint.targets import load_registry;"
             "r = load_registry();"
             "assert r.registry_version;"
-            "bad = [m for m in ('torch','transformers','endpoint.model') if m in sys.modules];"
+            "bad = [m for m in ('torch','transformers','endpoint.model',"
+            "'endpoint.sentiment_v1','endpoint.loader') if m in sys.modules];"
             "print('LOADED:' + ','.join(bad))" % ROOT
         )
         out = subprocess.run(
@@ -260,12 +261,33 @@ class TestRegistry:
         assert r.target("sentiment_v1").target_id != r.target("emotion_v1").target_id
 
     def test_module_paths_are_recorded_not_imported(self):
-        r = load_registry()
-        assert r.target("sentiment_v1").module == "endpoint.sentiment_v1"
-        assert not (ROOT / "endpoint" / "sentiment_v1.py").exists(), (
-            "this test is meaningless once Task 2 lands the module; update it then"
+        """The registry stores module paths as strings; loading it must not import them.
+
+        Task 2 landed endpoint/sentiment_v1.py, which imports transformers/torch at
+        module scope (see endpoint/loader.py -- loading a target's model happens on
+        import, same as endpoint/model.py always has for emotion). So the file
+        existing is no longer the thing to check; what actually matters is that
+        load_registry() alone -- reading targets.json, building TargetSpec objects --
+        never triggers that import as a side effect. If it did, --help, offline
+        tests, and anything else that only needs to read the registry would start
+        paying for a full model load, or fail entirely in an environment with no
+        transformers installed.
+        """
+        assert (ROOT / "endpoint" / "sentiment_v1.py").exists(), (
+            "Task 2's sentiment endpoint should exist by now"
         )
+
+        r = load_registry()
+
+        assert r.target("sentiment_v1").module == "endpoint.sentiment_v1"
         assert r.target("sentiment_v1").app_path == "endpoint.sentiment_v1:app"
+
+        # The "did loading import it?" half cannot be asserted here: pytest runs the
+        # whole suite in one interpreter, and tests/test_endpoint.py legitimately
+        # imports endpoint.sentiment_v1 for real, so sys.modules is already populated
+        # by the time this runs and an in-process check proves nothing either way.
+        # That half lives in test_loads_without_importing_any_model above, which asks
+        # a clean subprocess -- the only place the question is actually answerable.
 
     def test_unknown_ids_raise_rather_than_returning_none(self):
         r = load_registry()
@@ -286,12 +308,31 @@ class TestRegistry:
         require_runnable(r, "emotion.core")
 
     def test_future_task_files_are_missing_but_do_not_break_loading(self):
+        """Deferred existence checks: the registry loads either way, and says which.
+
+        This asserted the other direction at foundation time -- sentiment.core's files
+        were deliberately absent, and the point was that load_registry() still worked.
+        Task 2 landed endpoint/sentiment_v1.py and Task 4 landed
+        baseline/sentiment_baseline.json, so there is nothing left missing and the
+        original assertion became false on integration rather than on either branch
+        alone. The deferred-check mechanism is what this test is really about, so it
+        is asserted against a target that genuinely is absent instead, and the now-
+        satisfied evaluation is required to be runnable.
+        """
         r = load_registry()
-        assert missing_requirements(r, "sentiment.core"), (
-            "Task 2/4 files should still be absent at foundation time"
+
+        assert missing_requirements(r, "sentiment.core") == [], (
+            "Task 2's endpoint and Task 4's baseline have both landed, so nothing "
+            "should be reported missing for sentiment.core"
         )
+        require_runnable(r, "sentiment.core")        # must not raise
+
+        # The mechanism still has to report a genuinely absent file, or it would be
+        # reporting success by no longer looking.
+        missing = missing_requirements(r, "sentiment.core", root=ROOT / "tests" / "fixtures")
+        assert missing, "requirement checking must still detect absent files"
         with pytest.raises(TargetConfigError):
-            require_runnable(r, "sentiment.core")
+            require_runnable(r, "sentiment.core", root=ROOT / "tests" / "fixtures")
 
     @pytest.mark.parametrize(
         "mutate,expected",
@@ -896,3 +937,91 @@ class TestFixturePack:
             if p.is_file() and "__pycache__" not in p.parts
         }
         assert before == after
+
+    def test_manifest_files_key_order_is_the_canonical_posix_sort(self):
+        """MANIFEST.json's ``files`` object must be ordered platform-independently.
+
+        Its key order previously came from ``sorted()`` over ``Path`` objects, which
+        compares paths under the host OS's own semantics -- case-insensitive on
+        Windows, case-sensitive on POSIX (see ``sorted_paths`` in build_fixtures.py
+        for the full mechanism and the Rayyan-reported failure it fixes). This does
+        not run the builder; it just pins the *committed* file's key order to the
+        one true canonical ordering, so a regression shows up as a normal diff on
+        whichever OS is used to review it, not only as a fixture-determinism
+        failure on a different OS.
+        """
+        manifest = load_json(FIXTURES / "MANIFEST.json")
+        keys = list(manifest["files"].keys())
+        assert keys == sorted(keys), (
+            "MANIFEST.json's files object is not in canonical (plain Python string) "
+            "sorted order -- it was likely regenerated with a Path-native sort"
+        )
+
+    def test_sorted_paths_helper_is_platform_independent(self, tmp_path):
+        """The canonical-ordering helper, exercised directly against a case-mix.
+
+        Builds a small tree with a deliberately adversarial mix -- upper/lowercase
+        siblings, and a nested path whose name would sort on the opposite side of a
+        top-level file under case-insensitive (Windows-native) comparison versus
+        case-sensitive (POSIX-native) comparison. ``sorted_paths`` must return the
+        same order regardless of which OS is running the test.
+        """
+        sys.path.insert(0, str(FIXTURES))
+        import build_fixtures
+
+        names = [
+            "README.md", "readme_notes.txt", "api", "api/status.json",
+            "Zeta.json", "alpha/nested.json", "alpha/Nested2.json", "negative",
+            "negative/truncated.jsonl",
+        ]
+        for rel in names:
+            p = tmp_path / rel
+            if rel.endswith((".md", ".txt", ".json", ".jsonl")):
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text("x", encoding="utf-8")
+            else:
+                p.mkdir(parents=True, exist_ok=True)
+
+        ordered = build_fixtures.sorted_paths(tmp_path.rglob("*"), tmp_path)
+        keys = [p.relative_to(tmp_path).as_posix() for p in ordered]
+
+        # The canonical order is exactly plain Python string sort over the posix
+        # keys -- independent of Path.__lt__, independent of the host OS, and
+        # independent of filesystem enumeration order (rglob order is not relied
+        # on; sorted_paths re-sorts whatever it is given).
+        assert keys == sorted(keys)
+        # And it is genuinely case-sensitive (the explicit, documented case policy):
+        # "README.md" sorts before "Zeta.json" (both uppercase-leading, 'R' < 'Z'),
+        # and every uppercase-leading name sorts before every lowercase-leading one.
+        assert keys.index("README.md") < keys.index("Zeta.json")
+        assert keys.index("Zeta.json") < keys.index("alpha")
+        assert keys.index("Zeta.json") < keys.index("api")
+
+    def test_sorted_paths_detects_a_future_return_to_implicit_path_ordering(self, tmp_path):
+        """Guards the guard: a naive ``sorted(paths)`` must disagree with the helper
+        on this adversarial case, or this whole regression class stops being tested.
+        """
+        sys.path.insert(0, str(FIXTURES))
+        import build_fixtures
+
+        for rel in ("README.md", "negative", "negative/truncated.jsonl"):
+            p = tmp_path / rel
+            if "." in p.name:
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text("x", encoding="utf-8")
+            else:
+                p.mkdir(parents=True, exist_ok=True)
+
+        canonical = [p.relative_to(tmp_path).as_posix()
+                     for p in build_fixtures.sorted_paths(tmp_path.rglob("*"), tmp_path)]
+        naive = [p.relative_to(tmp_path).as_posix() for p in sorted(tmp_path.rglob("*"))]
+
+        assert canonical == sorted(canonical), "the helper itself must be canonical"
+        if naive == canonical:
+            pytest.skip(
+                "this host's native Path ordering happens to agree with the "
+                "canonical order for this case mix; the two orderings are still "
+                "provably different in general (Windows case-insensitive vs "
+                "POSIX case-sensitive), so this is a property of this OS's "
+                "Path.__lt__, not evidence the helper is unnecessary"
+            )

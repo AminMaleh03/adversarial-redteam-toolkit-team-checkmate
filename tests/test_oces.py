@@ -293,7 +293,25 @@ def test_oces_cases_register_in_an_isolated_oces_suite():
 
 # ------------------------------------------------------------------------- rebuild parity
 def test_rebuild_reproduces_committed_oces_files():
-    """Guarded on tokenizer availability; then rebuild UNGUARDED and diff byte-for-byte."""
+    """Guarded on tokenizer availability; then rebuild UNGUARDED and diff the content.
+
+    ``build_oces.build()`` writes in place, over the tracked frozen artifacts, and it also
+    regenerates ``freeze_content_hashes.json`` from raw on-disk bytes. Two consequences the
+    original version of this test did not handle, both found during PR #8 integration:
+
+    * ``_write_json`` opens without ``newline=``, so on Windows it writes CRLF and cannot
+      reproduce the committed LF bytes. The comparison below is therefore content equality
+      (``read_text`` normalises newlines), not byte equality -- a true cross-platform
+      byte-for-byte guarantee needs ``newline="\\n"`` in the generator, which changes
+      ``build_oces.py``'s own hash and so requires a new, visible generator version rather
+      than a silent amendment of the freeze record.
+    * Left unrestored, that rewrite dirties the frozen artifacts and rewrites the freeze
+      hash record with environment-dependent values, which made this module fail on every
+      second run.
+
+    Every byte is restored afterwards, so the freeze record keeps its committed identity
+    and the run order of this module stops mattering.
+    """
     try:
         from transformers import AutoTokenizer
         AutoTokenizer.from_pretrained(build_oces.EMOTION_TOKENIZER[0],
@@ -303,8 +321,15 @@ def test_rebuild_reproduces_committed_oces_files():
     except Exception as exc:                                    # noqa: BLE001 - tokenizer unavailable
         pytest.skip(f"pinned tokenizers unavailable offline: {exc}")
 
-    before = {p: p.read_text(encoding="utf-8")
-              for p in (EMO_SEEDS, SENT_SEEDS, EMO_CASES, SENT_CASES, PROVENANCE)}
-    build_oces.build()                                          # rewrites the files
-    for path, text in before.items():
-        assert path.read_text(encoding="utf-8") == text, f"{path.name} not reproduced"
+    rebuilt = (EMO_SEEDS, SENT_SEEDS, EMO_CASES, SENT_CASES, PROVENANCE,
+               CASES_DIR / "freeze_content_hashes.json", CASES_DIR / "oces_review_sheet.csv")
+    before_text = {p: p.read_text(encoding="utf-8") for p in rebuilt if p.exists()}
+    before_bytes = {p: p.read_bytes() for p in rebuilt if p.exists()}
+    try:
+        build_oces.build()                                      # rewrites the files in place
+        for path in (EMO_SEEDS, SENT_SEEDS, EMO_CASES, SENT_CASES, PROVENANCE):
+            assert path.read_text(encoding="utf-8") == before_text[path], \
+                f"{path.name} not reproduced"
+    finally:
+        for path, raw in before_bytes.items():
+            path.write_bytes(raw)

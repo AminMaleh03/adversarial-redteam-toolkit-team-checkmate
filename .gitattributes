@@ -30,4 +30,20 @@ analysis/policies/*.json -text
 analysis/remediation_rules.json -text
 endpoint/targets.json -text
 
+# Task 4 (OCES) frozen evidence. attacks/data/oces/freeze_content_hashes.json and
+# freeze_provenance.json record a SHA-256 for each frozen artifact -- including the two
+# generator sources, which is why .py files appear here. baseline/oces/build_oces.py
+# regenerates that hash record from raw on-disk bytes, so without these entries a CRLF
+# checkout both fails the freeze-integrity tests and silently rewrites the freeze record
+# with environment-dependent hashes. The frozen content itself is unchanged and LF.
+attacks/data/oces/** -text
+baseline/oces/** -text
+
+# Other Stage 3 data whose SHA-256 is quoted as identity (coverage map version and its
+# historical overlay, the generated sentiment baseline and its provenance).
+attacks/coverage_map.json -text
+attacks/overlays/*.json -text
+baseline/sentiment_baseline.json -text
+baseline/sentiment_provenance.json -text
+
 # Everything else keeps the project's existing text rules, unchanged.

@@ -114,13 +114,14 @@ known attempted body, and that is exactly when "how big was it really?" gets ask
 If serialisation fails before any bytes exist, both fields are `null` **and** the
 reason is recorded on `error` with the `serialization_error:` prefix, counted
 separately from transport failures because nothing reached the endpoint. `null` means
-unavailable; it never means zero.
+unavailable; it never means zero. Any serialization failure makes the collector exit 2
+with `termination_reason="errored"`, while preserving the recorded rows.
 
 ## Tokenizers and boundaries
 
 Length boundaries are built with the pinned tokenizer **of the target under test**,
 loaded through `endpoint.loader.load_target_tokenizer` — which loads the tokenizer and
-config and **no model weights**. The runner never imports `endpoint.model`, which
+config and **no model weights**. This target-aware CLI path never imports `endpoint.model`, which
 would load the emotion classifier as an import side effect and count sentiment text
 with an emotion tokenizer, putting every boundary case on the wrong token.
 
@@ -159,7 +160,7 @@ next ping would otherwise fail on a dead pooled socket.
 
 Exit codes: **0** completed selected execution (including limits), **1** post-request
 health failure, **2** failed preflight, invalid arguments or any configuration and
-readiness failure, **130** interruption.
+readiness or serialization failure, **130** interruption.
 
 ### What `run_meta.json` records
 
@@ -250,3 +251,32 @@ comes from a real integrated run and is reported in
 [`docs/stage3/handoffs/rayyan.md`](../docs/stage3/handoffs/rayyan.md).
 
 See [HANDOFF.md](../HANDOFF.md) for the latest verified commits and integration scope.
+
+
+## Windows continuation and artifact checks
+
+Use the repository Python 3.11 environment: `.\.venv\Scripts\python.exe`.
+The complete current validation record is in
+[Rayyan's handover](../docs/stage3/handoffs/rayyan.md).
+
+`build_token_counter(target_id: str | None = None)` preserves its no-argument legacy
+emotion behavior; an explicit target uses the pinned tokenizer-only loader. The CLI
+uses `build_token_counter_for_target(target_id, registry)` for every target.
+
+Evaluations declaring a case set require `--case-set`; duplicate/unknown skips,
+duplicate generated IDs, conflicting split/combined selections and invalid selection
+versions fail before requests. Registry bytes are copied to `registry.json`; exact
+selection-file bytes go to `case_selection.json`. These copies match the recorded
+hashes and are published only after readiness succeeds. Coverage-map snapshot wiring
+remains an integration check when Task 4's map lands.
+
+The gate requires exactly one matching evaluation entry, consistent row/metadata
+identities, unique rows, a matching results-file hash and a saved analysis.json equal
+to the orchestrator's document. It supplies the measured policy-file hash to the pure
+policy function. An explicit `analysis_json` return path is accepted; otherwise it
+reads `report_dir/analysis.json`. Missing optional report files are reported as null.
+Only the internal `ci.emotion` evaluation is accepted by this gate.
+
+When a PowerShell script invokes the gate, end it with `exit $LASTEXITCODE` so the
+native 0/1/2 code reaches the calling workflow. The missing frozen policy currently
+produces exit 2; this branch does not claim an integrated policy pass.

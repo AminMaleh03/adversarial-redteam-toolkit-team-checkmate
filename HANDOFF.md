@@ -1,343 +1,72 @@
-# TASK 2 (RAYYAN) — ENDPOINT, RUNNER AND GATE, HANDED OVER
+# TASK 2 WINDOWS ? COMPONENTS VERIFIED; INTEGRATION PENDING
 
-2026-09-15, Claude Opus 5, Asia/Dubai. Branch `stage3/rayyan`, code head
-`d6143aec181bac63ae0e2bb664640310fe56d0d4` (the branch tip is this checkpoint's own
-documentation-only commit), base `257e15f` (the tagged foundation).
-macOS/Apple silicon, Python 3.11.14 `.venv`. Full report:
-[`docs/stage3/handoffs/rayyan.md`](docs/stage3/handoffs/rayyan.md) — read that, not this
-summary, before accepting.
+Updated: 2026-09-15T15:40:34+04:00, Codex, Asia/Dubai. Branch `stage3/rayyan-windows`.
+Code head: `f60697c83e609999af33f817d3e4d619019b180c`; base remote merge `d55f1e2`.
+Python 3.11.9 `.venv`, Windows. Full current record:
+[Rayyan handover](docs/stage3/handoffs/rayyan.md).
 
-**Status: handed over, with named gaps.** Four commits on top of `9813c13`: loader identity
-validation and tokenizer-only loading; the target-aware runner; the gate CLI; a regression
-guard for V2's length defense. Endpoint/runner and gate are separate commits so the first two
-can merge ahead of Khalid's `analysis.policy` and Ahsan's orchestration.
+## Objective and authorization
 
-**Validation by Claude (not historical).** `TOKENIZERS_PARALLELISM=false python -m pytest -q`
-= **790 passed, 30 skipped, 3 failed**. The three failures are pre-existing: confirmed
-identical on the untouched tip `9813c13` in a separate worktree (3 failed, 98 passed). Baseline
-was 674 passed, so 116 tests added and none removed. The 30 skips are all pre-existing browser
-tests; nothing in `test_endpoint.py`/`test_runner.py`/`test_gate.py` is skipped. `git diff
---check` clean.
+On 2026-09-15 the user explicitly asked to carry out Rayyan's Task 2 on this device.
+This authorizes endpoint/, runner/, their tests, Rayyan's handoff, and normal
+checkpoint updates. Task 2 asks for separate endpoint/runner and gate commits.
+No outside-owner production files edited. No team messages, push, or merge to main.
+Khalid's committed branch stays at `34b18b5`; all work continues on the new local branch.
+OCES is not authorized before freeze; no OCES predictions were run.
 
-**Real runs.** Frozen `ci_core_v1` (162 cases) against a live `emotion_v2` on its configured
-loopback port: 162 completed, 0 missing, 0 × 5xx, 6 s, reproducing `planned_suite_sha256`
-`7fcccf16…a430` — the preserved V6 benchmark's fingerprint — through the new registry-driven
-tokenizer path. Legacy `--version v1 --limit 30` still writes the legacy file names. Real
-sentiment endpoint verified at the pinned revision (both labels uppercase, full `all_scores`,
-health 200, over-length input reaching the model and failing rather than being truncated).
+## Completed and committed
 
-**Not done, stated plainly.** No real sentiment core/OCES run — blocked on
-`baseline/sentiment_baseline.json` (Lamei) and the OCES freeze; no case count claimed. No gate
-pass on real evidence — `analysis.policy` does not exist, so exit 0/1 are fixture-driven shape
-checks and only the exit-2 paths are demonstrated for real. No paired two-target run in one
-parent directory — the `run.json` index is Ahsan's.
+- `fc8560c`: repair incompatible merged runner definitions and undefined names;
+  selection validation, serialization exit 2, exact registry/selection snapshots;
+  task/model label and label-index validation; live sentiment probe and tests.
+- `f60697c`: gate checks real persisted evidence/hashes, consistent identities,
+  duplicate rows and analysis, measured policy hash, error context, Windows paths.
+- Documentation updated for Windows validation, reproducible commands, and remaining
+  integration work; documentation-only final commit follows the code head above.
 
-**Four defects found, none mine to fix** (detail and suggested fixes in the handoff §9):
-the OCES freeze-point hash `cf364b70…` is the CRLF rendering of `endpoint/v2.py` and fails on
-any macOS/Linux checkout; the frozen CI `manifest_sha256` `0471bccb…` has the same CRLF
-relationship and **will fail on a Linux CI runner** unless `attacks.metadata.write_manifest`
-writes with `newline="\n"`; the fixture builder sorts platform-dependently and also dirties
-`tests/fixtures/stage3/MANIFEST.json` on every `pytest` run; and
-`test_module_paths_are_recorded_not_imported` is the stale assertion it warns about itself.
-Separately: V2's length defense had **no test at all** — the whole suite passed with it
-removed — so `d6143ae` adds one.
+## Validation by this Codex session
 
-**Regression demo branch:** `stage3/rayyan-regression-demo` @ `d0a5fda`. Never merge. Measured,
-not assumed: over-length input returns a flat HTTP 500 with no stack trace and the process
-stays alive. Against the frozen selection the released build shows 0 × 5xx and the demo branch
-7 × 5xx, exactly the over-limit cases.
+Commands use HF_HUB_OFFLINE=1, TRANSFORMERS_OFFLINE=1, TOKENIZERS_PARALLELISM=false.
+- `.\.venv\Scripts\python.exe -m pytest -q tests/test_endpoint.py tests/test_runner.py tests/test_gate.py --tb=short`:
+  **221 passed**, no skips, 28.52s.
+- `.\.venv\Scripts\python.exe -m pytest -q --tb=short -rs` at f60697c:
+  **832 passed, 30 skipped, 1 failed**, 38.65s. Log results/task2-windows-final-tests.txt.
+  Failure: Ahsan-owned foundation test line 278 assumes sentiment not previously imported
+  in shared pytest process; it needs a fresh subprocess. 27 browser + 3 PDF skips.
+- Real sentiment: results/task2-windows-sentiment-3, **26/26**, received bytes/hash match;
+  512 tokens -> 200, 513 -> 500, health stays 200. Cached startup 2.858s; service peak
+  working set 495775744 B. Reusable command in tests/fixtures/rayyan/sentiment_runtime.py.
+- Real defended emotion frozen selection: results/task2-windows-ci, **162 complete,
+  0 missing**, zero 5xx/timeout/transport/health failures; full planned identity 1928.
+- Real gate error: results/task2-windows-gate-error/gate_result.json, missing policy,
+  exit 2 verified through Python and explicit PowerShell `exit $LASTEXITCODE`.
+- `git diff --check` clean. No released defense or model pin changed.
 
----
+Live runs predated local commits: their metadata correctly records d55f1e2 dirty=true;
+no artifact was relabeled as clean committed evidence. The full suite tested f60697c.
 
-# STAGE 3 FOUNDATION — COMPLETE AND PUBLISHED
+## Remaining / next actionable step
 
-2026-09-15, Claude Opus 5, Asia/Dubai. Worktree `C:/Users/ahsan/OneDrive/Desktop/stage3-foundation`,
-branch `stage3/foundation`. Tested tree = tag `stage3-foundation-v1`. Base
-`a17fc5b3d06f1a069ebfa0b85a95f14fe01d344e` (`ahsan/v5-redlab`, tag `v6.0.0`) — the validated
-release, not `main` (`c507033`, four releases behind).
+Ahsan integrates the team feature branches and fixes the foundation test before
+acceptance. Lamei's sentiment baseline, suite metadata and coverage map are not on this
+branch; wire and verify map snapshots/provenance with that integration. No full generated
+sentiment core run yet. Khalid's analysis/policy exists on stage3/khalid, but the real
+frozen policy JSON and Ahsan's Stage 3 orchestration/index/report support are not here.
+Therefore no real integrated gate pass/fail or paired-run reuse proof. Run those checks
+on the integrated candidate, and OCES only after its separate freeze. The existing
+regression demo branch stays separate and must never merge into released code.
 
-Task: Task 5 only, from the supplied reviewed task pack. Status: **FOUNDATION_READY**. Full
-report in `docs/stage3/FOUNDATION_READINESS.md`. Tasks 1-4 are NOT started.
+## Processes and local artifacts
 
-The earlier NOT_READY verdict was raised because the reviewed plan and Task 1-4 descriptions
-had not been supplied. They were then supplied, are checked in verbatim under `docs/stage3/`
-(the five task sections were verified byte-identical to the standalone files), and the
-blocker is resolved.
-
-**Delivered.** `CONTRACTS.md` 3.0.0 · `contract.py` gains four appended `RunResult` fields
-(`target_id`, `suite_id`, `request_body_bytes`, `request_body_sha256`) plus model-free
-`ModelSpec`/`TaskSpec`/`TargetSpec`/`EvaluationSpec`/`Registry`/`CheckResult`/`GateOutcome`;
-`BaselineCase`/`AttackCase`/`Finding` structurally unchanged · `endpoint/targets.py` +
-`targets.json` with the five agreed evaluations and real pins · `attacks.metadata.scoped_registry`
-(snapshot->clear->yield->restore; no existing caller changed) · `artifacts/benchmark_v6/`
-byte-exact with `PROVENANCE.md` · frozen `ci_core_v1` (162 cases) and the approved clean
-reference · `tests/fixtures/stage3/` (53 files, deterministic builder) · ownership, decisions
-and model identity docs · narrow `AGENTS.md`/`CLAUDE.md` updates preserving all unrelated rules.
-
-**Pins.** emotion `0e1cd914e3d46199ed785853e12b57304e04178b`; sentiment
-`distilbert/distilbert-base-uncased-finetuned-sst-2-english` @
-`714eb0fa89d2f80546fda750413ed43d93601a13`, labels NEGATIVE/POSITIVE, limit 512; dataset
-`stanfordnlp/sst2` @ `8d51e7e4887a4caaa95b3fbebbf53c0490b58bbb`, validation, 872 rows. No
-model weights were downloaded or loaded at any point.
-
-**Validation by Claude (not historical).** `.venv` Python 3.11.9. `python -m pytest -q` =
-681 passed, 27 skipped (580 pre-existing + 101 new foundation tests); the same from a clean
-`--no-local` clone; `git diff --check` clean; fixture builder self-validates and rebuilds
-byte-identically; registry import subprocess confirms no torch/transformers/endpoint.model.
-27 skips are pre-existing (Playwright, WeasyPrint). The historical "607 passed" was not used
-as evidence. No deployment, no new inference, no OCES authored or run.
-
-**Two real bugs found and fixed, both pre-existing or latent.** (1) `test_web.py::test_verified_full_served_bytes_match_recorded_evidence_hashes`
-failed on any fresh Windows clone of `v6.0.0` (CRLF-mangled `verified_full_report`);
-confirmed on an unmodified clone of `a17fc5b`. (2) Four new foundation tests failed on a
-fresh clone because fixture/CI-input hashes are taken from on-disk bytes. Both fixed by a
-`.gitattributes` scoped to `artifacts/**` (binary) and the hash-bearing LF paths (`-text`).
-Published bytes unchanged; project-wide text rules unchanged.
-
-**Preserved.** The uncommitted `HANDOFF.md` edit (Codex reference audit) is untouched in the
-main checkout on `ahsan/v5-redlab`. No reset, stash, discard or force-push; no existing
-branch overwritten.
-
-**Published.** `stage3/foundation`, `stage3/integration`, and `stage3/ahsan`,
-`stage3/rayyan`, `stage3/khalid`, `stage3/lamei` — all six tips at the same foundation SHA
-on `origin`. Member checkout commands are in `docs/stage3/FOUNDATION_READINESS.md` section 9.
-
-**Next.** Ahsan distributes Tasks 1-4. Remaining runtime checks belonging to those tasks are
-listed in the readiness report section 4; nothing in this foundation is evidence that any
-feature works.
-
-**Temporary files.** Clean-clone checkouts under the session scratchpad only; nothing left
-running.
-
-# SYSTEM V6 — DEPLOYMENT RELEASE (DEPLOYED; ONE USER ACTION LEFT)
-
-2026-09-10, Claude (took over from Codex at its usage limit), Asia/Dubai.
-Branch `ahsan/v5-redlab`. Starting HEAD `901cc22` (V5.5, human-approved visuals).
-Final V6 HEAD: `4c68d47`, pushed to `origin` and deployed to the existing HF Space.
-Ahsan's V6 brief authorized the report-history fix, release hygiene/docs, new V6
-commits, the release-branch push, an exact-snapshot upload to the existing Space while
-Protected, local/container/cloud/mobile acceptance, then Public visibility and an
-annotated `v6.0.0` tag. No merge, no V5.5 amendment, no redesign, no core change.
-
-## V6 commits
-
-- `dc60422` report navigation fix and release docs.
-- `a93479e` byte-exact deployment snapshots for the verified evidence.
-- `d03657a` report internal navigation history-safe during parse.
-- `4c68d47` report internal navigation history-safe for unparsed sections.
-
-## The UX fix as shipped
-
-Internal report navigation (sidebar, mobile drawer, rubric and finding anchors, skip
-link) is handled by a delegated listener in the report's `<head>`: it takes over the
-click, scrolls the target into view and calls `history.replaceState`, so the Technical
-Report occupies one logical page and the global Back control leaves it. The end-of-body
-script keeps scrollspy, drawer and active state through `window.rlOnInternalNav`.
-Two placements were required and both were found by real testing, not review:
-1. the listener must be in `<head>` — this document is ~500KB, so on the hosted Space
-   the sidebar is interactive long before the end-of-body script parses;
-2. it must take over clicks whose target section is not parsed yet — otherwise the
-   click fell through to native navigation, pushed an entry and scrolled nowhere.
-Report entry links from Home, Lab and the demo report now open in the same tab, which
-the brief's Results -> Report -> Back requirement needs. Source JSON keeps its new tab.
-Modified clicks, deep links, `aria-current`, scrollspy, the drawer and Evidence/Audit
-ordering are unchanged. V5.5 visual design untouched; behaviour only.
-
-## Evidence-integrity defect found during deployment
-
-The first upload built and started cleanly, but the anonymous smoke check caught the
-served `/verified-full/analysis.json` hashing to `8a950cad...` instead of the published
-`12d47b35...`. Cause: this checkout has `core.autocrlf=true` and the repo has no
-`.gitattributes`, so `git archive` rewrote text blobs to CRLF — identical content,
-different bytes, invalid published hash. `report.pdf` (binary) was unaffected. The
-release operator now uses `git -c core.autocrlf=false -c core.eol=lf archive` and
-asserts every `export_meta.json` entry before uploading;
-`tests/test_web.py::test_verified_full_served_bytes_match_recorded_evidence_hashes`
-now fails locally instead of shipping. Any future deployment tooling must preserve
-committed bytes exactly.
-
-## Validation (all run in this checkout)
-
-- Full suite **607 passed, 1 pre-existing deprecation warning, 55.53s**
-  (`.\.venv\Scripts\python.exe -m pytest -q` with `REDLAB_BROWSER_TESTS=1`).
-  Baseline was 599 at V5.5; V6 adds 8 report-history/evidence-integrity tests.
-- Real local acceptance PASS (`results/v6-local-acceptance/summary.json`): Demo ->
-  Results -> Report -> sections -> Back returns to Results, second Back to Home,
-  forward/reload, Custom reload and Test Another, CUSTOM -> DEMO -> CUSTOM, active-Demo
-  rejoin keeps the same run_name, no stale completed execution view.
-- Docker `red-lab-v6:latest` built with cached apt/pip/model layers
-  (`results/v6-docker-build.log`); container acceptance PASS, six routes 200, real
-  CUSTOM -> DEMO -> CUSTOM (`results/v6-docker-acceptance.json`).
-- Hygiene (`results/v6-hygiene.json`): nothing tracked from `results/`, no temporary
-  scripts, logs, caches, screenshots or credential-shaped values. Absolute paths appear
-  only in the intentional redaction fixtures in `tests/test_analysis*.py`; retained.
-- No orphan endpoint processes or 8000/8001 listeners after local and container runs.
-- Integrity unchanged throughout, locally and as served by the Space:
-  `analysis.json` `12d47b35c700c6c172ceff5fc071f78952aef7a8695473dc457e9d69229737da`,
-  `report.pdf` `0853108d4939bab1ff2069a1e3dc42b8ad68b14096d12cfd1bfa81fbb56718ca`.
-  Only the verified `report.html` was re-rendered from the template; no benchmark rerun.
-
-## Deployment
-
-GitHub `origin` https://github.com/AminMaleh03/adversarial-redteam-toolkit-team-checkmate.git
-— branch `ahsan/v5-redlab` pushed at `4c68d47`. No merge into `main`.
-HF Space `ahsan-141117/team-checkmate-adversarial-redteam-toolkit`, authenticated as
-`ahsan-141117`. Method: `git archive` of the exact commit (autocrlf disabled) plus
-`huggingface_hub.upload_folder`, then a remote tree blob-hash check of all 77 files
-against the commit; the Space's only extra file is its platform `.gitattributes`.
-Operator `results/v6_hf_release.py` (ignored). Raw HF git protocol-v2 fetch is still
-avoided. Space revision `732faf7` = GitHub `4c68d47`, stage RUNNING, Docker Space
-architecture and 7860-only exposure unchanged; V1/V2 stay internal subprocesses.
-
-Cloud validation against https://ahsan-141117-team-checkmate-adversarial-redteam-toolkit.hf.space
-while the Space was still Protected:
-- Smoke PASS: `/healthz`, `/`, `/lab`, verified `report.html`/`analysis.json`/`report.pdf`
-  and all five static assets 200; static and report bytes match local; evidence SHA-256
-  matches the published values; JSON still inline, not an attachment.
-- Startup logs clean, no secrets (`results/v6-hf-run.log`, `results/v6-hf-build.log`).
-- Real cloud acceptance PASS (`results/v6-cloud-acceptance/summary.json`, 64 screenshots):
-  live Demo, custom Lab, CUSTOM -> DEMO -> CUSTOM with no wait, active-Demo rejoin,
-  Report -> `#remediation`/`#provenance`/`#v2-findings` with `history.length` constant,
-  Back returns to Demo Results, unknown lab job 404, zero page errors.
-- Mobile/responsive PASS at 1920/1440/1366/1024/768/390: no horizontal overflow on Home,
-  Lab, Lab metrics, Demo execution/Results, Evidence and the Technical Report; mobile
-  nav drawer and report drawer usable; report Back from mobile returns Home.
-- Result framing correct: cloud Demo reports "V1 162/1928 (8.40%)" and states the numbers
-  describe that demo run only; the Technical Report keeps 1928/1928.
-
-## Remaining user action
-
-Space visibility is still **Protected** (`private=true`). The automated switch was
-blocked by this session's permission policy, not by Hugging Face — authentication and
-the API call are ready. Either re-run with approval:
-`.\.venv\Scripts\python.exe results/v6_hf_release.py public` (it re-checks cloud
-acceptance, stage and smoke before flipping, then confirms through the unauthenticated
-Hub API), or set the Space to Public in its Hub settings. The unauthenticated
-post-public check and the `v6.0.0` tag push are the only steps after that.
-
-## Approved V5.5 snapshot (historical)
-
-Updated: 2026-09-10T18:07:45+04:00, Codex, Asia/Dubai.
-Branch: `ahsan/v5-redlab`. Observed pre-tuning HEAD: `b2b5f18`.
-State: implemented, verified and amended locally. Observed code-amendment HEAD
-`0f82bc7`; this final factual checkpoint is folded into the same V5.5 amendment.
-Use `git rev-parse HEAD` for the final hash. V5.4 parent remains `0ea2581`.
-No push or merge. Human visual approval is still required.
-
-## Current objective and authorization
-
-Ahsan's latest attached "SYSTEM V5.5 - FINAL VISUAL TUNING PASS" brief on
-10 September 2026 explicitly approves the structure delivered in b2b5f18: Home,
-Demo execution, Lab, Technical Report/sidebar, far-left Back and state/history.
-It authorizes only palette/atmosphere/particles, Lab metric icons, optional Evidence
-anchor, corresponding tests, verified HTML-only regeneration, local/Docker acceptance,
-and amendment of the unpushed V5.5 commit. This includes web/report/tests/artifact scope.
-No V5.6, push, merge, full benchmark, authoritative PDF regeneration or core changes.
-
-## Completed final tuning
-
-- Shared palette: warm white #fff9f4, white surfaces, charcoal #17181c/#292a2f,
-  crimson #c6253d/#971e32, warm red #d53a3e, burnt orange #e5622e and rare citrus
-  #f0a33a. Muted text #6d655f and borders #e7dcd3. Rust/green remain endpoint semantics.
-- Home: decorative field spans the actual viewport (excluding scrollbar), while content
-  measure and hierarchy stay unchanged. Removed corner framing and duplicate bounded
-  background rules. Integrated crimson/orange washes and fine static texture.
-- Particles: 1.8x average previous drift velocity; independent depth, size and opacity;
-  short warm connections, independent nodes and a soft central reading zone. Desktop
-  44/68 nodes, mobile 16; reduced motion keeps a static field. No pointer interaction.
-  Existing visibility/hidden-view lifecycle remains intact.
-- CTA dimensions and hierarchy preserved; Technical Report now has white fill and
-  crimson border/text. Static internal surfaces, current-stage emphasis, input focus
-  and restrained shadows updated by modifying existing authoritative selectors.
-- All seven Lab metrics retain their exact values/labels. Inline decorative SVGs sit
-  right of the number/label; fixed local geometry, aria-hidden, not focusable. No library.
-  Only renderSummary presentation changed in lab.js; state/storage/polling untouched.
-- Demo Results: Evidence anchor after Method fits the existing desktop header and mobile
-  menu. Existing 03 / SOURCE heading, evidence explanation, SHA-256 and schema preserved.
-- Technical Report: shared palette only. Its generated content and scripts are byte-for-
-  byte unchanged after excluding the style block. No sidebar/rubric/chart redesign.
-- Removed superseded Home field/corner rules, metric declarations shared incorrectly
-  with score lists, and duplicate progress transition. No new override layer/!important.
-
-Changed this pass: web/static/{app.css,particles.js,lab.js}, report/{style.css,
-demo_template.html}, tests/test_ui_browser.py, verified report.html/export_meta.json,
-and this handoff. Web templates, app.js/chrome.js, report template/charts unchanged.
-
-## Validation by this Codex pass
-
-Project Python 3.11 .venv, optional Playwright/installed Edge. Full suite:
-```
-$env:HF_HUB_OFFLINE='1'
-$env:TRANSFORMERS_OFFLINE='1'
-$env:REDLAB_BROWSER_TESTS='1'
-.\.venv\Scripts\python.exe -m pytest -q --tb=short
-```
-**599 passed, 1 existing Starlette/AnyIO deprecation warning in 93.39s**.
-Log: `results/v55-tuning-final-tests.txt`. Existing 595 retained; two additional
-responsive widths and two focused browser tests (metric SVG/text/layout, Evidence
-entry/provenance/header fit). Initial browser-only run had one new fixture failure:
-full-report sample lacked a Demo-only field; fixed only the test fixture, then passed.
-
-Real local command: `.\.venv\Scripts\python.exe results/v55_tuning_acceptance.py`.
-PASS: Demo complete/results/Back/Forward/reload; Custom results/reload/Test Another;
-CUSTOM -> DEMO -> CUSTOM; repeated active Demo nav/reload retains the same run_name,
-no duplicate run. No stale views or browser errors. Local process/listener probe found
-no endpoint.v1/endpoint.v2 processes and no listeners on 8000/8001 after completion.
-Demo runs: hf_demo_20260910_140226_008f86 and hf_demo_20260910_140308_30eac5.
-Screenshots/no-overflow checks: 1920, 1440, 1366, 1024, 768, 390 for Home, Lab metrics,
-Demo Results/Evidence, Technical Report/charts; mobile report drawer included.
-Evidence: `results/v55-tuning-acceptance/summary.json`, screenshots in same directory;
-`results/v55-tuning-real-acceptance.log`. Preview fixture images are separate in
-`results/v55-tuning-preview/`; they are not measurement evidence.
-
-Docker: one successful build AFTER local tests; apt/pip/pinned-model layers CACHED.
-Command: `.\.venv\Scripts\python.exe results/v55_tuning_docker_build.py`.
-Image: `team-checkmate-v5-redlab:latest`, config/id
-`0cbbd3e8b6ed2b4f14c554d91e4dbb845c9de7b763e5834da398caad7d1af53a`.
-Reviewed tracked-source staging context excludes local .claude settings; no Dockerfile
-or dependency changes. Log: `results/v55-tuning-docker-build.log`.
-`.\.venv\Scripts\python.exe results/v55_tuning_docker_acceptance.py`: PASS.
-Six routes 200: /, /healthz, /lab, verified report.html, analysis.json, report.pdf.
-JSON remains inline. Real CUSTOM -> DEMO -> CUSTOM passed (8.56/24.51/8.59s).
-Privacy 404, JSON/PDF hashes, no endpoint processes/listeners and no .claude in image
-all verified. Temporary redlab-v55-tuning-acceptance container removed.
-Evidence: `results/v55-tuning-docker-acceptance.json` and container log.
-
-## Integrity and Git
-
-Before AND after, including Docker-served evidence:
-- analysis.json: `12d47b35c700c6c172ceff5fc071f78952aef7a8695473dc457e9d69229737da`
-- report.pdf: `0853108d4939bab1ff2069a1e3dc42b8ad68b14096d12cfd1bfa81fbb56718ca`
-
-Only verified HTML re-rendered using render_html; export metadata matches actual HTML
-bytes. No benchmark rerun. `.\.venv\Scripts\python.exe results/v55_tuning_audit.py`
-PASS: frozen paths unchanged; lab.js changes confined to metric presentation; generated
-Technical Report non-style content/scripts unchanged. `git diff --check` passed.
-Frozen: contract.py, endpoint/model/V1/V2, baseline, attacks, runner, analysis/thresholds,
-run_all.py, web backend/privacy. No production dependency changes.
-Read-only remote checks: origin main c507033; Space main b11bf79; neither has a V5.5
-branch, and no remote-tracking ref contains b2b5f18. V5.4 parent 0ea2581 must remain.
-Only the existing V5.5 commit may be amended; no pushes to either remote.
-
-## Running processes and next action
-
-Intentional preview remains healthy at http://127.0.0.1:7860/:
-`HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 .venv/Scripts/python.exe -m uvicorn
-web.app:app --host 127.0.0.1 --port 7860`; server PID 7060, launcher 37532,
-original exec session 33913. Log: `results/v55-closure-server.log`.
-All new test/build/acceptance sessions completed; temporary Docker container removed.
-Task staging directory results/v55-docker-context has been removed.
-Ignored results logs/screens/scripts stay for review and must not be committed.
-Pre-existing .claude/settings.local.json preserved; globally ignored in normal Git.
-Sandboxed Git cannot read that global ignore and may show .claude/ as untracked.
-
-Next: Ahsan's manual visual review at http://127.0.0.1:7860/. Implementation and
-validation are complete; Git status was clean after the code amendment. No push.
+No service, download or test process left running. Corrected probe explicitly verifies
+port closure. Probe 1's launcher memory figure is marked unusable; probe 2 caught cleanup
+failure; probe 3 is the accepted runtime evidence. All remain ignored under results/.
+The pinned sentiment cache now contains config.json, tokenizer_config.json, vocab.txt,
+model.safetensors (about 268 MB); no credentials recorded and no dependencies changed.
 
 ## Short history
 
-V4 frozen tag v4.0.0 -> bba3a7b. V5.1 6b0bc9c branding; V5.2 5eb8735 execution;
-V5.3 6716107 report navigation; V5.4 0ea2581 Custom Lab/registry isolation.
-Original V5.5 3d1c990 was rejected visually; previous closure b2b5f18 fixed structure,
-charts, history and Back. Latest human review approves that structure and asks only
-for this final color/dynamics pass. Older parked suggestions are not new tasks.
+Foundation 257e15f; Khalid handover 34b18b5; Rayyan fetched merge d55f1e2; local Windows
+repairs fc8560c and f60697c. Earlier Mac results remain clearly historical in Rayyan's
+handover. Foundation/release history is available in Git and FOUNDATION_READINESS.md;
+it is context and does not authorize resuming deployment work.

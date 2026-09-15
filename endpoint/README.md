@@ -138,3 +138,22 @@ time and a few seconds after. The loader's identity checks are tested offline ag
 hand-built stand-ins; the tests that need real weights say so and **skip with a stated
 reason** when the pinned model is unavailable. A skipped sentiment test is a gap in
 the evidence, never a pass.
+
+
+## Repeatable Windows runtime check
+
+```powershell
+.\.venv\Scripts\python.exe tests/fixtures/rayyan/sentiment_runtime.py --out results/sentiment-probe-new
+```
+
+Use a new output directory. The probe requires the pinned model cached locally and
+an unused configured loopback port 8002. It checks full scores, health, exact 512/513
+token behavior and 26 sender/receiver request-body hashes. It records startup,
+latency and the real service process's peak Windows working set, then verifies
+shutdown. It is a smoke check; full generated sentiment core and frozen OCES
+execution remain separate acceptance requirements.
+
+Registry loading also rejects a known task wired to the other model's label space.
+The loader requires contiguous zero-based label indices in the exact pinned order.
+See [Rayyan's handover](../docs/stage3/handoffs/rayyan.md) for current evidence and
+remaining owner-side integration checks.

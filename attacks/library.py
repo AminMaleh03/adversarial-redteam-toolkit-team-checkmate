@@ -23,6 +23,7 @@ from typing import Callable, Optional
 
 from contract import AttackCase, BaselineCase
 from attacks import boundary, encoding, malformed, perturbation, truncation, whitespace
+from attacks import coverage
 from attacks import metadata as md
 
 
@@ -56,10 +57,16 @@ def build_derived(baseline: BaselineCase) -> list[AttackCase]:
 def build_suite(baselines: list[BaselineCase], *,
                 token_counter: Optional[Callable[[str], int]] = None,
                 max_tokens: Optional[int] = None) -> list[AttackCase]:
-    """Convenience: the whole suite (standalone + derived for every baseline)."""
+    """Convenience: the whole suite (standalone + derived for every baseline).
+
+    After building, every core case is stamped with its outcome-independent coverage
+    declaration from ``attacks/coverage_map.json`` (so ``write_manifest`` emits it), and an
+    unmapped subfamily fails loudly here rather than silently downstream.
+    """
     cases = list(standalone_cases(token_counter=token_counter, max_tokens=max_tokens))
     for baseline in baselines:
         cases.extend(build_derived(baseline))
+    coverage.stamp_manifest()
     return cases
 
 

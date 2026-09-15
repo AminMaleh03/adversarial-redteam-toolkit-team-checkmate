@@ -35,7 +35,22 @@ import json
 from dataclasses import asdict, dataclass, field
 from typing import Optional
 
-from contract import AttackCase
+from contract import (
+    AttackCase,
+    COVERAGE_CLASSES,
+    OCES_FAMILIES,
+    SUITES,
+    SUITE_CORE,
+)
+
+# The three declared application-layer input controls V2 adds. `controls_targeted` is a
+# subset of these; the scoped exception handler (C3) is deliberately NOT here because it is
+# cross-cutting and must never be attributed as causal coverage. Frozen values match the
+# CONTRACTS wording ("length, strict_type_schema, normalization").
+CONTROL_LENGTH = "length"
+CONTROL_STRICT_TYPE_SCHEMA = "strict_type_schema"
+CONTROL_NORMALIZATION = "normalization"
+CONTROLS = frozenset({CONTROL_LENGTH, CONTROL_STRICT_TYPE_SCHEMA, CONTROL_NORMALIZATION})
 
 # --------------------------------------------------------------------------------------
 # Controlled vocabularies (module constants so a typo is an ImportError, not a silent join
@@ -146,6 +161,17 @@ class AttackMetadata:
     expected_sanitizer_behavior: str = SAN_NOT_APPLICABLE
     expected_http_behavior: str = HTTP_MEASURE
     notes: str = ""
+    # --- Stage 3 coverage + suite/OCES fields (CONTRACTS.md 4.4, frozen names) ---
+    # suite the case belongs to; `coverage_*` are the outcome-INDEPENDENT declaration of
+    # which declared control (if any) governs this case, resolved from attacks/coverage_map.json
+    # by attacks.coverage. `exposure`/`declared_family` are populated for OCES cases (Phase 2+).
+    suite_id: str = SUITE_CORE
+    coverage_class: Optional[str] = None          # one of COVERAGE_CLASSES once resolved
+    controls_targeted: list[str] = field(default_factory=list)  # subset of CONTROLS
+    coverage_rationale: str = ""
+    coverage_map_version: Optional[str] = None
+    exposure: str = ""
+    declared_family: Optional[str] = None         # oces.paraphrase | oces.distractor
 
     def __post_init__(self) -> None:
         if self.relation not in RELATIONS:
@@ -161,6 +187,21 @@ class AttackMetadata:
         if self.boundary_source is not None and self.boundary_source not in BOUNDARY_SOURCES:
             raise ValueError(
                 f"unknown boundary_source {self.boundary_source!r} for {self.attack_id}"
+            )
+        if self.suite_id not in SUITES:
+            raise ValueError(f"unknown suite_id {self.suite_id!r} for {self.attack_id}")
+        if self.coverage_class is not None and self.coverage_class not in COVERAGE_CLASSES:
+            raise ValueError(
+                f"unknown coverage_class {self.coverage_class!r} for {self.attack_id}"
+            )
+        for control in self.controls_targeted:
+            if control not in CONTROLS:
+                raise ValueError(
+                    f"unknown control {control!r} in controls_targeted for {self.attack_id}"
+                )
+        if self.declared_family is not None and self.declared_family not in OCES_FAMILIES:
+            raise ValueError(
+                f"unknown declared_family {self.declared_family!r} for {self.attack_id}"
             )
 
 

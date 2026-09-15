@@ -76,8 +76,10 @@ Phase 2/3 hardening · `6abef0e` Phase 4 candidates · `28942a5` Phase 4 audit f
   model output. Provenance keeps the per-row source mapping out of `BaselineCase`.
 
 ## OCES additional evaluation (Phase 4/5 — FROZEN)
-- Seeds (deterministic, model-free): **21 emotion** (3 per each of 7 labels) + **20 sentiment**
-  (10 per label) → `baseline/oces/{emotion_seeds,sentiment_seeds}.json`. Seed `text` is the
+- Seeds (deterministic, model-free) drawn from the **committed** Task 4 baselines
+  (`baseline/baseline.json` and `baseline/sentiment_baseline.json`), not re-fetched from any
+  external dataset: **21 emotion** (3 per each of the 7 emotion-baseline labels) + **20
+  sentiment** (10 per label) → `baseline/oces/{emotion_seeds,sentiment_seeds}.json`. Seed `text` is the
   OCES clean request = `clean_text(raw source)` (sanitation-invariant); raw source retained in
   provenance. Core baselines untouched.
 - Variants: 1 paraphrase + 1 neutral distractor per seed → **42 emotion + 40 sentiment = 82**;
@@ -135,12 +137,15 @@ Run from repo root, project venv, `TOKENIZERS_PARALLELISM=false`.
   `tests/test_report.py` (native PDF renderer unavailable on this machine — report area,
   external asset). My own asset-gated tests (real pinned-tokenizer sentiment count, OCES
   rebuild parity, frozen `clean_text` equivalence) **ran** (assets cached), not skipped.
-- **2 deselected — pre-existing CRLF/LF environment failures on macOS, NOT a Task 4
-  regression** (confirmed by running them on the pristine foundation): 
+- **2 deselected — pre-existing CRLF/LF environment-specific foundation tests, NOT a Task 4
+  regression:**
   `tests/test_stage3_foundation.py::TestPreservedEvidence::test_defense_freeze_point_still_matches_the_checked_in_file`
   and `tests/test_stage3_foundation.py::TestFixturePack::test_builder_is_deterministic`.
-  They pass on the team's Windows/CI. The latter also rewrites `tests/fixtures/stage3/`;
-  `git checkout -- tests/fixtures/stage3/` to clean.
+  Both were reproduced failing on the pristine foundation checkout (outside Task 4, before any
+  Task 4 change), so they are environment/line-ending artifacts, not caused by this work; they
+  are deselected locally. (No claim is made here about how they behave on other machines/CI,
+  which was not verified from this environment.) The latter also rewrites
+  `tests/fixtures/stage3/`; `git checkout -- tests/fixtures/stage3/` to clean.
 
 ### Acceptance / failure coverage (all fail loudly)
 unknown subfamily; duplicate attack id; orphan baseline; missing/invalid coverage metadata;

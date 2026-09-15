@@ -260,6 +260,24 @@ def test_freeze_content_hashes_match_actual_files():
         assert actual == sha, f"{rel}: hash drift ({actual} != {sha})"
 
 
+def test_freeze_provenance_references_freeze_commit_and_matches_artifacts():
+    """Phase-5 freeze provenance: references the freeze commit (not embedded in it), records
+    zero pre-freeze inference, and its frozen-artifact hashes match the committed files."""
+    import hashlib
+    fp = _load(CASES_DIR / "freeze_provenance.json")
+    assert fp["model_inference_before_freeze"] is False
+    assert len(fp["freeze_commit"]) == 40
+    assert fp["freeze_commit_utc"].endswith("Z")
+    assert fp["defense_identity"]["endpoint_v2_git_blob"] == "b71787e3bf39e4062f883c9e34fae78d5b7c6263"
+    assert fp["foundation_commit"] == "257e15f3432aa29a3942d52b2cf3befb12ba3354"
+    assert fp["counts"]["total_additional_requests"] == 123
+    assert fp["tier_distribution"] == {"SILVER": 50, "REVIEW": 32}
+    assert fp["coverage_distribution"] == {"not_targeted": 82}
+    assert fp["human_review"]["reviewer"] == "Lamei (Task 4 owner)"
+    for rel, sha in fp["frozen_artifacts_sha256"].items():
+        assert hashlib.sha256((REPO / rel).read_bytes()).hexdigest() == sha, f"{rel}: drift"
+
+
 # ------------------------------------------------------------------------- isolation
 def test_oces_cases_register_in_an_isolated_oces_suite():
     md.reset()

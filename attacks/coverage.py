@@ -44,9 +44,18 @@ def default_map_path() -> Path:
 
 
 def coverage_map_sha256(path: Optional[Path] = None) -> str:
-    """SHA-256 of the coverage map file bytes as committed."""
+    """SHA-256 of the coverage map FILE bytes as committed (identifies the on-disk artifact)."""
     path = Path(path) if path is not None else _DEFAULT_MAP_PATH
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def map_content_sha256(cmap: dict) -> str:
+    """
+    Deterministic hash of the EXACT map content used (not the default file), so an overlay
+    built from a custom/in-memory map can never claim the committed file's hash.
+    """
+    blob = json.dumps(cmap, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
 def load_coverage_map(path: Optional[Path] = None) -> dict:
@@ -160,7 +169,9 @@ def build_historical_overlay(historical_manifest_path: Path, cmap: Optional[dict
                 "The archived raw manifest is unchanged."
             ),
             "coverage_map_version": cmap["coverage_map_version"],
-            "coverage_map_sha256": coverage_map_sha256(),
+            # Content hash of the EXACT map used to build this overlay (never the default
+            # file's byte hash, which could differ from a custom/in-memory map).
+            "coverage_map_content_sha256": map_content_sha256(cmap),
             "source_manifest_path": str(historical_manifest_path).replace("\\", "/"),
             "source_manifest_sha256": hashlib.sha256(
                 historical_manifest_path.read_bytes()

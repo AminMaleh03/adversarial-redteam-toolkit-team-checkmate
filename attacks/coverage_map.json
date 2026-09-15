@@ -1,6 +1,8 @@
 {
   "coverage_map_version": "1.0.0",
   "authored_utc": "2026-09-15",
+  "source_manifest_path": "artifacts/benchmark_v6/run/manifest.json",
+  "source_manifest_sha256": "0471bccbf293095d15287904a7ddfdef15161e3fb2efdcb773ccd1b952cca717",
   "source_suite_fingerprint": "7fcccf16989784ca046317158a97fca6fcb52299eae99deda62ab0c63914a430",
   "defense_identity": {
     "defense_commit": "257e15f3432aa29a3942d52b2cf3befb12ba3354",
@@ -16,6 +18,12 @@
   },
   "cross_cutting_note": "The scoped exception handler (C3) is cross-cutting. Its observable responses are evaluated, but it is never listed in controls_targeted and never attributed as causal coverage by length/schema/normalization. A clean rejection may reflect framework/parser behaviour shared with V1, not V2 hardening.",
   "classification_basis": "attack construction + declared control design; never observed V1/V2 results",
+  "class_subfamily_counts": {
+    "in_scope": 34,
+    "mixed": 5,
+    "not_targeted": 19,
+    "out_of_scope": 6
+  },
   "subfamilies": {
     "bidi_reorder": {
       "family": "encoding",

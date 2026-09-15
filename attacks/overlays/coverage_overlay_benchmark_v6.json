@@ -2,7 +2,7 @@
   "_overlay": {
     "note": "Coverage overlay authored AFTER the historical run. The classification is NOT historically pre-declared; it is applied later from coverage_map.json. The archived raw manifest is unchanged.",
     "coverage_map_version": "1.0.0",
-    "coverage_map_sha256": "7c5668747a60fc1a41513caf7244fc84a7fc49c8b904944506985e2bceb41d87",
+    "coverage_map_content_sha256": "b8ccefdd8937b66859ec78efc4bd64c14ebc5f685a09c4018b8b2c585177d642",
     "source_manifest_path": "artifacts/benchmark_v6/run/manifest.json",
     "source_manifest_sha256": "0471bccbf293095d15287904a7ddfdef15161e3fb2efdcb773ccd1b952cca717"
   },

@@ -195,3 +195,47 @@ def test_historical_overlay_resolves_and_leaves_archive_untouched(tmp_path):
     assert overlay["_overlay"]["coverage_map_version"] == coverage.load_coverage_map()["coverage_map_version"]
     assert all(v["coverage_class"] in COVERAGE_CLASSES for v in overlay["coverage_by_attack_id"].values())
     assert archived.read_bytes() == before             # archived raw file never modified
+
+
+def test_overlay_identifies_the_exact_map_used_not_the_default():
+    archived = REPO / "artifacts" / "benchmark_v6" / "run" / "manifest.json"
+    default_map = coverage.load_coverage_map()
+    altered = json.loads(json.dumps(default_map))
+    altered["coverage_map_version"] = "test-9.9.9"     # a different map than the committed file
+    overlay = coverage.build_historical_overlay(archived, cmap=altered)
+    stamped = overlay["_overlay"]["coverage_map_content_sha256"]
+    assert stamped == coverage.map_content_sha256(altered)          # identifies the map actually used
+    assert stamped != coverage.map_content_sha256(default_map)      # cannot claim the default's hash
+    assert overlay["_overlay"]["coverage_map_version"] == "test-9.9.9"
+
+
+def test_map_carries_source_manifest_identity():
+    cmap = coverage.load_coverage_map()
+    assert cmap["source_manifest_path"].endswith("benchmark_v6/run/manifest.json")
+    assert len(cmap["source_manifest_sha256"]) == 64
+    assert cmap["source_suite_fingerprint"]                 # payload identity kept alongside
+
+
+# ----------------------------------------------------------------------------- mode completeness
+
+def test_approximate_mode_every_case_resolves():
+    """A real no-token-counter build (approximate boundaries) must fully resolve."""
+    with md.scoped_registry():
+        cases = library.build_suite(BASELINES)          # no counter -> approximate mode
+        man = md.manifest()
+        unmapped = [c.attack_id for c in cases if man[c.attack_id].coverage_class is None]
+    assert unmapped == []
+
+
+def test_unused_map_entries_are_exactly_the_three_approx_boundary_variants():
+    # Uses the CANONICAL 42-baseline suite: some subfamilies (e.g. compatibility_ligature)
+    # only fire on baselines that contain the relevant substring, so "unused" is only well
+    # defined against the real baseline set, not two arbitrary sentences.
+    from baseline.load import load_baseline
+    cmap = coverage.load_coverage_map()
+    canonical = sorted(load_baseline(), key=lambda b: b.baseline_id)
+    with md.scoped_registry():
+        library.build_suite(canonical, token_counter=_fake_counter, max_tokens=64)  # exact mode
+        generated = {m.subfamily for m in md.manifest().values()}
+    unused = set(cmap["subfamilies"]) - generated
+    assert unused == {"length_clearly_under", "length_near_limit", "length_clearly_over"}

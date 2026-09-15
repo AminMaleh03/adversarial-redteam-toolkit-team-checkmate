@@ -12,7 +12,9 @@ here exactly once and that the committed file matches this generator's output.
 
 from __future__ import annotations
 
+import hashlib
 import json
+from collections import Counter
 from pathlib import Path
 
 from attacks.metadata import (
@@ -23,6 +25,10 @@ from attacks.metadata import (
 
 COVERAGE_MAP_VERSION = "1.0.0"
 AUTHORED_UTC = "2026-09-15"
+
+# The preserved core manifest this classification overlays/derives from. Its hash is a
+# distinct artifact identity from the payload suite fingerprint -- Task 4 requires both.
+SOURCE_MANIFEST_REL = "artifacts/benchmark_v6/run/manifest.json"
 
 # Defense identity this classification is authored against (see docs/stage3/handoffs/lamei.md).
 DEFENSE_IDENTITY = {
@@ -162,14 +168,25 @@ def build() -> dict:
             "controls_targeted": controls,
             "coverage_rationale": rationale,
         }
+    manifest_path = Path(__file__).resolve().parents[1] / SOURCE_MANIFEST_REL
+    source_manifest_sha256 = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    # Subfamily-weighted class counts (map-intrinsic; independent of baseline count). The
+    # case-weighted view (which depends on the 42-baseline suite) is reported in the handover
+    # alongside this one -- both denominators are always shown, never "65% of families".
+    class_subfamily_counts = dict(sorted(
+        Counter(d["coverage_class"] for d in subfamilies.values()).items()
+    ))
     return {
         "coverage_map_version": COVERAGE_MAP_VERSION,
         "authored_utc": AUTHORED_UTC,
+        "source_manifest_path": SOURCE_MANIFEST_REL,
+        "source_manifest_sha256": source_manifest_sha256,
         "source_suite_fingerprint": SOURCE_SUITE_FINGERPRINT,
         "defense_identity": DEFENSE_IDENTITY,
         "controls": CONTROLS_DESC,
         "cross_cutting_note": CROSS_CUTTING_NOTE,
         "classification_basis": "attack construction + declared control design; never observed V1/V2 results",
+        "class_subfamily_counts": class_subfamily_counts,
         "subfamilies": dict(sorted(subfamilies.items())),
         "case_exceptions": {},  # none needed: every subfamily is internally uniform
     }

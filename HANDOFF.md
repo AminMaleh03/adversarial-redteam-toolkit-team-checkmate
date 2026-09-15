@@ -1,7 +1,8 @@
 # Rayyan Task 2 checkpoint
 
 Updated 2026-09-15T16:39:09+04:00, Codex, Asia/Dubai. Active assigned branch **stage3/rayyan**.
-Observed HEAD **8c5b42c631a917642b5f4b4a5ee68227ce7fa58c**.
+Observed delivery HEAD **44ce8d438fbe79afbb6c0bf04b2aae900ab7ef27**.
+Production code remains tested at 8c5b42c; this follow-up records delivery only.
 User reiterated stage3/rayyan only; stage3/rayyan-windows was agent-created locally,
 is superseded, and will not be pushed. Khalid's branch remains preserved.
 
@@ -42,10 +43,13 @@ we did not edit that file and disclose it in the handover/PR.
 
 ## Remaining / next step
 
-Review docs diffs, commit documentation, push stage3/rayyan only, open PR into
-stage3/integration and request reviewer ahsan-141117 (foundation commit author).
-Remote Rayyan remains d55f1e2; integration/Ahsan remain257e15f. Latest Lamei089e54d
-only changes handover/tests from validated production snapshot f619e51.
+Delivery 44ce8d4 was committed and pushed only to stage3/rayyan. PR **#10** is open:
+https://github.com/AminMaleh03/adversarial-redteam-toolkit-team-checkmate/pull/10
+Base stage3/integration, compare stage3/rayyan. Reviewer **ahsan-141117** requested;
+no merge performed. GitHub connector returned403, then existing Git authentication
+successfully created the PR/review request; no credentials printed or persisted.
+This follow-up checkpoint is documentation only and will update that same branch.
+Next: Ahsan reviews and tests the exact current PR head, with integration below.
 Production/test commits are complete for currently available Rayyan interfaces.
 Ahsan orchestration and Khalid frozen policy JSON remain missing; Lamei published
 OCES freeze but public build_suite still rejects OCES. Do not implement their

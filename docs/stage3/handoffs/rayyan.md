@@ -2,7 +2,11 @@
 
 Updated 2026-09-15T16:39:09+04:00, Codex. Assigned and active branch: **stage3/rayyan**.
 Tested code head: **8c5b42c631a917642b5f4b4a5ee68227ce7fa58c**.
-The delivery commit adds documentation only; its SHA is the PR head / `git rev-parse HEAD`.
+Handover delivery commit: **44ce8d438fbe79afbb6c0bf04b2aae900ab7ef27**.
+[PR #10](https://github.com/AminMaleh03/adversarial-redteam-toolkit-team-checkmate/pull/10)
+is open into stage3/integration; Ahsan (ahsan-141117) has been requested as reviewer.
+Any subsequent delivery checkpoint changes documentation only. Test the PR's exact
+current head (`git rev-parse origin/stage3/rayyan`) before acceptance.
 Base remote merge: `d55f1e223e40d9ef4c1a61e62983c74bf16f80b2`.
 Python 3.11.9 in `.venv`, Windows. Ahsan: test the exact PR head before acceptance.
 

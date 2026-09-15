@@ -1,0 +1,305 @@
+{
+  "artifact": "sentiment_baseline",
+  "builder_version": "1.0.0",
+  "authored_utc": "2026-09-15",
+  "generator": "baseline/build_sentiment_baseline.py",
+  "selection": {
+    "seed": 20260915,
+    "per_label": 21,
+    "total_selected": 42,
+    "label_balance": {
+      "NEGATIVE": 21,
+      "POSITIVE": 21
+    },
+    "order": "NEGATIVE group then POSITIVE group, each ascending by dataset idx",
+    "algorithm": "mechanical validity + de-dup over the whole split, then one fixed seeded permutation per label, take first PER_LABEL. Model-free and deterministic.",
+    "model_free": true,
+    "replacement_rule": "Exclusions (empty text, duplicate sentence) are computed over the whole split BEFORE selection and removed from the eligible pool. For each label, selection then walks a single fixed seeded permutation (random.Random(SEED).sample of the idx-sorted eligible pool) and takes the first PER_LABEL rows. An excluded row is therefore deterministically skipped and the next eligible row in the same permutation takes its place. No row is ever chosen, skipped or replaced on the basis of any model output (correctness, confidence, or attack success)."
+  },
+  "dataset": {
+    "repo_id": "stanfordnlp/sst2",
+    "revision": "8d51e7e4887a4caaa95b3fbebbf53c0490b58bbb",
+    "split": "validation",
+    "split_file": "data/validation-00000-of-00001.parquet",
+    "split_file_sha256": "fb00fe008f6828f86ba2beda8415a4cf5da0c884f21c5f238c87131b5aa19529",
+    "rows": 872,
+    "schema": {
+      "idx": "int32",
+      "sentence": "string",
+      "label": "int64"
+    },
+    "label_distribution": {
+      "0": 428,
+      "1": 444
+    },
+    "label_meaning": {
+      "0": "NEGATIVE",
+      "1": "POSITIVE"
+    },
+    "text_policy": "verbatim; SST tokenisation artefacts (spaced punctuation, trailing spaces) intentionally preserved",
+    "holdout_claim": "none; SST-2 validation is a public benchmark split, not a proven-unseen holdout"
+  },
+  "sentiment_model_the_baseline_is_for": {
+    "model_id": "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+    "revision": "714eb0fa89d2f80546fda750413ed43d93601a13",
+    "note": "recorded for provenance only; NOT loaded and NOT used in selection"
+  },
+  "exclusions": {
+    "count": 0,
+    "rows": []
+  },
+  "source_mapping": {
+    "sst2-val-18": {
+      "dataset_idx": 18,
+      "dataset_label_int": 0,
+      "label": "NEGATIVE",
+      "sentence_sha256": "2e3d15d631195c6a6511fde9d4b6dadd0c85cefe7ec37672e45037a6981b772c"
+    },
+    "sst2-val-35": {
+      "dataset_idx": 35,
+      "dataset_label_int": 0,
+      "label": "NEGATIVE",
+      "sentence_sha256": "3294625dbe16ef71d31dcb89c67e8cbb6acb99284b4b8894800086407b16b4d6"
+    },
+    "sst2-val-59": {
+      "dataset_idx": 59,
+      "dataset_label_int": 0,
+      "label": "NEGATIVE",
+      "sentence_sha256": "ebf62ddc9e630bcf8579aa966d75cceabb48433667733e6b048e88b7538caadd"
+    },
+    "sst2-val-110": {
+      "dataset_idx": 110,
+      "dataset_label_int": 0,
+      "label": "NEGATIVE",
+      "sentence_sha256": "144e5adb76a616b4d9c585bd52fb822446fb09c22ea341e229d4645f899bf8b4"
+    },
+    "sst2-val-111": {
+      "dataset_idx": 111,
+      "dataset_label_int": 0,
+      "label": "NEGATIVE",
+      "sentence_sha256": "727c72127b4100f8c0267d3ab71db60395cc72cf206b9abe256ab1bbe2a9fce7"
+    },
+    "sst2-val-121": {
+      "dataset_idx": 121,
+      "dataset_label_int": 0,
+      "label": "NEGATIVE",
+      "sentence_sha256": "c04ed24880a063600fa4a34aaf2a6e5017e90dccca7e6b740fe262ecc3607386"
+    },
+    "sst2-val-136": {
+      "dataset_idx": 136,
+      "dataset_label_int": 0,
+      "label": "NEGATIVE",
+      "sentence_sha256": "7d5fd14bb51fbf0472c8bff462b93448f24b79a381b2dea3ae920353a8862a7a"
+    },
+    "sst2-val-162": {
+      "dataset_idx": 162,
+      "dataset_label_int": 0,
+      "label": "NEGATIVE",
+      "sentence_sha256": "60e62a458856250ac6f08539444f5c5eec409e688883f45019d10e24b02b27a6"
+    },
+    "sst2-val-211": {
+      "dataset_idx": 211,
+      "dataset_label_int": 0,
+      "label": "NEGATIVE",
+      "sentence_sha256": "4633a641c2081404c1a56681c414156af1f55f0adb221e9dc3e6a48e9683961d"
+    },
+    "sst2-val-319": {
+      "dataset_idx": 319,
+      "dataset_label_int": 0,
+      "label": "NEGATIVE",
+      "sentence_sha256": "76ed04fa8f1dae27aa853fb051a8472d44c3061b6e97598b7489e95e7bd49173"
+    },
+    "sst2-val-361": {
+      "dataset_idx": 361,
+      "dataset_label_int": 0,
+      "label": "NEGATIVE",
+      "sentence_sha256": "97cd468d516f703d66c5b2196b2cf55c89ad5645d96706dbe86a6b4e13f08a1a"
+    },
+    "sst2-val-432": {
+      "dataset_idx": 432,
+      "dataset_label_int": 0,
+      "label": "NEGATIVE",
+      "sentence_sha256": "35734426254110dd037d610a147231c46b3dc9bef591245a1b460b1a77570707"
+    },
+    "sst2-val-489": {
+      "dataset_idx": 489,
+      "dataset_label_int": 0,
+      "label": "NEGATIVE",
+      "sentence_sha256": "4e0a5ab92a04f500754bc5ff565d558aa102b6c0f7215537815d54c54985bacb"
+    },
+    "sst2-val-590": {
+      "dataset_idx": 590,
+      "dataset_label_int": 0,
+      "label": "NEGATIVE",
+      "sentence_sha256": "1a23692e4a4e331b8f90b5b9c185c3c7bec656047f84a92ef0a0a62df4f018a0"
+    },
+    "sst2-val-601": {
+      "dataset_idx": 601,
+      "dataset_label_int": 0,
+      "label": "NEGATIVE",
+      "sentence_sha256": "d63a713214e072067d156231b99bdeb5a6a7ab5478ab70a41cce4365f9826c1c"
+    },
+    "sst2-val-672": {
+      "dataset_idx": 672,
+      "dataset_label_int": 0,
+      "label": "NEGATIVE",
+      "sentence_sha256": "473691dea68e51d01c6db1eb8b9e286906e5584e3985823c3526a7079eb5f051"
+    },
+    "sst2-val-730": {
+      "dataset_idx": 730,
+      "dataset_label_int": 0,
+      "label": "NEGATIVE",
+      "sentence_sha256": "97e4a71b35c62f6385a146955e2b0f7584783084fa029c2852a6dd3ee30bf5fd"
+    },
+    "sst2-val-743": {
+      "dataset_idx": 743,
+      "dataset_label_int": 0,
+      "label": "NEGATIVE",
+      "sentence_sha256": "da8cc0ff447596f04706b4d15dda7f9a2bb98a5a9e3530eab829e24354a393fd"
+    },
+    "sst2-val-748": {
+      "dataset_idx": 748,
+      "dataset_label_int": 0,
+      "label": "NEGATIVE",
+      "sentence_sha256": "fa31d6556a342cdc84f8c0b50d063b5b7fde0b76c75cdb543330abc22cef5a9a"
+    },
+    "sst2-val-761": {
+      "dataset_idx": 761,
+      "dataset_label_int": 0,
+      "label": "NEGATIVE",
+      "sentence_sha256": "5e1100fed4fc8a15cdde299b2fc97e74c5b21c4129a1a3ff58d81909b9ee11a2"
+    },
+    "sst2-val-805": {
+      "dataset_idx": 805,
+      "dataset_label_int": 0,
+      "label": "NEGATIVE",
+      "sentence_sha256": "81f701bcd54447bc3ea9a580080e47be7d7131cf1228f458a923e6233fd602b0"
+    },
+    "sst2-val-13": {
+      "dataset_idx": 13,
+      "dataset_label_int": 1,
+      "label": "POSITIVE",
+      "sentence_sha256": "4048ff941c4c604e0538cf769ddcc62a75132cdf6acf935c205de4cbe423f2ad"
+    },
+    "sst2-val-17": {
+      "dataset_idx": 17,
+      "dataset_label_int": 1,
+      "label": "POSITIVE",
+      "sentence_sha256": "20450e01688060cc8bdd701210b3d19b8f6acf5ec8f24b45bf63c162ab384d40"
+    },
+    "sst2-val-52": {
+      "dataset_idx": 52,
+      "dataset_label_int": 1,
+      "label": "POSITIVE",
+      "sentence_sha256": "ea965afdc86a1a276a556e92ef300c8cf366658248baade588f0ce245c2b363d"
+    },
+    "sst2-val-109": {
+      "dataset_idx": 109,
+      "dataset_label_int": 1,
+      "label": "POSITIVE",
+      "sentence_sha256": "3485f75c614dcb6199e36a82eed1de366488fd3a33dea9795b5377486fb47315"
+    },
+    "sst2-val-120": {
+      "dataset_idx": 120,
+      "dataset_label_int": 1,
+      "label": "POSITIVE",
+      "sentence_sha256": "c83cef0853b11994be1f8f7a78b97925df00f2b504c0109f403edf91994af42c"
+    },
+    "sst2-val-201": {
+      "dataset_idx": 201,
+      "dataset_label_int": 1,
+      "label": "POSITIVE",
+      "sentence_sha256": "1aa1dd6f98d17c2efcb29a626f00715f4796c86b463249ca06d6f52e45aca38b"
+    },
+    "sst2-val-227": {
+      "dataset_idx": 227,
+      "dataset_label_int": 1,
+      "label": "POSITIVE",
+      "sentence_sha256": "9b60888d2e9ed349a573648a1238906c3677d5c5c11b1f0b289e472816a2e2d2"
+    },
+    "sst2-val-248": {
+      "dataset_idx": 248,
+      "dataset_label_int": 1,
+      "label": "POSITIVE",
+      "sentence_sha256": "67271ca9889a534cd0b9f10e7a670edaf3d828a0e3fca3dc93953e1bb7fab8ba"
+    },
+    "sst2-val-290": {
+      "dataset_idx": 290,
+      "dataset_label_int": 1,
+      "label": "POSITIVE",
+      "sentence_sha256": "0385f096e460b074da8eeb0223c2d271c14a999749567886d584ca340924488a"
+    },
+    "sst2-val-341": {
+      "dataset_idx": 341,
+      "dataset_label_int": 1,
+      "label": "POSITIVE",
+      "sentence_sha256": "a2a6639d3ff204f2c8a43df7a52a743414ee3ad2aeb5a979e37eac5e65338280"
+    },
+    "sst2-val-427": {
+      "dataset_idx": 427,
+      "dataset_label_int": 1,
+      "label": "POSITIVE",
+      "sentence_sha256": "55d4d193645b27906fdbf040c9877567347d25a446a52092fe27c7bb0ca7a6ee"
+    },
+    "sst2-val-480": {
+      "dataset_idx": 480,
+      "dataset_label_int": 1,
+      "label": "POSITIVE",
+      "sentence_sha256": "3277536278312963400477e84c52c34f2c8891f8e90554fc1680b6b6cd199118"
+    },
+    "sst2-val-561": {
+      "dataset_idx": 561,
+      "dataset_label_int": 1,
+      "label": "POSITIVE",
+      "sentence_sha256": "4b33149b7236b1d8251ceeaacc8c19fbbc356a8d33ac55f796d7290e77badc86"
+    },
+    "sst2-val-588": {
+      "dataset_idx": 588,
+      "dataset_label_int": 1,
+      "label": "POSITIVE",
+      "sentence_sha256": "c10aa1ce047fb2f5f6b689a77fc228d4d77a5f5e5f36912e83a78020303dd0fe"
+    },
+    "sst2-val-609": {
+      "dataset_idx": 609,
+      "dataset_label_int": 1,
+      "label": "POSITIVE",
+      "sentence_sha256": "c631338b7fc065dca410cad129feb5b4b6be44b36656c446d730b2d573804e95"
+    },
+    "sst2-val-656": {
+      "dataset_idx": 656,
+      "dataset_label_int": 1,
+      "label": "POSITIVE",
+      "sentence_sha256": "9c3a50c28205aaae479159e94ca25de0562929b55c8c521855882d295472baca"
+    },
+    "sst2-val-671": {
+      "dataset_idx": 671,
+      "dataset_label_int": 1,
+      "label": "POSITIVE",
+      "sentence_sha256": "1ca17ba3670d515d47d9f865807e7bbb41df8cbb7832516aedc0b1b152b60fce"
+    },
+    "sst2-val-674": {
+      "dataset_idx": 674,
+      "dataset_label_int": 1,
+      "label": "POSITIVE",
+      "sentence_sha256": "e496e416ad37597d34f5d99564825f69d502347fc9e5c9cd63532690b5a8f38f"
+    },
+    "sst2-val-686": {
+      "dataset_idx": 686,
+      "dataset_label_int": 1,
+      "label": "POSITIVE",
+      "sentence_sha256": "759810cf6adf598c884aa94287557967ea8057c2c83aeae59466814dbeadd363"
+    },
+    "sst2-val-778": {
+      "dataset_idx": 778,
+      "dataset_label_int": 1,
+      "label": "POSITIVE",
+      "sentence_sha256": "447c8d81a1c8fae8ae11098d0d6468a68a532a04a2568c14e5f849240334cfec"
+    },
+    "sst2-val-785": {
+      "dataset_idx": 785,
+      "dataset_label_int": 1,
+      "label": "POSITIVE",
+      "sentence_sha256": "42e367f74e22f7d63266691d4a10ab1651e046e36436c87d753ceb368e129116"
+    }
+  }
+}

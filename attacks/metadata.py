@@ -212,6 +212,27 @@ class AttackMetadata:
 _MANIFEST: dict[str, AttackMetadata] = {}
 _FINGERPRINTS: dict[str, str] = {}
 
+# Fields that are STAMPED ONTO a case after it is registered (by library.build_suite ->
+# _stamp_suite_id and attacks.coverage.stamp_manifest), never supplied at registration.
+# They are derived annotations, not part of a case's identity, so re-registering the same
+# case (e.g. a second build_suite pass in a shared, non-cleared registry -- as run_all does
+# across a Demo/Full run and then a Lab job) must not trip the "different metadata" guard
+# just because the earlier pass has since been stamped. The subsequent build re-stamps them,
+# so the end state stays correct. The guard still fires on any genuine identity difference
+# (relation, oracle, source, tier, dose, ...).
+_POST_REGISTRATION_FIELDS = frozenset({
+    "suite_id",
+    "coverage_class",
+    "controls_targeted",
+    "coverage_rationale",
+    "coverage_map_version",
+})
+
+
+def _registration_identity(meta: "AttackMetadata") -> dict:
+    """The metadata as supplied at registration, minus post-registration stamped fields."""
+    return {k: v for k, v in asdict(meta).items() if k not in _POST_REGISTRATION_FIELDS}
+
 
 def _fingerprint(case: AttackCase) -> str:
     """
@@ -265,7 +286,9 @@ def register(case: AttackCase, meta: AttackMetadata) -> AttackCase:
     if existing_fp is not None and existing_fp != fp:
         raise ValueError(f"attack_id {case.attack_id!r} reused for a DIFFERENT payload")
     existing_meta = _MANIFEST.get(case.attack_id)
-    if existing_meta is not None and existing_meta != meta:
+    if existing_meta is not None and (
+        _registration_identity(existing_meta) != _registration_identity(meta)
+    ):
         raise ValueError(f"attack_id {case.attack_id!r} reused with DIFFERENT metadata")
 
     _MANIFEST[case.attack_id] = meta

@@ -1,8 +1,8 @@
 # Runner
 
-Owner: Rayyan. `runner.run` fires a suite at one target and records what came back.
-The gate CLI (`runner.gate`) lands in its own commit, so this component can merge
-ahead of the analysis and orchestration it depends on.
+Owner: Rayyan. Two entry points: `runner.run` fires a suite at one target and records
+what came back; `runner.gate` runs the CI evaluation and turns the policy's verdict
+into a process exit code.
 
 Run from the repository root with the Python 3.11 `.venv`. Start the chosen endpoint
 separately, bound to the loopback port its registry entry declares.
@@ -191,16 +191,62 @@ order hash says what was run and in what sequence — so a policy frozen against
 selection cannot be satisfied by a different one, or by the same one run in a
 different order.
 
+## The gate
+
+```bash
+.venv/bin/python -m runner.gate \
+    --policy analysis/policies/ci_core_v1.json \
+    --out results/ci \
+    --evaluation ci.emotion
+```
+
+`runner.gate` calls `run_all.run_experiment` for the internal `ci` evaluation, reads
+back the produced analysis, every target's `run_meta.json` and every target's parsed
+`RunResult` rows, and hands all of it to `analysis.policy.evaluate_policy`. It writes
+`gate_result.json` and returns `GateOutcome.exit_code`.
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | The named policy passed, on real evidence, on this selection. |
+| 1 | A well-recorded candidate failure. The evidence is trustworthy; the candidate failed. |
+| 2 | The gate could not reach a verdict: configuration, readiness, or missing/unusable evidence. |
+
+There is no policy logic in `runner/gate.py` — no threshold, no recalibration, no
+skipping hard cases when CI is red — and no local stand-in policy to fall back on. A
+missing `analysis.policy`, an orchestrator that raised, an absent `run_meta.json`, a
+results row that is not a `RunResult`, or a policy that raised are all exit 2, each
+with a readable reason written into `gate_result.json` whenever the destination can be
+written. Error paths fabricate nothing: `candidate` and `reference` stay empty and
+`selection_sha256` stays blank, because a placeholder there is indistinguishable from
+a real value in a CI log.
+
+Exit 1 and exit 2 are kept apart deliberately. An endpoint that died mid-suite is
+data: `run_experiment` preserves it and returns normally, the policy calls it a
+failure, and the gate reports 1. Turning that into 2 would lose the distinction
+between "the candidate is bad" and "we could not tell", which is the distinction the
+two codes exist for.
+
+`run_all` must never import `runner.gate` — the gate calls the orchestrator, not the
+reverse. Both heavy imports are deferred into the function that needs them, so
+`--help`, an offline test and every error path load no model and no orchestrator.
+
+A gate pass claims compliance with the named policy on that selection. It is not
+comprehensive model-level adversarial robustness and not production certification.
+
 ## Tests
 
 ```bash
-.venv/bin/python -m pytest tests/test_runner.py -q
+.venv/bin/python -m pytest tests/test_runner.py tests/test_gate.py -q
 .venv/bin/python -m pytest -q
 ```
 
 `tests/test_runner.py` runs offline against `httpx.MockTransport` with an injected
 clock, plus one real local socket test that cancels a dripping response at ten seconds
-and checks the next request still succeeds. Real-run evidence is reported in
+and checks the next request still succeeds. `tests/test_gate.py` replaces the
+orchestrator and the pure policy with doubles; it proves the gate maps a `GateOutcome`
+to the right exit code and refuses to reach a verdict without evidence — it proves
+nothing about whether any policy is correct or any candidate passes. That evidence
+comes from a real integrated run and is reported in
 [`docs/stage3/handoffs/rayyan.md`](../docs/stage3/handoffs/rayyan.md).
 
 See [HANDOFF.md](../HANDOFF.md) for the latest verified commits and integration scope.

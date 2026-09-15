@@ -1255,7 +1255,7 @@ def _run_registry_experiment(mode: str, run_name: Optional[str], results_root: O
 
     run_id = uuid.uuid4().hex[:16]
     display_name = _safe_run_name(run_name, mode)
-    root = Path(results_root) if results_root is not None else RESULTS_ROOT
+    root = (Path(results_root) if results_root is not None else RESULTS_ROOT).resolve()
     run_dir = root / f"{display_name}_{run_id}"
     run_dir.mkdir(parents=True, exist_ok=False)
     (run_dir / "runs").mkdir()

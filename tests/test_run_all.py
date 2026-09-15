@@ -8,6 +8,7 @@ webbrowser.open is allowed to be called).
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -179,6 +180,49 @@ def test_run_analysis_and_report_emits_analyzing_then_generating_results(monkeyp
         progress_callback=lambda stage, message: events.append(stage),
     )
     assert events == ["analyzing", "generating_results"]
+
+
+def test_registry_experiment_accepts_relative_results_root(monkeypatch, tmp_path):
+    class PlannedStop(RuntimeError):
+        pass
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        run_all, "_plan_evaluation",
+        lambda *args, **kwargs: (_ for _ in ()).throw(PlannedStop("planned stop")),
+    )
+
+    with pytest.raises(PlannedStop, match="planned stop"):
+        run_all.run_experiment(
+            mode="ci",
+            run_name="relative_root",
+            results_root=Path("relative-results"),
+            evaluation_ids=["ci.emotion"],
+            html_only=True,
+        )
+
+    run_dirs = list((tmp_path / "relative-results").iterdir())
+    assert len(run_dirs) == 1
+    run_dir = run_dirs[0]
+    document = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+    target_dirs = document["evaluations"][0]["target_dirs"]
+    assert target_dirs == {"emotion_v2": "runs/ci_emotion/emotion_v2"}
+    assert not Path(target_dirs["emotion_v2"]).is_absolute()
+    assert (run_dir / Path(target_dirs["emotion_v2"]).parent).is_dir()
+
+
+def test_release_workflow_prepares_results_and_preserves_gate_exit_code():
+    workflow = (ROOT / ".github" / "workflows" / "release-gate.yml").read_text(
+        encoding="utf-8"
+    )
+    mkdir = workflow.index("mkdir -p results")
+    producer = workflow.index("python -m runner.gate")
+    tee = workflow.index("tee results/gate.log")
+    capture = workflow.index("code=${PIPESTATUS[0]}")
+    record = workflow.index('echo "$code" > results/gate-exit-code.txt')
+    enforce = workflow.index("code=$(cat results/gate-exit-code.txt 2>/dev/null || echo 2)")
+    assert mkdir < producer < tee < capture < record < enforce
+    assert 'test "$code" -eq 0' in workflow[enforce:]
 
 
 def test_cli_opens_browser_by_default_but_not_with_no_open(monkeypatch, tmp_path):

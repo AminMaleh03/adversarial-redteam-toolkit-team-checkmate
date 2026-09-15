@@ -338,3 +338,27 @@ V5.3 6716107 report navigation; V5.4 0ea2581 Custom Lab/registry isolation.
 Original V5.5 3d1c990 was rejected visually; previous closure b2b5f18 fixed structure,
 charts, history and Back. Latest human review approves that structure and asks only
 for this final color/dynamics pass. Older parked suggestions are not new tasks.
+
+# Stage 3 Task 1 PR #11 - targeted CI repair in progress
+
+2026-09-15T23:43:23+04:00, Codex, Asia/Dubai. Branch `stage3/ahsan`, observed
+pre-repair HEAD `c809ca4bd03f1b93e08239b511fbf7bb6ffb22bb`; live GitHub branch and PR #11
+head matched it, and `stage3/integration` remained `40ceef06cfecd10fb34ab53c5e41de35cd694ae8`.
+User authorized the narrowly targeted repair in the 15 September 2026 attached brief.
+
+Implemented but not yet committed/pushed: resolve an explicitly supplied registry
+`results_root` before deriving the run directory; create `results/` before the release-gate
+tee/redirection; focused regressions cover portable target paths and the workflow's producer
+exit-code chain. Validation by this Codex session: Python 3.11.9; targeted
+`tests/test_run_all.py tests/test_gate.py` **52 passed in 0.87s** after correcting one new
+test assertion (initial targeted run: 51 passed, 1 failed); workflow YAML parse PASS;
+`git diff --check` PASS. The one authorized real command produced run
+`ci-targeted-repair_0cc2162a825c470b`, gate outcome `pass`, exit 0, all 13 checks status
+`pass`, and wrote `gate_result.json`, analysis evidence, `gate.log`, and
+`gate-exit-code.txt` containing 0. No full suite, Docker, OCES, Playwright, deployment, or
+report regeneration was run. No process was left running.
+
+Next: review/stage the four explicit files, confirm the live GitHub head is still `c809ca4`,
+commit `fix(ci): normalize gate output paths`, push normally, and observe only its PR run.
+The main integration checkout's intentional `HANDOFF.md` remains byte-identical at SHA-256
+`901bfd4e739f0e9b1ea2d8dad173df6663fa203e2e56716da8a99048e9337ae2`.

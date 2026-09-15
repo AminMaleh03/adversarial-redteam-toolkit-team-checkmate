@@ -38,6 +38,7 @@ jobs:
         id: candidate_gate
         shell: bash
         run: |
+          mkdir -p results
           set +e
           python -m runner.gate \
             --policy analysis/policies/ci_core_v1.json \

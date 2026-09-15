@@ -1,72 +1,61 @@
-# TASK 2 WINDOWS ? COMPONENTS VERIFIED; INTEGRATION PENDING
+# Rayyan Task 2 checkpoint
 
-Updated: 2026-09-15T15:40:34+04:00, Codex, Asia/Dubai. Branch `stage3/rayyan-windows`.
-Code head: `f60697c83e609999af33f817d3e4d619019b180c`; base remote merge `d55f1e2`.
-Python 3.11.9 `.venv`, Windows. Full current record:
-[Rayyan handover](docs/stage3/handoffs/rayyan.md).
+Updated 2026-09-15T16:39:09+04:00, Codex, Asia/Dubai. Active assigned branch **stage3/rayyan**.
+Observed HEAD **8c5b42c631a917642b5f4b4a5ee68227ce7fa58c**.
+User reiterated stage3/rayyan only; stage3/rayyan-windows was agent-created locally,
+is superseded, and will not be pushed. Khalid's branch remains preserved.
 
 ## Objective and authorization
 
-On 2026-09-15 the user explicitly asked to carry out Rayyan's Task 2 on this device.
-This authorizes endpoint/, runner/, their tests, Rayyan's handoff, and normal
-checkpoint updates. Task 2 asks for separate endpoint/runner and gate commits.
-No outside-owner production files edited. No team messages, push, or merge to main.
-Khalid's committed branch stays at `34b18b5`; all work continues on the new local branch.
-OCES is not authorized before freeze; no OCES predictions were run.
+Finish Rayyan Task 2 only. Attached starting/delivery instructions authorize commit,
+push only stage3/rayyan, PR base stage3/integration, Ahsan reviewer, no self-merge.
+Our changes: Rayyan code/tests/docs plus this required shared checkpoint. No Khalid
+analysis edits. The incoming branch already edited Ahsan-owned foundation tests;
+we did not edit that file and disclose it in the handover/PR.
 
-## Completed and committed
+## Completed and verified
 
-- `fc8560c`: repair incompatible merged runner definitions and undefined names;
-  selection validation, serialization exit 2, exact registry/selection snapshots;
-  task/model label and label-index validation; live sentiment probe and tests.
-- `f60697c`: gate checks real persisted evidence/hashes, consistent identities,
-  duplicate rows and analysis, measured policy hash, error context, Windows paths.
-- Documentation updated for Windows validation, reproducible commands, and remaining
-  integration work; documentation-only final commit follows the code head above.
-
-## Validation by this Codex session
-
-Commands use HF_HUB_OFFLINE=1, TRANSFORMERS_OFFLINE=1, TOKENIZERS_PARALLELISM=false.
+- Earlier fixes fc8560c (runner/endpoint), f60697c (gate), 69db5b6 (documentation).
+- 9d75993: exact coverage-map snapshot/hash, reusable paired planning, tokenizer
+  context validation. 8c5b42c: gate CLI errors write error artifacts.
 - `.\.venv\Scripts\python.exe -m pytest -q tests/test_endpoint.py tests/test_runner.py tests/test_gate.py --tb=short`:
-  **221 passed**, no skips, 28.52s.
-- `.\.venv\Scripts\python.exe -m pytest -q --tb=short -rs` at f60697c:
-  **832 passed, 30 skipped, 1 failed**, 38.65s. Log results/task2-windows-final-tests.txt.
-  Failure: Ahsan-owned foundation test line 278 assumes sentiment not previously imported
-  in shared pytest process; it needs a fresh subprocess. 27 browser + 3 PDF skips.
-- Real sentiment: results/task2-windows-sentiment-3, **26/26**, received bytes/hash match;
-  512 tokens -> 200, 513 -> 500, health stays 200. Cached startup 2.858s; service peak
-  working set 495775744 B. Reusable command in tests/fixtures/rayyan/sentiment_runtime.py.
-- Real defended emotion frozen selection: results/task2-windows-ci, **162 complete,
-  0 missing**, zero 5xx/timeout/transport/health failures; full planned identity 1928.
-- Real gate error: results/task2-windows-gate-error/gate_result.json, missing policy,
-  exit 2 verified through Python and explicit PowerShell `exit $LASTEXITCODE`.
-- `git diff --check` clean. No released defense or model pin changed.
+  **230 passed**, no skips, 20.88s.
+- `.\.venv\Scripts\python.exe -m pytest -q --tb=short -rs`:
+  **841 passed, 30 skipped, 1 failed**, 26.66s. Full log:
+  results/task2-rayyan-completion-tests-final.txt. Existing Ahsan foundation test
+  line278 asserts fresh import state in shared pytest interpreter; owner must put
+  registry isolation assertion in a subprocess. 27 browser and 3 native PDF skips.
+- Full real pinned sentiment core: **1931/1931**, zero missing; all received body
+  lengths/hashes match sender. 85 recorded 5xx, no timeouts/health/transport failures.
+  Runtime43.467s, cached readiness3.457s, service peak working set1138769920B.
+- Results/task2-full-sentiment-core/ records source SHAs, raw/meta/map/manifest,
+  receiver observations and measurements. Export combines Rayyan8c5b42c and
+  Lamei attacks/baseline f619e51, not a single integrated commit. Source in .source
+  prevents duplicate pytest discovery; no project files removed.
+- Real pinned tokenizer planning proves paired one-build reuse and cross-task
+  manifest isolation. Correct sentiment.oces readiness rejects unsupported suite;
+  planning_summary.json lists all20seeds+40variants not_executed with exact reason.
+  Initial invalid evaluation ID probe retained separately; no OCES predictions.
+- Actual final gate missing-policy error writes results/task2-rayyan-final-gate/
+  gate_result.json and returns2 to PowerShell. Fixture gates verify0/1/2 only.
+- Endpoint V2 and both model pins unchanged. No service/test processes left running.
 
-Live runs predated local commits: their metadata correctly records d55f1e2 dirty=true;
-no artifact was relabeled as clean committed evidence. The full suite tested f60697c.
+## Remaining / next step
 
-## Remaining / next actionable step
-
-Ahsan integrates the team feature branches and fixes the foundation test before
-acceptance. Lamei's sentiment baseline, suite metadata and coverage map are not on this
-branch; wire and verify map snapshots/provenance with that integration. No full generated
-sentiment core run yet. Khalid's analysis/policy exists on stage3/khalid, but the real
-frozen policy JSON and Ahsan's Stage 3 orchestration/index/report support are not here.
-Therefore no real integrated gate pass/fail or paired-run reuse proof. Run those checks
-on the integrated candidate, and OCES only after its separate freeze. The existing
-regression demo branch stays separate and must never merge into released code.
-
-## Processes and local artifacts
-
-No service, download or test process left running. Corrected probe explicitly verifies
-port closure. Probe 1's launcher memory figure is marked unusable; probe 2 caught cleanup
-failure; probe 3 is the accepted runtime evidence. All remain ignored under results/.
-The pinned sentiment cache now contains config.json, tokenizer_config.json, vocab.txt,
-model.safetensors (about 268 MB); no credentials recorded and no dependencies changed.
+Review docs diffs, commit documentation, push stage3/rayyan only, open PR into
+stage3/integration and request reviewer ahsan-141117 (foundation commit author).
+Remote Rayyan remains d55f1e2; integration/Ahsan remain257e15f. Latest Lamei089e54d
+only changes handover/tests from validated production snapshot f619e51.
+Production/test commits are complete for currently available Rayyan interfaces.
+Ahsan orchestration and Khalid frozen policy JSON remain missing; Lamei published
+OCES freeze but public build_suite still rejects OCES. Do not implement their
+pending components. Ahsan must test exact handover PR head before acceptance.
+See [Rayyan handover](docs/stage3/handoffs/rayyan.md) for exact commands, hashes,
+cache files, all blockers, real-versus-fixture evidence, and regression demo branch.
 
 ## Short history
 
-Foundation 257e15f; Khalid handover 34b18b5; Rayyan fetched merge d55f1e2; local Windows
-repairs fc8560c and f60697c. Earlier Mac results remain clearly historical in Rayyan's
-handover. Foundation/release history is available in Git and FOUNDATION_READINESS.md;
-it is context and does not authorize resuming deployment work.
+Foundation257e15f; Khalid handover34b18b5; Rayyan fetched merge d55f1e2 repaired
+on this device. Earlier real sentiment smoke26/26 and emotionV2 CI selection162/162
+remain in results/task2-windows-sentiment-3 and results/task2-windows-ci. Older
+historical Mac claims are labeled separately in Rayyan's handover.

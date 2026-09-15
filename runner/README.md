@@ -280,3 +280,33 @@ Only the internal `ci.emotion` evaluation is accepted by this gate.
 When a PowerShell script invokes the gate, end it with `exit $LASTEXITCODE` so the
 native 0/1/2 code reaches the calling workflow. The missing frozen policy currently
 produces exit 2; this branch does not claim an integrated policy pass.
+
+
+### Reuse one planned suite for paired targets
+
+Public signatures (existing positional arguments remain usable):
+
+```python
+plan_run(args: argparse.Namespace, out_dir: Path, staging: Path, *,
+         reuse_plan: RunPlan | None = None) -> RunPlan
+main(argv: Sequence[str] | None = None, *, reuse_plan: RunPlan | None = None) -> int
+```
+
+An orchestrator calls `plan_run` once with arguments from `build_parser()` and an
+existing temporary staging directory. Pass the returned plan to `main(...,
+reuse_plan=plan)` for **both** emotion targets, with separate output directories.
+This builds the suite and manifest once. Each execution copies the planned cases
+and exact manifest bytes. The registry, task, suite, model/tokenizer, baseline
+hash, tokenizer mode, selection bytes and ordered IDs must match. Changed cases
+or incompatible contexts fail readiness before any prediction. Plan objects are
+in-process data; callers must not mutate their contents.
+
+When supplied by the attack component, `attacks/coverage_map.json` is copied
+byte for byte to each run directory. Metadata records `coverage_map.path`,
+`coverage_map.version`, `coverage_map.sha256`, and
+`fingerprints.coverage_map_sha256`. A manifest declaring a map requires that map
+and a matching version. Legacy manifests without coverage data record null map
+evidence when no source map exists. Readiness failures preserve published files.
+
+CLI configuration errors from `runner.gate` return 2 and write an error artifact
+when a single usable `--out` destination can be recovered. `--help` remains offline.

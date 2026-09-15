@@ -1,168 +1,179 @@
-# Task 2 Windows continuation ? verified components, integration pending
+# Rayyan Task 2 handover
 
-Updated 2026-09-15T15:40:34+04:00, Codex, Asia/Dubai. Branch **stage3/rayyan-windows**.
-Code head tested: **f60697c83e609999af33f817d3e4d619019b180c**. Base: Rayyan remote merge
-`d55f1e223e40d9ef4c1a61e62983c74bf16f80b2`. Python `.venv` 3.11.9, Windows.
-The final handover commit changes documentation only; the code head above identifies
-the tested implementation. No push or merge to main. Khalid's branch stays at `34b18b5`.
+Updated 2026-09-15T16:39:09+04:00, Codex. Assigned and active branch: **stage3/rayyan**.
+Tested code head: **8c5b42c631a917642b5f4b4a5ee68227ce7fa58c**.
+The delivery commit adds documentation only; its SHA is the PR head / `git rev-parse HEAD`.
+Base remote merge: `d55f1e223e40d9ef4c1a61e62983c74bf16f80b2`.
+Python 3.11.9 in `.venv`, Windows. Ahsan: test the exact PR head before acceptance.
 
-The user authorized Rayyan's Task 2 on this device on 2026-09-15, including Rayyan's
-owned component files/tests and handoff. Task 2 requests separate endpoint/runner
-and gate commits. No other owner's production component was edited, and no teammate
-was messaged. Ahsan: please test this exact code head before accepting integration.
+## Scope and delivery
 
-## Local commits and corrections
+The user's attached instructions authorize commits and push only to stage3/rayyan,
+PR base stage3/integration, Ahsan review, and no self-merge. The earlier
+stage3/rayyan-windows name was an agent-created local branch, superseded by the
+assigned branch. It is not the delivery branch and has not been pushed.
 
-- `fc8560c`: reconcile the broken runner merge, preserve the frozen path-based
-  case-set API and exact-order execution, reject conflicting/duplicate selections
-  and missing required CI selections, return exit 2 for serialization failures,
-  copy byte-exact registry and case-selection snapshots, validate task/model labels
-  and contiguous label indices. Retain the merged request-byte tests, adapted to
-  the documented API. Add the reproducible live sentiment probe.
-- `f60697c`: gate verifies persisted result hashes, identity consistency, duplicate
-  rows and saved analysis before handing evidence to the pure policy. Supply the
-  measured policy-file hash, retain policy identity on evidence-error paths,
-  report only existing report files, and fix the Windows path assertion.
+Changes authored during this continuation are entirely Rayyan-owned code/tests/docs
+plus the required shared HANDOFF.md. **No Khalid analysis code was edited.**
+Files changed since fetched Rayyan merge: endpoint/loader.py, endpoint/targets.py,
+endpoint/README.md, runner/run.py, runner/gate.py, runner/README.md,
+tests/test_endpoint.py, tests/test_runner.py, tests/test_gate.py,
+tests/fixtures/rayyan/sentiment_runtime.py, this handover and HANDOFF.md.
+The overall PR also includes the earlier Rayyan sentiment endpoint implementation.
 
-Owned files changed: `endpoint/loader.py`, `endpoint/targets.py`, `runner/run.py`,
-`runner/gate.py`, `tests/test_endpoint.py`, `tests/test_runner.py`, `tests/test_gate.py`,
-`tests/fixtures/rayyan/sentiment_runtime.py`, component READMEs, this handover, HANDOFF.
-`endpoint/v1.py`, `endpoint/v2.py`, and both model pins are unchanged.
+**Incoming-history disclosure:** tests/test_stage3_foundation.py was already changed
+on the fetched Rayyan branch. This continuation did not edit that Ahsan-owned file.
+Released endpoint/v1.py, endpoint/v2.py and model pins remain unchanged.
 
-The fetched merge could not import runner/run.py: a second `load_case_set` definition
-referenced undefined `CASE_SETS_DIR`. It also contained incompatible target/case-set
-calls and undefined `_registry`, `RunnerConfigError`, `LEGACY_VERSION_TARGET_ID`, and
-`load_tokenizer_for_target`. The older Mac handover below did not validate this merge.
+## Implementation commits
 
-## Validation by Codex on this device
+- fc8560c: reconcile incompatible runner merge, frozen selections, exact request
+  evidence including serialization failure, registry/selection snapshots, label
+  checks and real sentiment probe.
+- f60697c: gate validates persisted rows/hashes/identities and saved analysis,
+  supplies actual policy hashes and artifact paths, retains honest error context.
+- 69db5b6: previous Windows verification documentation.
+- 9d75993: reusable paired plans, exact coverage-map snapshot/hash, wrong tokenizer
+  context rejection and corresponding tests. New optional keyword arguments preserve
+  existing callers; exact public signatures are in runner/README.md.
+- 8c5b42c: gate argument errors emit gate_result.json when --out is recoverable.
 
-Set `HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`, `TOKENIZERS_PARALLELISM=false`.
+## Validation on this device
 
-| Command | Result |
+| Exact command | Observed result |
 | --- | --- |
-| `.\.venv\Scripts\python.exe -m pytest -q tests/test_endpoint.py tests/test_runner.py tests/test_gate.py --tb=short` | **221 passed**, no skips, 28.52 s |
-| `.\.venv\Scripts\python.exe -m pytest -q --tb=short -rs` at the code head above | **832 passed, 30 skipped, 1 failed**, 38.65 s |
+| `.\.venv\Scripts\python.exe -m pytest -q tests/test_endpoint.py tests/test_runner.py tests/test_gate.py --tb=short` | **230 passed**, no skips, 20.88 s |
+| `.\.venv\Scripts\python.exe -m pytest -q --tb=short -rs` | **841 passed, 30 skipped, 1 failed**, 26.66 s |
+| `.\.venv\Scripts\python.exe results/task2-full-sentiment-core/validate.py` | Real full sentiment core: **1931/1931**, zero missing; runner exit 0 |
+| `.\.venv\Scripts\python.exe results/task2-full-sentiment-core/check_planning.py` | Real pinned tokenizers: paired plan uses one build; cross-task manifests remain isolated; precise OCES readiness error |
+| Gate command below, followed by `exit $LASTEXITCODE` | **2** reaches PowerShell; error JSON written |
 | `git diff --check` | clean |
-| Real sentiment probe, below | 26/26 observed requests, all sender/receiver body hashes match |
-| Real `ci_core_v1` runner collection | 162/162 complete; zero 5xx, timeouts, connection/health/serialization failures |
-| Real gate invocation with currently absent frozen policy | `execution_error`, Python and PowerShell process exit **2**; JSON written |
 
-Full test log: `results/task2-windows-final-tests.txt`. The 30 skips are 27 browser
-acceptance cases and three native PDF-renderer cases. No Rayyan component test skipped.
-The full suite is **not green**: `tests/test_stage3_foundation.py:278`,
-`TestRegistry.test_module_paths_are_recorded_not_imported`, assumes
-`endpoint.sentiment_v1` has not already been imported. Earlier real endpoint tests
-correctly import it. This is an order-dependent test assertion, not a registry import.
+Full log: results/task2-rayyan-completion-tests-final.txt. Skips: 27 browser and
+3 native PDF cases. The failure is the existing Ahsan-owned registry test at
+ tests/test_stage3_foundation.py:278: it asserts sentiment has not been imported
+in the shared pytest interpreter, after legitimate endpoint tests imported it.
+**Request to Ahsan:** run that registry-isolation assertion in a fresh subprocess,
+checking torch/transformers/endpoint apps remain absent after loading only targets.
+Do not weaken the isolation check. No whole-repository green claim is made.
+An initial broad test attempt collected duplicate tests from the exported dependency
+snapshot. The snapshot is now .source inside the ignored evidence directory; the
+normal full-suite command above was rerun successfully through collection.
 
-**Concrete request to Ahsan (test owner):** move that registry-import assertion into
-its own fresh subprocess. In that subprocess import only endpoint.targets, call
-load_registry, assert the recorded module/app strings, and assert torch,
-transformers, endpoint.model and endpoint.sentiment_v1 are absent from sys.modules.
-Do not assert fresh-process state in the shared pytest interpreter. This file was
-already changed in the fetched remote branch; Codex did not edit it.
+## Real full sentiment core evidence
 
-## Real pinned sentiment on Windows
+Directory: **results/task2-full-sentiment-core/**. Source export combines Rayyan
+8c5b42c631a917642b5f4b4a5ee68227ce7fa58c with Lamei attacks/baseline
+f619e513bdd10f5eb5c94830ce9efc3f11c28c4a. source_revisions.json records these
+exact SHAs; this is real dependency integration, **not a single integrated commit**.
+No other owner's code was modified or added to this branch. Latest Lamei 089e54d
+changes only his handover/tests relative to that production snapshot.
 
-Model and tokenizer: `distilbert/distilbert-base-uncased-finetuned-sst-2-english`
-@ **714eb0fa89d2f80546fda750413ed43d93601a13**. Served labels NEGATIVE/POSITIVE,
-id 0/1 respectively; full scores, finite confidences and health responses verified.
-The exact pinned download contains `config.json` (629 B), `tokenizer_config.json`
-(48 B), `vocab.txt` (231,508 B), `model.safetensors` (267,832,558 B).
-Those four files are the sentiment cache material Ahsan needs for Docker; Dockerfile
-was not edited. Metadata hashes match MODEL_IDENTITY.md:
+- run/run_meta.json, results.jsonl, manifest.json, registry.json, coverage_map.json
+  hold actual evidence. summary.json records measurements. Local validation scripts
+  and immutable source export are retained under this ignored directory.
+- **1931 planned, selected and completed; 0 missing/skipped/limit-excluded.**
+  The generated count is 42 baselines plus 1889 attacks; it was not forced to 1928.
+- **1931 independent received-body observations match sender lengths and SHA-256.**
+- 85 HTTP 5xx responses; zero timeouts, connection errors, health failures or
+  serialization failures. V1 collection completed; this is not a gate/policy pass.
+- Cached readiness **3.457 s**, runner **43.467 s**, service peak working set
+  **1,138,769,920 bytes**. These are Windows measurements, not container estimates.
+- Service and launcher PIDs handled separately; configured port 8002 closed after run.
+- Planned SHA: `ff9cc7cffa91b1c1a25c491a5836e7f3cc5a0c156ff190e982394cd034c207ca`.
+- Manifest SHA: `f694ab3d303fc10d0eb971bf6eee2a92f44e7f54c73ad0e919ce50f8532b8336`.
+- Map SHA: `650674889799fe217390dcb97c5e50ad542c3e187fa2e708d5cc9fbd2631f02a`.
+- Results SHA: `1329072eb2ae897c491a5d893d2382f34622fd93d8d58a2c2296d9a1f317dc61`.
+
+On an integrated checkout, with the real service on its configured loopback port:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn endpoint.sentiment_v1:app --host 127.0.0.1 --port 8002
+# In another terminal:
+.\.venv\Scripts\python.exe -m runner.run --target http://127.0.0.1:8002 --target-id sentiment_v1 --suite core --evaluation-id sentiment.core --out results/sentiment-core-new
+```
+
+## Pinned identity, no truncation and Docker cache
+
+Model/tokenizer: distilbert/distilbert-base-uncased-finetuned-sst-2-english at
+**714eb0fa89d2f80546fda750413ed43d93601a13**. NEGATIVE id 0, POSITIVE id 1.
+Real inference/tokenizer capacity is **512 tokens including special tokens**;
+model-card training length is not the inference limit. Full score vectors and
+health responses verified. Sentiment loads no emotion module/weights.
+Emotion pin remains 0e1cd914e3d46199ed785853e12b57304e04178b.
+
+Ahsan's sentiment cache files: config.json (629 B), tokenizer_config.json (48 B),
+vocab.txt (231508 B), model.safetensors (267832558 B). Dockerfile was not edited.
+Metadata hashes:
 
 - config: `582122c8f414793d131e10022ce9ba04e3811a9da6389137ee2f18665b4f4d15`
 - tokenizer config: `5ab9097b4149371c5fd52b2d6e26cb6f9c07c0d19fcfdda895b1adad6b57c3e0`
 - vocab: `07eced375cec144d27c900241f3e339478dec958f92fddbc551f295c992038a3`
 
-Run from the repository root, choosing a new output directory:
+Earlier real probe results/task2-windows-sentiment-3/: 26/26, 512 tokens HTTP 200,
+513 tokens HTTP 500 with healthy service. Run it using:
 
 ```powershell
 .\.venv\Scripts\python.exe tests/fixtures/rayyan/sentiment_runtime.py --out results/sentiment-probe-new
 ```
 
-Authoritative probe output here: **results/task2-windows-sentiment-3/**. The probe
-starts the real app on configured `127.0.0.1:8002`, observes received ASGI body bytes
-without modifying them, and compares every row to that independent receiver record.
-It is a smoke probe, **not the generated sentiment core suite or OCES**.
+Exact sender/receiver body examples from that probe:
 
-- 26 requests: positive/negative/Unicode, malformed UTF-8, 512 and 513 tokens, 20 repeats.
-- Exactly 512 tokens: HTTP 200. Exactly 513: HTTP 500. All post-request health checks pass.
-  The model gets oversized input; no silent truncation or added sentiment defense.
-- Cached startup **2.858 s**; first prediction **105.93 ms**; next 20 median **12.88 ms**,
-  p95 **13.73 ms** (nearest-rank). Service peak working set **495,775,744 B (472.81 MiB)**.
-  This is Windows working set, not container memory or a cold-download startup claim.
-- Positive body 52 B, Unicode 55 B, malformed UTF-8 15 B; token boundaries 2562/2567 B.
-  Full SHA-256 values and received bytes are in summary.json/received.jsonl/results.jsonl.
-- Service PID and launcher PID recorded separately. Service exit and closed port verified.
+| Input | Bytes | SHA-256 |
+| --- | ---: | --- |
+| ASCII positive | 52 | 9b1567774afc4e78894f97bfd82e9df05d2ff9107f03291998c9b56687ceb82e |
+| Unicode | 55 | dc5bf8b4697a29aed7225e174d8cbe2159db328491022daef8272f5ff254d76a |
+| Raw malformed UTF-8 | 15 | 0cce6ee85f97f0d683347b368e35bc762dd3c61cc418e576791a8a029be47dff |
 
-Probe 1's requests passed but its memory figure measured the venv launcher; the
-summary explicitly marks it unusable for resource claims. Probe 2 caught incomplete
-launcher-only cleanup and has no success summary. Probe 3 corrects both issues.
-All three directories are retained as local audit evidence; no service is left running.
+Probe cached readiness 2.858 s, first request 105.93 ms, repeat median 12.88 ms,
+p95 13.73 ms; service peak 495775744 B. Probe 1 measured the launcher memory and
+is explicitly invalid for resource claims; probe 2 detected incomplete cleanup;
+probe 3 is the accepted probe. All processes are stopped.
 
-## Real frozen emotion selection
-
-**results/task2-windows-ci/emotion_v2/** holds results.jsonl, run_meta.json, manifest.json,
-registry.json and the exact case_selection.json bytes. Parent summary and logs are
-in results/task2-windows-ci/. Real pinned emotion V2, configured `127.0.0.1:8001`.
-
-```powershell
-# Start endpoint.v2 on 127.0.0.1:8001 separately, then:
-.\.venv\Scripts\python.exe -m runner.run --target http://127.0.0.1:8001 --target-id emotion_v2 --evaluation-id ci.emotion --parent-run-id b2e733b9c53946f5aaba7448ce92b19f --case-set analysis/case_sets/ci_core_v1.json --out results/ci-new/emotion_v2
-```
-
-162 selected/completed, zero missing; planned 1928, deselected 1766, skipped/limit-excluded
-zero. Runner wall time 7.216 s, cached endpoint readiness 3.284 s. All transport/error
-counts zero. This is collection evidence, **not a policy pass**.
-
-- planned: `7fcccf16989784ca046317158a97fca6fcb52299eae99deda62ab0c63914a430`
-- manifest: `0471bccbf293095d15287904a7ddfdef15161e3fb2efdcb773ccd1b952cca717`
-- selection file: `25573a71931259a3da4241af4ee507314544fd783f796c74c32d0fa88c56ec9d`
-- results: `9b2e03aa841a0304c3b3813d3d3564d85458cc78ca6ce92134a9986077583e05`
-
-These runs happened before the local commits; run_meta correctly records base d55f1e2
-and dirty=true. The final code head was subsequently verified by the full suite.
-No evidence was relabeled as a clean committed run.
-
-## Gate and outstanding integration
+## Gate, OCES and remaining integration requirements
 
 ```powershell
 .\.venv\Scripts\python.exe -m runner.gate --policy analysis/policies/ci_core_v1.json --out results/gate-new --evaluation ci.emotion --html-only
-# When wrapping this in a PowerShell script/workflow, propagate the native code:
 exit $LASTEXITCODE
 ```
 
-On this branch the frozen policy file is absent. Actual error artifact:
-**results/task2-windows-gate-error/gate_result.json**, `gate_policy_readable`, exit 2,
-with candidate/reference empty and unavailable measurements null. Fixture-driven
-pass/fail/error tests verify 0/1/2 mapping; they do not establish a real gate pass.
+Actual final error: results/task2-rayyan-final-gate/gate_result.json:
+`outcome=execution_error`, `exit_code=2`, check `gate_policy_readable`, reason missing
+policy file; observed/threshold null, candidate/reference empty. Fixture tests
+exercise real GateOutcome pass/fail/error mapping to 0/1/2 using explicit doubles
+for missing orchestration/policy interfaces. They are not integrated gate verdicts.
 
-Remaining work, explicitly unverified:
+Earlier real emotion V2 collection: results/task2-windows-ci/emotion_v2/,
+162/162 frozen selected cases complete, full core identity 1928, no operational
+failures; startup 3.284 s, run 7.216 s. Its precommit metadata correctly records
+d55f1e2 dirty=true. No artifacts were relabeled as clean-commit evidence.
 
-1. Integrate Lamei's sentiment baseline and suite/metadata commits, then execute the
-   full generated sentiment core count. They exist on Lamei's remote branch but are
-   not incorporated here; no substitute baseline or attack library was authored.
-2. Wire and verify coverage-map snapshots/provenance after integrating Lamei's map;
-   current runner snapshots cover registry and case selection. Agree the per-run map
-   identity with Ahsan/Khalid instead of inventing a competing artifact shape.
-3. Integrate Khalid's real policy/analysis and Ahsan's Stage 3 run_experiment/index/report
-   support; resolve and freeze the real policy JSON, including actual platform-stable
-   manifest/map hashes. Khalid's policy implementation exists on stage3/khalid; it is
-   absent from this Rayyan branch and no frozen policy JSON exists there either.
-4. Verify paired emotion runs in one enclosing run, including reuse of the planned
-   suite and comparable metadata. Current tests prove isolated builds; they do not
-   prove the pending orchestrator reuses one build for the pair.
-5. Run the same-policy failed/corrected demonstration using the already published
-   stage3/rayyan-regression-demo branch. Do not merge that regression; released V2
-   retains its length defense. Prior Mac collection results below are historical,
-   not newly executed gate verdicts.
-6. OCES stays unexecuted: origin/stage3/lamei was still marked PRE-FREEZE when inspected.
-   Run only after the separate case/rule freeze and record every nonexecuted reason.
-7. Ahsan fixes the foundation test described above and tests the exact handover code
-   revision before acceptance. No Docker deployment or report/PDF acceptance claimed.
+1. **Ahsan:** integrate dependencies and call runner.plan_run once per task/suite,
+   then runner.main(..., reuse_plan=plan) for both paired targets. Real tokenizer
+   planning proves reuse/isolation; final run_all integration remains unverified.
+2. **Ahsan/Khalid:** land frozen run_experiment/index/report support and the real
+   frozen policy JSON. The analysis implementation exists on stage3/khalid, but
+   the policy JSON and Ahsan's Stage 3 orchestration are still absent here.
+   Run real policy pass/fail and html_only acceptance after integration.
+3. **Lamei:** implement the approved public OCES suite loading path. Freeze A
+   5e01825f7e399ae2019671f0f964b6b83be52a71 and provenance B f619e51 exist.
+   Correct sentiment.oces readiness currently raises: build_suite generates core
+   only; OCES variants are frozen data files, not generated here. All **20 seeds
+   and 40 variants** have individual not_executed reasons in planning_summary.json.
+   No OCES predictions were sent. An earlier invalid evaluation-ID probe remains
+   in summary.json for audit; planning_summary.json is the corrected readiness check.
+4. **Ahsan:** run failing/corrected candidates under the same frozen policy using
+   existing isolated stage3/rayyan-regression-demo at
+   d0a5fdaa38bd09e3fa6abcee1b2ef285174ccd4c. It removes length rejection only.
+   The exception handler may return a generic HTTP 500; no process crash or stack
+   trace is promised. Never merge the demo; released V2 retains its defense.
+5. **Ahsan:** fix the owned foundation test above and test the exact PR head before
+   acceptance. No PDF/Docker deployment or complete integrated gate is claimed.
 
 ---
+
+## Historical Mac handover (superseded by the current record above)
+
 
 # Historical Mac handover (different code head and machine)
 

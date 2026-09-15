@@ -45,7 +45,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Optional
 
-from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
+from transformers import (
+    AutoConfig,
+    AutoModelForSequenceClassification,
+    AutoTokenizer,
+    pipeline,
+)
 
 from contract import ModelSpec, Registry
 from endpoint.targets import load_registry
@@ -54,6 +59,16 @@ from endpoint.targets import load_registry
 # tokenizer config sets no explicit value. That is a "no limit configured" sentinel,
 # not a real limit, and must never be trusted as one.
 _UNSET_MAX_LENGTH_SENTINEL = int(1e30)
+
+# Position ids a family reserves before the first real token, so the usable limit is
+# max_position_embeddings minus this. RoBERTa-style models start position ids at
+# padding_idx + 1 = 2; BERT/DistilBERT start at 0. Anything not listed reserves none.
+_RESERVED_POSITIONS_BY_MODEL_TYPE = {
+    "roberta": 2,
+    "xlm-roberta": 2,
+    "camembert": 2,
+    "longformer": 2,
+}
 
 
 class ModelIdentityError(ValueError):
@@ -108,25 +123,130 @@ def _resolve_usable_max_length(model_spec: ModelSpec, tokenizer) -> int:
     return reported
 
 
-def load_tokenizer_for_target(target_id: str, registry: Optional[Registry] = None):
-    """Load ONLY the tokenizer for `target_id` -- no model weights.
+def _inference_capacity(config) -> Optional[int]:
+    """Positions this architecture can actually attend over, or None if unknowable.
 
-    For callers (the runner's token counting) that need to know how many tokens a
-    piece of text is, not run inference. Loading the full model just to count tokens
-    would be wasteful and, worse, is exactly the kind of accidental extra load this
-    task's fixtures warn about ("token counting must not accidentally ... load its
-    weights"). Runs the same identity check as :func:`load_target_model` on the
-    tokenizer side, so a mismatched max_sequence_length is still caught here.
+    This is the "actual inference capacity" the task separates from a model card's
+    *training* sequence length. It is read from the pinned ``config.json``, never from
+    prose: ``max_position_embeddings`` is the size of the learned position embedding
+    table, so a longer input indexes past the end of that table and the forward pass
+    fails -- it is a hard architectural ceiling, not a recommendation.
 
-    Returns (tokenizer, max_sequence_length).
+    RoBERTa-family models reserve the first two position ids (``padding_idx`` is 1 and
+    position ids start at ``padding_idx + 1``), which is why the emotion model reports
+    ``max_position_embeddings=514`` and a real usable limit of 512. BERT/DistilBERT
+    reserve none, so 512 means 512. Both numbers include the special tokens, exactly as
+    ``ModelSpec.max_sequence_length`` is defined to.
+
+    Returns ``None`` -- not a guess -- when the config declares no position table, so a
+    caller records "not derivable from this config" instead of inventing a boundary.
+    """
+    positions = getattr(config, "max_position_embeddings", None)
+    if not isinstance(positions, int) or isinstance(positions, bool) or positions <= 0:
+        return None
+    offset = _RESERVED_POSITIONS_BY_MODEL_TYPE.get(getattr(config, "model_type", ""), 0)
+    capacity = positions - offset
+    return capacity if capacity > 0 else None
+
+
+def _validate_inference_capacity(model_spec: ModelSpec, config) -> Optional[int]:
+    """The declared limit must be the architecture's real capacity, when derivable."""
+    capacity = _inference_capacity(config)
+    if capacity is None:
+        return None
+    if capacity != model_spec.max_sequence_length:
+        raise ModelIdentityError(
+            f"{model_spec.model_id}: pinned config gives an inference capacity of "
+            f"{capacity} tokens (max_position_embeddings="
+            f"{getattr(config, 'max_position_embeddings', None)}, model_type="
+            f"{getattr(config, 'model_type', None)!r}), but the registry declares "
+            f"max_sequence_length={model_spec.max_sequence_length}. Boundary attacks "
+            "built on the registry value would sit on the wrong token, so this is a "
+            "configuration error, not something to round off here."
+        )
+    return capacity
+
+
+@dataclass(frozen=True)
+class TokenizerContext:
+    """A target's tokenizer and token limit, loaded WITHOUT any model weights.
+
+    This is what the runner needs and all it needs: boundary attacks have to land on
+    the true token limit of the target actually under test, and building them must not
+    drag a second model into the process. Loading this for ``sentiment_v1`` imports no
+    ``endpoint.model``, downloads no weights and allocates no tensors -- only the
+    pinned ``tokenizer.json``/``vocab.txt`` and ``config.json``.
+    """
+
+    target_id: str
+    task_id: str
+    model_spec: ModelSpec
+    # Confirmed against the live tokenizer AND, when the config allows it to be
+    # derived, against the architecture's real position-table capacity.
+    max_tokens: int
+    # None when the pinned config declares no position table -- recorded as unknown
+    # rather than assumed equal to the tokenizer's limit.
+    inference_capacity: Optional[int]
+    # text -> token count including special tokens. Never truncates.
+    count_tokens: Callable[[str], int]
+
+    def describe(self) -> dict:
+        """A JSON-safe record of what was verified, for a run's metadata."""
+        return {
+            "target_id": self.target_id,
+            "task_id": self.task_id,
+            "model_id": self.model_spec.model_id,
+            "model_revision": self.model_spec.revision,
+            "tokenizer_id": self.model_spec.tokenizer_id,
+            "tokenizer_revision": self.model_spec.tokenizer_revision,
+            "labels": list(self.model_spec.labels),
+            "max_tokens": self.max_tokens,
+            "inference_capacity": self.inference_capacity,
+            "weights_loaded": False,
+        }
+
+
+def load_target_tokenizer(
+    target_id: str, registry: Optional[Registry] = None
+) -> TokenizerContext:
+    """Load only the pinned tokenizer and config for `target_id`. No weights.
+
+    Use this anywhere a token count or a length boundary is needed for a target --
+    above all in the runner, where importing ``endpoint.model`` would load the
+    *emotion* classifier's weights into a sentiment run and silently give every
+    boundary case the wrong tokenizer.
+
+    Validates the same declared-vs-actual identity as :func:`load_target_model`, minus
+    the parts that genuinely need weights: label space comes from the pinned config
+    here rather than from a loaded ``model.config``.
     """
     registry = registry if registry is not None else load_registry()
+    task = registry.task_for(target_id)
     model_spec = registry.model_for(target_id)
+
     tokenizer = AutoTokenizer.from_pretrained(
         model_spec.tokenizer_id, revision=model_spec.tokenizer_revision
     )
-    max_sequence_length = _resolve_usable_max_length(model_spec, tokenizer)
-    return tokenizer, max_sequence_length
+    config = AutoConfig.from_pretrained(model_spec.model_id, revision=model_spec.revision)
+
+    _validate_label_space(model_spec, config.id2label)
+    max_tokens = _resolve_usable_max_length(model_spec, tokenizer)
+    capacity = _validate_inference_capacity(model_spec, config)
+
+    def count_tokens(text: str) -> int:
+        # truncation=False is the whole point: a truncated count would report the
+        # limit for any oversized input, and the boundary cases built from it would
+        # all collapse onto the same length.
+        return len(tokenizer.encode(text, add_special_tokens=True, truncation=False))
+
+    return TokenizerContext(
+        target_id=target_id,
+        task_id=task.task_id,
+        model_spec=model_spec,
+        max_tokens=max_tokens,
+        inference_capacity=capacity,
+        count_tokens=count_tokens,
+    )
 
 
 def load_target_model(target_id: str, registry: Optional[Registry] = None) -> LoadedTarget:
@@ -149,6 +269,7 @@ def load_target_model(target_id: str, registry: Optional[Registry] = None) -> Lo
 
     _validate_label_space(model_spec, model.config.id2label)
     max_sequence_length = _resolve_usable_max_length(model_spec, tokenizer)
+    _validate_inference_capacity(model_spec, model.config)
 
     # top_k=None -> return every label's score, not just the winner.
     # truncation=False -> never silently trim input. See module docstring and

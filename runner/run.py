@@ -28,6 +28,7 @@ import asyncio
 import base64
 import dataclasses
 import hashlib
+import inspect
 import json
 import math
 import os
@@ -44,29 +45,26 @@ import httpx
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from attacks import library  # noqa: E402
+from attacks.metadata import scoped_registry  # noqa: E402
 from baseline.load import load_baseline  # noqa: E402
-from contract import AttackCase, BaselineCase, ContractError, RunResult  # noqa: E402
-from endpoint.targets import TargetConfigError, load_registry  # noqa: E402
+from contract import (  # noqa: E402
+    SUITE_CORE,
+    SUITES,
+    AttackCase,
+    BaselineCase,
+    ContractError,
+    Registry,
+    RunResult,
+)
+from endpoint import targets as target_registry  # noqa: E402
 
-# Model-free: endpoint.targets never imports transformers/torch, so this import is
-# free even for --help and offline tests. Loaded once, lazily, the first time a CLI
-# invocation actually needs it -- see resolve_target() and _find_evaluation_for().
-_REGISTRY = None
-
-
-def _registry():
-    global _REGISTRY
-    if _REGISTRY is None:
-        _REGISTRY = load_registry()
-    return _REGISTRY
-
-
-CASE_SETS_DIR = Path(__file__).resolve().parent.parent / "analysis" / "case_sets"
+ROOT = Path(__file__).resolve().parent.parent
 
 DEFAULT_OUT = "results"
 MANIFEST_NAME = "manifest.json"        # pinned by Ahsan. Lamei's integration
                                        # notes say attack_manifest.json; if the
                                        # analysis reads that name, change it here.
+SELECTION_NAME = "case_selection.json"  # snapshot of the frozen selection actually used
 REQUEST_TIMEOUT = 10.0
 HEALTH_TIMEOUT = 2.0                   # its own short timeout: a hung probe
                                        # must not stall the run behind it
@@ -80,8 +78,9 @@ BAND_TIMEOUT = "timeout"
 ERR_CONNECTION = "connection_error"
 ERR_TIMEOUT = "timeout"
 ERR_TRANSPORT = "transport_error"
-# Building the request itself failed, before any bytes existed to hash -- distinct
-# from a transport failure, which happens AFTER a real prepared body exists.
+# The request body could not be serialised, so no bytes ever existed to send. This is
+# an execution failure of ours, not a property of the endpoint, and it is recorded as
+# its own kind so the analysis never reads it as "the endpoint accepted an empty body".
 ERR_SERIALIZATION = "serialization_error"
 
 TERM_COMPLETED = "completed"
@@ -96,97 +95,10 @@ TERM_INTERRUPTED = "interrupted"
 MIN_PLAUSIBLE_MAX_TOKENS = 16
 MAX_PLAUSIBLE_MAX_TOKENS = 100_000
 
-# Legacy --version -> registry target_id, the "explicit emotion default" that keeps
-# every old `--target URL --version v1|v2` invocation working unchanged.
-LEGACY_VERSION_TARGET_ID = {"v1": "emotion_v1", "v2": "emotion_v2"}
-
-
-# --------------------------------------------------------------------------
-# target/suite resolution (Stage 3: target-aware runs)
-# --------------------------------------------------------------------------
-
-
-class RunnerConfigError(ValueError):
-    """Raised for a target/suite/case-set configuration the CLI must reject."""
-
-
-def resolve_target(
-    target: str | None,
-    version: str | None,
-    target_id: str | None,
-    registry,
-) -> tuple[str, str, str]:
-    """Resolve (target_url, version, target_id) from the CLI flags actually given.
-
-    Two, and only two, supported shapes:
-
-      * legacy:     --target URL --version v1|v2, no --target-id.
-                    target_id is derived as the "explicit emotion default"
-                    (emotion_v1 / emotion_v2) -- never inferred from the URL.
-      * target-aware: --target-id TARGET_ID, no --target and no --version.
-                    The URL is derived from the registry's own loopback port --
-                    never taken from the CLI. This is the only way an
-                    arbitrary/public target could sneak in, so it is refused
-                    entirely: a target-aware run only ever talks to a trusted
-                    registry target on 127.0.0.1.
-
-    Mixing the two (e.g. --target-id together with --target or --version) is a
-    configuration error, not a "which one wins" situation.
-    """
-    if target_id is not None:
-        if target is not None or version is not None:
-            raise RunnerConfigError(
-                "--target-id cannot be combined with --target or --version; "
-                "--target-id derives both from the trusted registry."
-            )
-        spec = registry.target(target_id)
-        resolved_url = f"http://127.0.0.1:{spec.port}"
-        return resolved_url, spec.version, target_id
-
-    if target is None or version is None:
-        raise RunnerConfigError(
-            "either pass --target-id, or pass both --target and --version."
-        )
-    return target, version, LEGACY_VERSION_TARGET_ID[version]
-
-
-def _find_evaluation_for(registry, target_id: str, suite_id: str):
-    """The one EvaluationSpec that runs `suite_id` against `target_id`.
-
-    Used only to resolve the baseline file this run must use -- never to change
-    which suite is executed or to introduce a third suite name. A bounded CI
-    selection is still `suite_id == "core"`; there is no separate "ci" suite here.
-    """
-    task_id = registry.target(target_id).task_id
-    matches = [
-        spec
-        for spec in registry.evaluations.values()
-        if spec.task_id == task_id
-        and spec.suite_id == suite_id
-        and target_id in spec.target_ids
-    ]
-    if not matches:
-        raise RunnerConfigError(
-            f"no evaluation is configured for target {target_id!r} suite {suite_id!r}"
-        )
-    if len(matches) > 1:
-        raise RunnerConfigError(
-            f"ambiguous evaluation configuration for target {target_id!r} suite "
-            f"{suite_id!r}: {[m.evaluation_id for m in matches]}"
-        )
-    return matches[0]
-
-
-def resolve_baseline_path(registry, target_id: str, suite_id: str) -> Path:
-    """The baseline file this (target, suite) run must load, per the registry.
-
-    Core uses the task's default baseline file. OCES uses the evaluation-level
-    override (a frozen seed file), never the task's core baseline -- resolving
-    this correctly is what lets the recorded baseline hash mean something.
-    """
-    evaluation = _find_evaluation_for(registry, target_id, suite_id)
-    relative = registry.baseline_file_for(evaluation.evaluation_id)
-    return (Path(__file__).resolve().parent.parent / relative)
+# What a bare `--version v1|v2` has always meant, now written down rather than
+# assumed. It is used ONLY to resolve that legacy flag; nothing else defaults to it,
+# and an unrecognised identity never falls back to it.
+LEGACY_TASK_ID = "emotion_7"
 
 
 # --------------------------------------------------------------------------
@@ -287,6 +199,390 @@ def sha256_file(path: Path) -> str:
 
 
 # --------------------------------------------------------------------------
+# target resolution
+#
+# `version` never identifies a model. `sentiment_v1` and `emotion_v1` are both
+# version "v1"; a row that records only "v1" cannot say which one produced it.
+# Everything below therefore resolves a real target_id from the registry and
+# treats `--version` as a legacy alias for the emotion target of that version.
+# --------------------------------------------------------------------------
+
+
+class SelectionError(ValueError):
+    """A case selection that cannot be executed exactly as frozen."""
+
+
+@dataclasses.dataclass(frozen=True)
+class ResolvedTarget:
+    """What a run is pointed at, resolved from the registry rather than guessed."""
+
+    target_id: str
+    version: str
+    task_id: str
+    suite_id: str
+    registry: Registry
+    evaluation_id: str | None = None
+    # How target_id was arrived at: "--target-id", "--version (emotion default)" or
+    # "--evaluation-id". Recorded so a reader never has to guess whether an identity
+    # was declared or inferred.
+    resolved_from: str = ""
+
+
+def emotion_target_for_version(registry: Registry, version: str) -> str:
+    """The explicit emotion target a legacy ``--version`` flag means.
+
+    Legacy calls keep working, but they stop being ambiguous at this line: the
+    default is written down, resolved against the registry, and recorded on every
+    row. There is no code path where an unrecognised identity quietly becomes
+    emotion -- an unmatched version raises here instead.
+    """
+    matches = sorted(
+        target_id
+        for target_id, spec in registry.targets.items()
+        if spec.version == version and spec.task_id == LEGACY_TASK_ID
+    )
+    if len(matches) != 1:
+        raise ContractError(
+            f"--version {version!r} does not name exactly one {LEGACY_TASK_ID} target "
+            f"in the registry (found {matches}). Pass --target-id explicitly."
+        )
+    return matches[0]
+
+
+def resolve_target(
+    registry: Registry,
+    *,
+    target_id: str | None,
+    version: str | None,
+    suite: str,
+    evaluation_id: str | None,
+) -> ResolvedTarget:
+    """Turn the CLI flags into one unambiguous target, or refuse.
+
+    Conflicts are errors, never a precedence rule: if ``--target-id sentiment_v1``
+    and ``--version v2`` disagree, silently preferring one of them would write rows
+    labelled with a target that did not serve them.
+    """
+    if target_id is None and version is None:
+        raise ContractError("one of --target-id or --version is required")
+    if suite not in SUITES:
+        raise ContractError(f"unknown suite {suite!r}; configured: {sorted(SUITES)}")
+
+    if target_id is not None:
+        spec = registry.target(target_id)          # raises on an unknown id
+        if version is not None and spec.version != version:
+            raise ContractError(
+                f"--target-id {target_id!r} is version {spec.version!r}, but "
+                f"--version {version!r} was also given. Drop one; they conflict."
+            )
+        resolved_from = "--target-id"
+    else:
+        target_id = emotion_target_for_version(registry, version)
+        spec = registry.target(target_id)
+        resolved_from = f"--version {version} (explicit {LEGACY_TASK_ID} default)"
+
+    if evaluation_id is not None:
+        evaluation = registry.evaluation(evaluation_id)   # raises on an unknown id
+        if target_id not in evaluation.target_ids:
+            raise ContractError(
+                f"evaluation {evaluation_id!r} covers targets "
+                f"{list(evaluation.target_ids)}, not {target_id!r}"
+            )
+        if evaluation.suite_id != suite:
+            raise ContractError(
+                f"evaluation {evaluation_id!r} is suite {evaluation.suite_id!r}, but "
+                f"--suite {suite!r} was given. They conflict."
+            )
+        resolved_from = f"--evaluation-id {evaluation_id}"
+
+    return ResolvedTarget(
+        target_id=target_id,
+        version=spec.version,
+        task_id=spec.task_id,
+        suite_id=suite,
+        registry=registry,
+        evaluation_id=evaluation_id,
+        resolved_from=resolved_from,
+    )
+
+
+def build_token_counter_for_target(
+    target_id: str, registry: Registry
+) -> tuple[Callable[[str], int], int, dict]:
+    """The pinned tokenizer for THIS target, with no model weights loaded.
+
+    Imported inside the function for the same reason ``build_token_counter`` is, and
+    for a second one that matters more here: ``endpoint.model`` is the *emotion*
+    model and loads its weights at import time. Reaching it during a sentiment run
+    would count sentiment text with an emotion tokenizer -- every boundary case would
+    then sit on the wrong token -- and would load a model nobody asked for. This path
+    touches ``endpoint.loader`` only, which reads the pinned tokenizer and config and
+    no weights at all.
+    """
+    from endpoint.loader import load_target_tokenizer
+
+    context = load_target_tokenizer(target_id, registry=registry)
+    max_tokens = int(context.max_tokens)
+    if not MIN_PLAUSIBLE_MAX_TOKENS <= max_tokens <= MAX_PLAUSIBLE_MAX_TOKENS:
+        raise RuntimeError(
+            f"{target_id}: resolved token limit {max_tokens} is not a plausible "
+            "limit. Boundary cases built around it would be meaningless and the "
+            "manifest would record them as exact."
+        )
+    return context.count_tokens, max_tokens, context.describe()
+
+
+# --------------------------------------------------------------------------
+# frozen case selections
+# --------------------------------------------------------------------------
+
+
+@dataclasses.dataclass(frozen=True)
+class CaseSelection:
+    """A frozen selection within a suite, read from a case-set file.
+
+    The ids and their order are the contract. This object never reorders, dedupes or
+    completes them -- anything that would need doing to make the file usable is
+    raised instead, because a selection quietly repaired here no longer matches the
+    selection the policy was frozen against.
+    """
+
+    case_set_id: str
+    selection_version: int
+    suite_id: str
+    baseline_ids: tuple[str, ...]
+    attack_ids: tuple[str, ...]
+    order: tuple[str, ...]
+    exclusions: tuple[dict, ...]
+    source_path: str
+    source_sha256: str
+
+    def describe(self) -> dict:
+        return {
+            "case_set_id": self.case_set_id,
+            "selection_version": self.selection_version,
+            "suite_id": self.suite_id,
+            "path": self.source_path,
+            "sha256": self.source_sha256,
+            "counts": {
+                "baselines": len(self.baseline_ids),
+                "attacks": len(self.attack_ids),
+                "total_cases": len(self.order),
+            },
+            "exclusions": [dict(item) for item in self.exclusions],
+        }
+
+
+def _string_list(raw, where: str) -> list[str]:
+    if not isinstance(raw, list) or not all(isinstance(x, str) and x for x in raw):
+        raise SelectionError(f"{where} must be a list of non-empty strings")
+    duplicates = sorted({x for x in raw if raw.count(x) > 1})
+    if duplicates:
+        raise SelectionError(f"{where} contains duplicate ids: {duplicates}")
+    return list(raw)
+
+
+def load_case_set(path: Path | str) -> CaseSelection:
+    """Read a frozen case-set file. Rejects anything it would have to guess about.
+
+    Accepts the common selection format from CONTRACTS.md 5.2. It also accepts a file
+    that splits its attacks into ``standalone_attack_ids`` and ``derived_attack_ids``
+    -- the shape ``analysis/case_sets/ci_core_v1.json`` is frozen in -- by reading
+    them in that order, which is the runner's own send order. `order` stays optional
+    for the same reason: when it is absent the send order below is authoritative, and
+    when it is present it must agree with the ids exactly.
+    """
+    path = Path(path)
+    try:
+        raw_bytes = path.read_bytes()
+    except OSError as exc:
+        raise SelectionError(f"cannot read case set {path}: {exc}") from exc
+    try:
+        raw = json.loads(raw_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise SelectionError(f"case set {path} is not valid JSON: {exc}") from exc
+    if not isinstance(raw, dict):
+        raise SelectionError(f"case set {path} must be a JSON object")
+
+    case_set_id = raw.get("case_set_id")
+    if not isinstance(case_set_id, str) or not case_set_id:
+        raise SelectionError(f"{path}: case_set_id is required")
+    suite_id = raw.get("suite_id")
+    if suite_id not in SUITES:
+        raise SelectionError(
+            f"{path}: suite_id {suite_id!r} is not one of {sorted(SUITES)}. CI is a "
+            "frozen selection of 'core', not a suite of its own."
+        )
+    selection_version = raw.get("selection_version", 1)
+    if not isinstance(selection_version, int) or isinstance(selection_version, bool):
+        raise SelectionError(f"{path}: selection_version must be an integer")
+
+    baseline_ids = _string_list(raw.get("baseline_ids", []), f"{path}.baseline_ids")
+    if "attack_ids" in raw:
+        attack_ids = _string_list(raw["attack_ids"], f"{path}.attack_ids")
+    else:
+        standalone = _string_list(
+            raw.get("standalone_attack_ids", []), f"{path}.standalone_attack_ids"
+        )
+        derived = _string_list(
+            raw.get("derived_attack_ids", []), f"{path}.derived_attack_ids"
+        )
+        attack_ids = standalone + derived
+        overlap = sorted(set(standalone) & set(derived))
+        if overlap:
+            raise SelectionError(
+                f"{path}: {overlap} appear in both standalone_attack_ids and "
+                "derived_attack_ids"
+            )
+    if not baseline_ids and not attack_ids:
+        raise SelectionError(f"{path}: the selection is empty; there is nothing to run")
+
+    derived_keys = [baseline_key(b) for b in baseline_ids] + [
+        attack_key(a) for a in attack_ids
+    ]
+    declared_order = raw.get("order")
+    if declared_order is None:
+        order = tuple(derived_keys)
+    else:
+        order = tuple(_string_list(declared_order, f"{path}.order"))
+        if sorted(order) != sorted(derived_keys):
+            missing = sorted(set(derived_keys) - set(order))
+            extra = sorted(set(order) - set(derived_keys))
+            raise SelectionError(
+                f"{path}: order does not match the selected ids "
+                f"(missing {missing}, unexpected {extra})"
+            )
+
+    exclusions = raw.get("exclusions", [])
+    if not isinstance(exclusions, list) or not all(
+        isinstance(item, dict) for item in exclusions
+    ):
+        raise SelectionError(f"{path}.exclusions must be a list of objects")
+
+    return CaseSelection(
+        case_set_id=case_set_id,
+        selection_version=selection_version,
+        suite_id=suite_id,
+        baseline_ids=tuple(baseline_ids),
+        attack_ids=tuple(attack_ids),
+        order=order,
+        exclusions=tuple(dict(item) for item in exclusions),
+        source_path=str(path),
+        source_sha256=hashlib.sha256(raw_bytes).hexdigest(),
+    )
+
+
+def apply_case_set(
+    selection: CaseSelection,
+    baselines: Sequence[BaselineCase],
+    attacks: Sequence[AttackCase],
+) -> list[BaselineCase | AttackCase]:
+    """The selected cases, in the selection's order. Every id must really exist.
+
+    An unknown id is an error and not a skip. A selection naming a case the built
+    suite does not contain describes a different suite, and running the remainder
+    would produce coverage numbers over a denominator nobody chose.
+    """
+    baseline_index = {case.baseline_id: case for case in baselines}
+    attack_index = {case.attack_id: case for case in attacks}
+
+    unknown_baselines = [b for b in selection.baseline_ids if b not in baseline_index]
+    unknown_attacks = [a for a in selection.attack_ids if a not in attack_index]
+    if unknown_baselines or unknown_attacks:
+        raise SelectionError(
+            f"case set {selection.case_set_id!r} selects cases this suite does not "
+            f"contain: baselines {unknown_baselines}, attacks {unknown_attacks}"
+        )
+
+    selected_baselines = set(selection.baseline_ids)
+    orphans = sorted(
+        attack_id
+        for attack_id in selection.attack_ids
+        if attack_index[attack_id].baseline_id is not None
+        and attack_index[attack_id].baseline_id not in selected_baselines
+    )
+    if orphans:
+        raise SelectionError(
+            f"case set {selection.case_set_id!r} selects derived attacks whose "
+            f"baseline is not selected: {orphans}. A derived case with no clean "
+            "result to compare against cannot be scored."
+        )
+
+    units: list[BaselineCase | AttackCase] = []
+    for key in selection.order:
+        kind, _, identifier = key.partition(":")
+        if kind == "baseline":
+            units.append(baseline_index[identifier])
+        elif kind == "attack":
+            units.append(attack_index[identifier])
+        else:
+            raise SelectionError(
+                f"case set {selection.case_set_id!r}: {key!r} is not a case key; "
+                "expected 'baseline:<id>' or 'attack:<id>'"
+            )
+    return units
+
+
+def fingerprint_selection(
+    selected_keys: Sequence[str], *, case_set_id: str | None, suite_id: str
+) -> str:
+    """SHA-256 over exactly what was selected, in order.
+
+    Recorded as ``fingerprints.selected_order_sha256``, and distinct from both of
+    its neighbours on purpose:
+
+    - ``planned_suite_sha256`` says what the whole suite is;
+    - ``selection_sha256`` is the SHA-256 of the case-selection **file**, so a
+      reviewer can confirm which committed selection a run was pointed at, and is
+      ``null`` when no selection file was used (see the fixture run metadata);
+    - this one says what was *actually executed*, in order, which is the only one of
+      the three that still exists for a run with no case-set file at all.
+
+    The hashed document is canonical JSON, sorted keys, UTF-8, no incidental
+    whitespace:
+
+        {"case_set_id": <str|null>, "order": [<case keys, in order>],
+         "suite_id": <str>}
+    """
+    return hashlib.sha256(
+        _canonical(
+            {
+                "case_set_id": case_set_id,
+                "suite_id": suite_id,
+                "order": list(selected_keys),
+            }
+        )
+    ).hexdigest()
+
+
+def code_provenance(root: Path | None = None) -> dict:
+    """The commit this run's code came from, or an honest null.
+
+    A run that cannot say which code produced it is still a valid run; it is not a
+    run anything may be compared against. Recording null says that plainly instead of
+    leaving the field out and letting a reader assume a clean tree.
+    """
+    import subprocess
+
+    base = Path(root) if root is not None else ROOT
+    def git(*argv: str) -> str | None:
+        try:
+            done = subprocess.run(
+                ["git", *argv], cwd=base, capture_output=True, text=True, timeout=10
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+        return done.stdout.strip() if done.returncode == 0 else None
+
+    commit = git("rev-parse", "HEAD")
+    status = git("status", "--porcelain")
+    return {
+        "app_commit": commit,
+        "dirty": None if status is None else bool(status),
+    }
+
+
+# --------------------------------------------------------------------------
 # building the suite
 # --------------------------------------------------------------------------
 
@@ -338,6 +634,9 @@ def build_suite_once(
     baselines: Sequence[BaselineCase],
     token_counter: Callable[[str], int] | None,
     max_tokens: int | None,
+    *,
+    suite: str = SUITE_CORE,
+    task_id: str = LEGACY_TASK_ID,
 ) -> list[AttackCase]:
     """Build the attack suite exactly once.
 
@@ -346,10 +645,27 @@ def build_suite_once(
     the same attack_id into the sidecar, and a build without the tokenizer
     would stamp approximate boundaries into it. The analysis would then be
     joining results against an oracle describing different cases.
+
+    ``suite``/``task_id`` are CONTRACTS.md 4.2's keyword-only arguments with their
+    legacy defaults. They are forwarded only when the installed attack library
+    actually accepts them: the library is Lamei's and lands separately, so until it
+    does, a request for the legacy combination behaves exactly as it always has and
+    a request for anything else fails loudly instead of silently running the emotion
+    core suite under a sentiment or OCES label.
     """
-    return library.build_suite(
-        list(baselines), token_counter=token_counter, max_tokens=max_tokens
-    )
+    kwargs: dict = {"token_counter": token_counter, "max_tokens": max_tokens}
+    parameters = inspect.signature(library.build_suite).parameters
+    if "suite" in parameters and "task_id" in parameters:
+        kwargs["suite"] = suite
+        kwargs["task_id"] = task_id
+    elif suite != SUITE_CORE or task_id != LEGACY_TASK_ID:
+        raise ContractError(
+            f"attacks.library.build_suite does not yet accept suite/task_id, so "
+            f"suite={suite!r} task_id={task_id!r} cannot be built. Building the "
+            "legacy core/emotion suite and labelling it otherwise would put the "
+            "wrong cases behind the right name. Waiting on CONTRACTS.md 4.2."
+        )
+    return library.build_suite(list(baselines), **kwargs)
 
 
 def partition_attacks(
@@ -359,6 +675,18 @@ def partition_attacks(
     standalone = [case for case in attacks if case.baseline_id is None]
     derived = [case for case in attacks if case.baseline_id is not None]
     return standalone, derived
+
+
+def default_send_order(
+    baselines: Sequence[BaselineCase], attacks: Sequence[AttackCase]
+) -> list[BaselineCase | AttackCase]:
+    """The order this runner has always used: baselines, standalone, derived.
+
+    Stable across runs so two runs are comparable, and the order a case-set file
+    with no explicit ``order`` is read in.
+    """
+    standalone, derived = partition_attacks(attacks)
+    return [*baselines, *standalone, *derived]
 
 
 # --------------------------------------------------------------------------
@@ -612,11 +940,9 @@ class Runner:
             raise ValueError("health timeout must be finite and greater than zero")
         self.base = target.rstrip("/")
         self.version = version
-        # New Stage 3 identity, stamped on every row. Blank stays supported (an
-        # existing direct `Runner(...)` construction, e.g. in older tests, still
-        # works and produces historical-style blank fields) -- a real CLI run
-        # always sets both explicitly. See RunResult.target_id/suite_id in
-        # contract.py: blank means historical, never an inferred emotion default.
+        # Recorded on every row. Blank is supported so existing callers are unchanged,
+        # and means exactly "this caller did not declare an identity" -- never
+        # "assume emotion". main() always supplies both for a new run.
         self.target_id = target_id
         self.suite_id = suite_id
         self.writer = writer
@@ -639,6 +965,9 @@ class Runner:
             "server_errors_5xx": 0,
             "health_ping_retries": 0,
             "health_failures": 0,
+            # Bodies we failed to serialise. Counted apart from transport failures
+            # because nothing reached the wire: the endpoint never saw the request.
+            "serialization_errors": 0,
         }
         # One loop for the lifetime of the connection pool. The public runner
         # remains synchronous and sends exactly one request at a time.
@@ -677,16 +1006,46 @@ class Runner:
         async with asyncio.timeout(timeout):
             return await self.client.request(method, url, timeout=timeout, **kwargs)
 
-    async def _send_prepared(self, request: httpx.Request, timeout: float) -> httpx.Response:
-        """Send an already-built request. Same outer-deadline reasoning as _request.
+    async def _send_prepared(self, request: httpx.Request) -> httpx.Response:
+        """Send the exact request whose bytes were already measured."""
+        async with asyncio.timeout(self.timeout):
+            return await self.client.send(request, follow_redirects=False)
 
-        HTTPX's per-request timeout lives on the request itself (set at build time,
-        via extensions), not as a `send()` keyword -- `AsyncClient.send()` takes no
-        `timeout` argument. `asyncio.timeout` is still the real outer deadline here;
-        this just has to match HTTPX's own expectations for where timeout is set.
+    # -- the bytes that actually go on the wire -----------------------------
+
+    def prepare_request(
+        self, case: AttackCase | None, text: str | None
+    ) -> tuple[httpx.Request, bytes]:
+        """Build the request and read back the body the client will really send.
+
+        The body evidence has to be the *sender's* record of the bytes on the wire,
+        so it is taken from the prepared request rather than recomputed from the
+        text. Recomputing is how the old reports ended up guessing: a JSON body is
+        not its text, ``ensure_ascii`` changes its length, and a raw body is not
+        text at all. This returns the request object itself, and that same object is
+        the one sent -- nothing re-serialises it in between.
         """
-        async with asyncio.timeout(timeout):
-            return await self.client.send(request)
+        if case is not None and case.is_raw:
+            body = case.raw_body
+            if isinstance(body, str):
+                body = body.encode("utf-8")
+            elif body is None:
+                body = b""
+            # Verbatim. These bytes may be deliberately invalid UTF-8, and the
+            # headers are part of the test. Using json= here, or adding a header,
+            # would repair the very thing being tested.
+            request = self.client.build_request(
+                "POST",
+                self.predict_url,
+                content=body,
+                headers=dict(case.raw_headers or {}),
+                timeout=self.timeout,
+            )
+        else:
+            request = self.client.build_request(
+                "POST", self.predict_url, json={"text": text}, timeout=self.timeout
+            )
+        return request, request.read()
 
     # -- sending ------------------------------------------------------------
 
@@ -726,35 +1085,38 @@ class Runner:
         retry would hide it. The health ping does retry once, for a reason
         specific to the ping -- see health_ok.
 
-        Body evidence (request_body_bytes / request_body_sha256) is captured
-        from the ACTUAL prepared request -- never recomputed independently, and
-        never substituted with a character count. It is present in every
-        returned outcome that reaches the try block below, including ones where
-        the transport subsequently fails: a request that got no response still
-        has a known attempted body. Only a serialization failure (caught before
-        the try block) leaves both fields None, because no bytes ever existed.
+        Every return carries the request-body evidence, including the failures.
+        A request that got no response still has a known attempted body, and
+        that is exactly the case where "how big was it really?" is asked.
         """
         started = self.clock()
         try:
-            request = self._build_request(case, text)
+            request, body = self.prepare_request(case, text)
         except Exception as exc:                      # noqa: BLE001
+            # No bytes ever existed, so there is nothing to measure. Recording 0
+            # here would claim we sent an empty body and the endpoint accepted it.
             latency_ms = (self.clock() - started) * 1000.0
+            self.counts["serialization_errors"] += 1
             return {
                 "status_code": None,
                 "response_body": "",
-                "error": f"{ERR_SERIALIZATION}: {type(exc).__name__}: {exc}",
+                "error": (
+                    f"{ERR_SERIALIZATION}: {type(exc).__name__}: {exc}. No request "
+                    "was sent and no body bytes exist to record."
+                ),
                 "latency_ms": round(latency_ms, 2),
                 "latency_band": band_latency(latency_ms, timed_out=False),
                 "request_body_bytes": None,
                 "request_body_sha256": None,
             }
 
-        prepared_body = request.content
-        request_body_bytes = len(prepared_body)
-        request_body_sha256 = hashlib.sha256(prepared_body).hexdigest()
+        evidence = {
+            "request_body_bytes": len(body),
+            "request_body_sha256": hashlib.sha256(body).hexdigest(),
+        }
 
         try:
-            response = self._async_runner.run(self._send_prepared(request, self.timeout))
+            response = self._async_runner.run(self._send_prepared(request))
 
             latency_ms = (self.clock() - started) * 1000.0
             if response.status_code >= 500:
@@ -765,8 +1127,7 @@ class Runner:
                 "error": None,
                 "latency_ms": round(latency_ms, 2),
                 "latency_band": band_latency(latency_ms, timed_out=False),
-                "request_body_bytes": request_body_bytes,
-                "request_body_sha256": request_body_sha256,
+                **evidence,
             }
 
         except (TimeoutError, httpx.TimeoutException) as exc:
@@ -778,8 +1139,7 @@ class Runner:
                 "error": f"{ERR_TIMEOUT}: no response within {self.timeout}s ({type(exc).__name__})",
                 "latency_ms": round(latency_ms, 2),
                 "latency_band": BAND_TIMEOUT,
-                "request_body_bytes": request_body_bytes,
-                "request_body_sha256": request_body_sha256,
+                **evidence,
             }
 
         except httpx.TransportError as exc:
@@ -791,8 +1151,7 @@ class Runner:
                 "error": f"{ERR_CONNECTION}: {type(exc).__name__}: {exc}",
                 "latency_ms": round(latency_ms, 2),
                 "latency_band": band_latency(latency_ms, timed_out=False),
-                "request_body_bytes": request_body_bytes,
-                "request_body_sha256": request_body_sha256,
+                **evidence,
             }
 
         except httpx.HTTPError as exc:
@@ -803,8 +1162,7 @@ class Runner:
                 "error": f"{ERR_TRANSPORT}: {type(exc).__name__}: {exc}",
                 "latency_ms": round(latency_ms, 2),
                 "latency_band": band_latency(latency_ms, timed_out=False),
-                "request_body_bytes": request_body_bytes,
-                "request_body_sha256": request_body_sha256,
+                **evidence,
             }
 
     def health_ok(self) -> bool:
@@ -875,6 +1233,8 @@ class Runner:
             endpoint_alive_after=alive,
             target_id=self.target_id,
             suite_id=self.suite_id,
+            # .get, not [], so a caller that hands _record a hand-built outcome
+            # gets an honest "unavailable" rather than a KeyError or a zero.
             request_body_bytes=outcome.get("request_body_bytes"),
             request_body_sha256=outcome.get("request_body_sha256"),
         )
@@ -924,13 +1284,32 @@ class Runner:
         # Skips are a property of the plan, including cases never reached after
         # a health failure. main() has already applied the limit to attacks.
         self.skipped = [attack_key(case.attack_id) for case in attacks if case.attack_id in self.skip]
-        for baseline in baselines:
-            self.send_baseline(baseline)
-        standalone, derived = partition_attacks(attacks)
-        for case in standalone:
-            self.send_attack(case)
-        for case in derived:
-            self.send_attack(case)
+        self.run_ordered(default_send_order(baselines, attacks), reset_skipped=False)
+
+    def run_ordered(
+        self,
+        units: Sequence[BaselineCase | AttackCase],
+        *,
+        reset_skipped: bool = True,
+    ) -> None:
+        """Send exactly these cases, in exactly this order.
+
+        The order is the caller's, because a frozen selection's order is part of
+        what was frozen: two runs that send the same cases in a different order are
+        not the same experiment once state, caching or an endpoint death is involved.
+        ``run`` is this function with the default order, so there is one send loop.
+        """
+        if reset_skipped:
+            self.skipped = [
+                attack_key(case.attack_id)
+                for case in units
+                if isinstance(case, AttackCase) and case.attack_id in self.skip
+            ]
+        for unit in units:
+            if isinstance(unit, AttackCase):
+                self.send_attack(unit)
+            else:
+                self.send_baseline(unit)
 
 
 # --------------------------------------------------------------------------
@@ -975,14 +1354,28 @@ def build_meta(
     limit_excluded: Sequence[str],
     limit: int | None,
     counts: dict,
+    deselected: Sequence[str] = (),
     suite_sizes: dict,
     request_timeout: float = REQUEST_TIMEOUT,
     health_timeout: float = HEALTH_TIMEOUT,
+    # --- Stage 3 identity. All defaulted, so every existing call still works and
+    # --- still produces exactly the file it produced before.
     target_id: str = "",
     suite_id: str = "",
+    task_id: str = "",
+    evaluation_id: str | None = None,
+    evaluation_run_id: str | None = None,
     case_set_id: str | None = None,
-    baseline_file: str = "",
-    baseline_file_sha256: str | None = None,
+    model: dict | None = None,
+    baseline_source: dict | None = None,
+    registry_source: dict | None = None,
+    case_set: dict | None = None,
+    tokenizer: dict | None = None,
+    selection_sha256: str | None = None,
+    selected_order_sha256: str | None = None,
+    results_sha256: str | None = None,
+    provenance: dict | None = None,
+    resolved_from: str = "",
 ) -> dict:
     """The meta file.
 
@@ -1001,28 +1394,54 @@ def build_meta(
     planned_count = len(planned)
     return {
         "run_id": run_id,
+        # The enclosing run this was one target of, when an orchestrator supplied
+        # one. null means this invocation stood alone -- it is not the same thing as
+        # run_id, and it is never filled in from it.
+        "evaluation_run_id": evaluation_run_id,
+        "evaluation_id": evaluation_id,
         "version": version,
         "target_id": target_id,
+        "task_id": task_id,
         "suite_id": suite_id,
-        "case_set_id": case_set_id,
+        "identity_resolved_from": resolved_from,
         "target": target,
         "started_at": started_at,
         "ended_at": ended_at,
         "run_type": "smoke" if is_smoke else "full",
         "limit": limit,
         "termination_reason": termination_reason,
+        "model": model,
+        "baseline": baseline_source,
+        "registry": registry_source,
+        "case_set": case_set,
+        "case_set_id": case_set_id,
+        "tokenizer": tokenizer,
+        "code_provenance": provenance,
         "fingerprints": {
             "planned_suite_sha256": planned_fingerprint,
             "manifest_sha256": manifest_sha256,
             "manifest_path": manifest_path,
-            "baseline_file": baseline_file,
-            "baseline_file_sha256": baseline_file_sha256,
+            # Of the case-selection FILE this run was pointed at; null when there
+            # was none, because there is then no file whose bytes could be hashed.
+            "selection_sha256": selection_sha256,
+            # Of the ordered selection actually executed, and of the rows actually
+            # written. null where the value is genuinely unavailable -- a run that
+            # never opened a results file has no results hash, and saying 0 or ""
+            # would be a claim about bytes that do not exist.
+            "selected_order_sha256": selected_order_sha256,
+            "results_sha256": results_sha256,
         },
         "suite": suite_sizes,
         "coverage": {
             "planned": planned_count,
             "skipped": len(skipped),
             "limit_excluded": len(limit_excluded),
+            # Planned cases a frozen selection did not choose. Its own bucket
+            # because it is not a skip and not a limit: nothing went wrong and no
+            # flag was used, the selection simply names a part of the suite. Without
+            # it, planned minus the other three buckets would not close and a reader
+            # would be left to infer which of the three absorbed the difference.
+            "deselected": len(deselected),
             "selected": len(selected),
             "completed": len(completed),
             "missing": len(missing),
@@ -1034,6 +1453,7 @@ def build_meta(
             "completed": list(completed),
             "skipped": list(skipped),
             "limit_excluded": list(limit_excluded),
+            "deselected": list(deselected),
             "missing": missing,
         },
         "transport_counts": counts,
@@ -1077,31 +1497,34 @@ def build_parser() -> argparse.ArgumentParser:
     # No default target and no default version: the same runner has to work
     # against a deployed endpoint later with no code change, and a deployed
     # endpoint has no port that tells us which version it is.
-    #
-    # --target/--version stay optional at the argparse level (not required=True
-    # any more) because they are now one of two valid shapes, the other being
-    # --target-id alone -- see resolve_target(). Which shape was actually given
-    # is validated after parsing, in main(), so the error message can name the
-    # real problem (missing one of a pair, or a conflicting combination)
-    # instead of argparse's generic "required" message.
-    parser.add_argument("--target", default=None, help="base URL of the endpoint (legacy mode)")
-    parser.add_argument("--version", default=None, choices=("v1", "v2"), help="(legacy mode)")
+    parser.add_argument("--target", required=True, help="base URL of the endpoint")
+    # No longer `required`, because --target-id now identifies a target on its own.
+    # Every existing invocation passes --version and behaves exactly as before; what
+    # changed is that the emotion default it implies is now explicit and resolved
+    # through the registry instead of assumed.
     parser.add_argument(
-        "--target-id",
-        default=None,
-        choices=sorted(_registry().targets),
-        help="a trusted registry target; derives --target and --version. "
-        "Cannot be combined with --target or --version.",
+        "--version", choices=("v1", "v2"), default=None,
+        help="legacy flag; implies the emotion target of that version, explicitly",
     )
     parser.add_argument(
-        "--suite", choices=("core", "oces"), default="core",
-        help="which suite to run (default core). oces is not runnable until its "
-        "case/rule freeze lands.",
+        "--target-id", default=None, metavar="ID",
+        help="registry target id (derives --version). Conflicting flags are an error.",
     )
     parser.add_argument(
-        "--case-set", default=None, metavar="CASE_SET_ID",
-        help="restrict the run to a frozen selection from analysis/case_sets/. "
-        "Cannot be combined with --limit.",
+        "--suite", choices=tuple(sorted(SUITES)), default=SUITE_CORE,
+        help=f"which case family set to build (default {SUITE_CORE})",
+    )
+    parser.add_argument(
+        "--case-set", default=None, metavar="PATH",
+        help="a frozen selection file; its ids and order are executed exactly",
+    )
+    parser.add_argument(
+        "--evaluation-id", default=None, metavar="ID",
+        help="registry evaluation this run is one target of; resolves the baseline file",
+    )
+    parser.add_argument(
+        "--parent-run-id", default=None, metavar="HEX",
+        help="run_id of the enclosing multi-target run, recorded as evaluation_run_id",
     )
     parser.add_argument(
         "--out",
@@ -1127,6 +1550,225 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _validate_flag_combinations(args: argparse.Namespace) -> None:
+    """Refuse combinations whose result nobody could predict from the flags.
+
+    --limit and --skip against a frozen selection are the ones that matter. A
+    selection is frozen so a policy can name exactly what was scored; quietly
+    dropping cases from it would leave a run that still claims the frozen
+    case_set_id while having executed something else.
+    """
+    if args.case_set is not None:
+        if args.limit is not None:
+            raise ContractError(
+                "--limit cannot be combined with --case-set: a frozen selection "
+                "already states exactly which cases run."
+            )
+        if args.skip:
+            raise ContractError(
+                "--skip cannot be combined with --case-set: dropping a case from a "
+                "frozen selection would leave the run claiming a selection it did "
+                "not execute. Change the case set, or run without one."
+            )
+
+
+@dataclasses.dataclass
+class RunPlan:
+    """Everything resolved before a single byte goes on the wire.
+
+    Building this is the readiness phase. It loads the registry, resolves the
+    target, reads the baseline the *evaluation* points at, builds the suite inside
+    an isolated metadata scope and writes the manifest from that same build. If any
+    of it fails, nothing in the output directory has been touched yet and the
+    previous successful run is still the published one.
+    """
+
+    resolved: ResolvedTarget
+    baselines: list[BaselineCase]
+    attacks: list[AttackCase]
+    planned_fingerprint: str
+    planned_keys: list[str]
+    units: list[BaselineCase | AttackCase]
+    selected_keys: list[str]
+    skipped_keys: list[str]
+    limit_excluded: list[str]
+    deselected: list[str]
+    selection: CaseSelection | None
+    selection_sha256: str | None
+    selected_order_sha256: str
+    baseline_source: dict
+    model: dict
+    registry_source: dict
+    tokenizer: dict
+    suite_sizes: dict
+
+
+def _resolve_baseline_file(resolved: ResolvedTarget) -> str:
+    """The repo-relative baseline file this run must actually read.
+
+    Always through the registry, and through ``baseline_file_for`` when there is an
+    evaluation, because an evaluation-level override is the only way an OCES run
+    finds its frozen seed file. Recording the core baseline's hash for an OCES run
+    would claim the run used data it did not use.
+    """
+    registry = resolved.registry
+    if resolved.evaluation_id is not None:
+        return registry.baseline_file_for(resolved.evaluation_id)
+    if resolved.suite_id != SUITE_CORE:
+        raise ContractError(
+            f"--suite {resolved.suite_id} has no baseline file of its own; pass "
+            "--evaluation-id so the evaluation's seed-file override resolves. "
+            "Falling back to the task default would run the wrong seeds."
+        )
+    return registry.task_for(resolved.target_id).baseline_file
+
+
+def plan_run(args: argparse.Namespace, out_dir: Path, staging: Path) -> RunPlan:
+    """Resolve, load, build and register expectations. Sends nothing."""
+    _validate_flag_combinations(args)
+
+    registry = target_registry.load_registry()
+    resolved = resolve_target(
+        registry,
+        target_id=args.target_id,
+        version=args.version,
+        suite=args.suite,
+        evaluation_id=args.evaluation_id,
+    )
+    if resolved.evaluation_id is not None:
+        # Existence of the module and baseline file, checked immediately before
+        # execution rather than at registry load -- see endpoint/targets.py.
+        target_registry.require_runnable(registry, resolved.evaluation_id)
+
+    baseline_rel = _resolve_baseline_file(resolved)
+    baseline_path = ROOT / baseline_rel
+    # File order from the loader, then sorted by id. Sorting means the
+    # fingerprint changes only when the content changes, not when the baseline
+    # file happens to be written in a different order.
+    baselines = sorted(load_baseline(baseline_path), key=lambda b: b.baseline_id)
+
+    if args.no_tokenizer:
+        token_counter, max_tokens = None, None
+        tokenizer_meta = {
+            "source": "approximate",
+            "max_tokens": None,
+            "weights_loaded": False,
+            "note": "--no-tokenizer: length boundaries are approximate, testing only",
+        }
+        print("WARNING: approximate length boundaries, for testing only")
+    else:
+        token_counter, max_tokens, tokenizer_meta = build_token_counter_for_target(
+            resolved.target_id, registry
+        )
+        tokenizer_meta = {"source": "tokenizer", **tokenizer_meta}
+
+    # One isolated build per task/suite. Clearing the shared metadata registry first
+    # is the point: without it, a suite built here would inherit every case already
+    # registered in this process, and the manifest written from this build would
+    # describe cases from another one.
+    with scoped_registry():
+        attacks = build_suite_once(
+            baselines,
+            token_counter,
+            max_tokens,
+            suite=resolved.suite_id,
+            task_id=resolved.task_id,
+        )
+        # Written from the same isolated build that is about to run.
+        library.write_manifest(str(staging / MANIFEST_NAME))
+
+    planned_fingerprint = fingerprint_suite(baselines, attacks)
+    standalone, derived = partition_attacks(attacks)
+    planned_keys = [baseline_key(b.baseline_id) for b in baselines] + [
+        attack_key(a.attack_id) for a in attacks
+    ]
+
+    selection: CaseSelection | None = None
+    if args.case_set is not None:
+        selection = load_case_set(args.case_set)
+        if selection.suite_id != resolved.suite_id:
+            raise SelectionError(
+                f"case set {selection.case_set_id!r} is suite "
+                f"{selection.suite_id!r}, but --suite {resolved.suite_id!r} was "
+                "given. They conflict."
+            )
+        if resolved.evaluation_id is not None:
+            declared = registry.evaluation(resolved.evaluation_id).case_set_id
+            if declared is not None and declared != selection.case_set_id:
+                raise SelectionError(
+                    f"evaluation {resolved.evaluation_id!r} declares case set "
+                    f"{declared!r}, but {selection.case_set_id!r} was supplied."
+                )
+        units = apply_case_set(selection, baselines, attacks)
+        selected_keys = list(selection.order)
+        skipped_keys = []
+        limit_excluded = []
+    else:
+        kept_attacks, limit_excluded = select_attacks(attacks, args.limit)
+        skip_set = set(args.skip)
+        # Limit takes precedence: an attack outside the limited prefix is only
+        # limit-excluded, even when its ID also appears in --skip.
+        skipped_keys = [
+            attack_key(a.attack_id) for a in kept_attacks if a.attack_id in skip_set
+        ]
+        selected_keys = [baseline_key(b.baseline_id) for b in baselines] + [
+            attack_key(a.attack_id) for a in kept_attacks if a.attack_id not in skip_set
+        ]
+        units = default_send_order(baselines, kept_attacks)
+
+    accounted = set(selected_keys) | set(skipped_keys) | set(limit_excluded)
+    deselected = [key for key in planned_keys if key not in accounted]
+
+    model_spec = registry.model_for(resolved.target_id)
+    return RunPlan(
+        resolved=resolved,
+        baselines=baselines,
+        attacks=attacks,
+        planned_fingerprint=planned_fingerprint,
+        planned_keys=planned_keys,
+        units=units,
+        selected_keys=selected_keys,
+        skipped_keys=skipped_keys,
+        limit_excluded=limit_excluded,
+        deselected=deselected,
+        selection=selection,
+        # The file's own bytes, or null when this run used no selection file.
+        selection_sha256=selection.source_sha256 if selection else None,
+        selected_order_sha256=fingerprint_selection(
+            selected_keys,
+            case_set_id=selection.case_set_id if selection else None,
+            suite_id=resolved.suite_id,
+        ),
+        baseline_source={
+            "path": baseline_rel,
+            "sha256": sha256_file(baseline_path),
+        },
+        model={
+            "model_id": model_spec.model_id,
+            "revision": model_spec.revision,
+            "tokenizer_id": model_spec.tokenizer_id,
+            "tokenizer_revision": model_spec.tokenizer_revision,
+            "labels": list(model_spec.labels),
+            "max_sequence_length": model_spec.max_sequence_length,
+        },
+        registry_source={
+            "registry_version": registry.registry_version,
+            "path": str(Path(registry.source_path).name),
+            "sha256": registry.source_sha256,
+        },
+        tokenizer=tokenizer_meta,
+        suite_sizes={
+            "baselines": len(baselines),
+            "attacks": len(attacks),
+            "standalone_attacks": len(standalone),
+            "derived_attacks": len(derived),
+            "total_cases": len(baselines) + len(attacks),
+            "boundary_source": "approximate" if token_counter is None else "tokenizer",
+            "max_tokens": max_tokens,
+        },
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -1150,138 +1792,104 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
-    results_path = out_dir / f"results_{version}.jsonl"
-    meta_path = out_dir / f"run_meta_{version}.json"
+    # Legacy file names stay legacy. A run that names its target uses the
+    # target-scoped names the Stage 3 layout expects
+    # (tests/fixtures/stage3/runs/<evaluation>/<target_id>/), so two targets of one
+    # evaluation write into their own directories without a version suffix
+    # colliding -- sentiment_v1 and emotion_v1 are both "v1".
+    target_scoped = args.target_id is not None
+    results_path = out_dir / ("results.jsonl" if target_scoped else f"results_{args.version}.jsonl")
+    meta_path = out_dir / ("run_meta.json" if target_scoped else f"run_meta_{args.version}.json")
     manifest_path = out_dir / MANIFEST_NAME
+    selection_path = out_dir / SELECTION_NAME
 
     run_id = uuid.uuid4().hex[:12]
     started_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
-    # Baseline file resolved through the registry for every target, including the
-    # legacy emotion ones -- it resolves to the exact same file they always used,
-    # so this is not a behavior change, just a single code path for both.
-    try:
-        baseline_path = resolve_baseline_path(registry, target_id, args.suite)
-    except (RunnerConfigError, ContractError) as exc:
-        parser.error(str(exc))
-    try:
-        # File order from the loader, then sorted by id. Sorting means the
-        # fingerprint changes only when the content changes, not when the
-        # baseline file happens to be written in a different order.
-        baselines = sorted(load_baseline(baseline_path), key=lambda b: b.baseline_id)
-    except FileNotFoundError:
-        print(
-            f"cannot run target {target_id!r} suite {args.suite!r}: baseline file "
-            f"not found at {baseline_path}. This evaluation's baseline has not been "
-            "produced yet.",
-            file=sys.stderr,
-        )
-        return 2
-    baseline_file_sha256 = sha256_file(baseline_path)
-
-    if args.no_tokenizer:
-        token_counter, max_tokens = None, None
-        print("WARNING: approximate length boundaries, for testing only")
-    else:
-        token_counter, max_tokens = build_token_counter(target_id)
-
-    attacks = build_suite_once(baselines, token_counter, max_tokens)
-
-    planned_fingerprint = fingerprint_suite(baselines, attacks)
-    standalone, derived = partition_attacks(attacks)
-
-    planned_keys = [baseline_key(b.baseline_id) for b in baselines] + [
-        attack_key(a.attack_id) for a in attacks
-    ]
-
-    if args.case_set is not None:
-        case_set = load_case_set(args.case_set)
-        try:
-            run_baselines, kept_attacks, limit_excluded = apply_case_set(
-                case_set, args.suite, baselines, attacks
-            )
-        except RunnerConfigError as exc:
-            parser.error(str(exc))
-    else:
-        run_baselines = baselines
-        kept_attacks, limit_excluded = select_attacks(attacks, args.limit)
-
-    skip_set = set(args.skip)
-    # Limit/case-set takes precedence: a case outside the selected set is only
-    # limit-excluded, even when its ID also appears in --skip.
-    skipped_keys = [attack_key(a.attack_id) for a in kept_attacks if a.attack_id in skip_set]
-    selected_keys = [baseline_key(b.baseline_id) for b in run_baselines] + [
-        attack_key(a.attack_id) for a in kept_attacks if a.attack_id not in skip_set
-    ]
-
-    suite_sizes = {
-        "baselines": len(baselines),
-        "attacks": len(attacks),
-        "standalone_attacks": len(standalone),
-        "derived_attacks": len(derived),
-        "total_cases": len(baselines) + len(attacks),
-        "boundary_source": "approximate" if token_counter is None else "tokenizer",
-        "max_tokens": max_tokens,
-    }
-
-    print(f"run       {run_id}  ({version})  target_id={target_id}  suite={args.suite}"
-          + (f"  case_set={args.case_set}" if args.case_set else ""))
-    print(f"target    {target}")
-    print(f"suite     {suite_sizes['baselines']} baselines + {suite_sizes['attacks']} attacks "
-          f"= {suite_sizes['total_cases']} planned")
-    print(f"sending   {len(selected_keys)} cases"
-          + (f" (--limit {args.limit})" if args.limit is not None else "")
-          + (f", skipping {len(args.skip)}" if args.skip else ""))
-    print(f"planned   fingerprint {planned_fingerprint[:16]}")
-    print(f"out       {results_path}")
-    print()
-
-    def progress(result: RunResult) -> None:
-        status = result.status_code if result.status_code is not None else "no response"
-        print(f"  {describe(result):<64} {str(status):>12} {result.latency_ms:>9.1f} ms "
-              f"{result.latency_band}", flush=True)
-
-    # Success is assigned only after the selected plan actually finishes.
-    termination = TERM_ERROR
+    print(f"run       {run_id}")
     exit_code = 0
     writer = None
     manifest_sha = None
-    runner = Runner(
-        target=target,
-        version=version,
-        writer=writer,
-        predict_path=args.predict_path,
-        health_path=args.health_path,
-        timeout=args.timeout,
-        health_timeout=args.health_timeout,
-        skip=args.skip,
-        on_record=progress,
-        target_id=target_id,
-        suite_id=args.suite,
-    )
-    runner.skipped = skipped_keys
+    runner = None
+    termination = TERM_ERROR
+    plan = None
 
     try:
-        # Register expectations once, before even the preflight health request.
-        # Stage them in this output directory so a failed preflight cannot
-        # replace an earlier run's manifest, results or metadata. Publication
-        # happens before the first prediction, preserving the oracle boundary.
-        with tempfile.TemporaryDirectory(prefix=".runner-", dir=out_dir) as staging:
-            staged_manifest = Path(staging) / MANIFEST_NAME
-            library.write_manifest(str(staged_manifest))
+        # Everything up to and including the preflight happens against a staging
+        # directory inside the output directory. Nothing already published is
+        # replaced until the endpoint has answered, so a readiness failure never
+        # destroys the previous successful run's evidence.
+        with tempfile.TemporaryDirectory(prefix=".runner-", dir=out_dir) as staging_name:
+            staging = Path(staging_name)
+            try:
+                plan = plan_run(args, out_dir, staging)
+            except (ContractError, SelectionError, OSError) as exc:
+                print(f"\nconfiguration error: {exc}", file=sys.stderr)
+                print("No cases were sent; previous run artifacts were preserved.",
+                      file=sys.stderr)
+                return 2
+
+            resolved = plan.resolved
+            sizes = plan.suite_sizes
+            print(f"target    {resolved.target_id} ({resolved.version}, task "
+                  f"{resolved.task_id}, suite {resolved.suite_id}) via {resolved.resolved_from}")
+            print(f"url       {args.target}")
+            print(f"baseline  {plan.baseline_source['path']}  "
+                  f"sha256 {plan.baseline_source['sha256'][:16]}")
+            print(f"suite     {sizes['baselines']} baselines + {sizes['attacks']} attacks "
+                  f"= {sizes['total_cases']} planned")
+            print(f"sending   {len(plan.selected_keys)} cases"
+                  + (f" (--limit {args.limit})" if args.limit is not None else "")
+                  + (f", skipping {len(args.skip)}" if args.skip else "")
+                  + (f" (case set {plan.selection.case_set_id})" if plan.selection else ""))
+            print(f"planned   fingerprint {plan.planned_fingerprint[:16]}")
+            print(f"selection fingerprint {plan.selected_order_sha256[:16]}"
+                  + (f"  (case set file {plan.selection_sha256[:16]})"
+                     if plan.selection_sha256 else ""))
+            print(f"out       {results_path}")
+            print()
+
+            def progress(result: RunResult) -> None:
+                status = result.status_code if result.status_code is not None else "no response"
+                print(f"  {describe(result):<64} {str(status):>12} {result.latency_ms:>9.1f} ms "
+                      f"{result.latency_band}", flush=True)
+
+            runner = Runner(
+                target=args.target,
+                version=resolved.version,
+                writer=None,
+                predict_path=args.predict_path,
+                health_path=args.health_path,
+                timeout=args.timeout,
+                health_timeout=args.health_timeout,
+                skip=args.skip,
+                on_record=progress,
+                target_id=resolved.target_id,
+                suite_id=resolved.suite_id,
+            )
+            runner.skipped = plan.skipped_keys
+
+            staged_manifest = staging / MANIFEST_NAME
             manifest_sha = sha256_file(staged_manifest)
+            if plan.selection is not None:
+                (staging / SELECTION_NAME).write_text(
+                    json.dumps(plan.selection.describe(), indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
             if not runner.preflight():
                 print(f"the endpoint at {target} is not answering {args.health_path}.")
                 print("No cases were sent; previous run artifacts were preserved.")
                 print("Start it, or check --target and --health-path.")
                 return 2
             staged_manifest.replace(manifest_path)
+            if plan.selection is not None:
+                (staging / SELECTION_NAME).replace(selection_path)
 
         writer = ResultWriter(results_path)
         runner.writer = writer
         print(f"manifest  {manifest_path}  sha256 {manifest_sha[:16]}")
         try:
-            runner.run(run_baselines, kept_attacks)
+            runner.run_ordered(plan.units, reset_skipped=False)
             termination = TERM_LIMIT if args.limit is not None else TERM_COMPLETED
         except EndpointDied as died:
             termination = TERM_HEALTH
@@ -1312,38 +1920,52 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise
     finally:
         try:
-            runner.close()
+            if runner is not None:
+                runner.close()
         finally:
             # A preflight failure has no new result file and must not replace
             # the metadata describing the previous invocation.
-            if writer is not None:
+            if writer is not None and plan is not None:
                 writer.close()
+                resolved = plan.resolved
                 meta = build_meta(
                     run_id=run_id,
-                    version=version,
+                    version=resolved.version,
                     started_at=started_at,
                     ended_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
                     is_smoke=args.limit is not None,
                     termination_reason=termination,
-                    planned_fingerprint=planned_fingerprint,
+                    planned_fingerprint=plan.planned_fingerprint,
                     manifest_sha256=manifest_sha,
                     manifest_path=str(manifest_path),
-                    target=target,
-                    planned=planned_keys,
-                    selected=selected_keys,
+                    target=args.target,
+                    planned=plan.planned_keys,
+                    selected=plan.selected_keys,
                     completed=runner.completed,
-                    skipped=skipped_keys,
-                    limit_excluded=limit_excluded,
+                    skipped=plan.skipped_keys,
+                    limit_excluded=plan.limit_excluded,
+                    deselected=plan.deselected,
                     limit=args.limit,
                     counts=runner.counts,
-                    suite_sizes=suite_sizes,
+                    suite_sizes=plan.suite_sizes,
                     request_timeout=runner.timeout,
                     health_timeout=runner.health_timeout,
-                    target_id=target_id,
-                    suite_id=args.suite,
-                    case_set_id=args.case_set,
-                    baseline_file=str(baseline_path),
-                    baseline_file_sha256=baseline_file_sha256,
+                    target_id=resolved.target_id,
+                    suite_id=resolved.suite_id,
+                    task_id=resolved.task_id,
+                    evaluation_id=resolved.evaluation_id,
+                    evaluation_run_id=args.parent_run_id,
+                    case_set_id=plan.selection.case_set_id if plan.selection else None,
+                    model=plan.model,
+                    baseline_source=plan.baseline_source,
+                    registry_source=plan.registry_source,
+                    case_set=plan.selection.describe() if plan.selection else None,
+                    tokenizer=plan.tokenizer,
+                    selection_sha256=plan.selection_sha256,
+                    selected_order_sha256=plan.selected_order_sha256,
+                    results_sha256=sha256_file(results_path) if results_path.exists() else None,
+                    provenance=code_provenance(),
+                    resolved_from=resolved.resolved_from,
                 )
                 write_meta(meta_path, meta)
                 coverage = meta["coverage"]
@@ -1351,7 +1973,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(f"recorded  {writer.count} rows to {results_path}")
                 print(f"coverage  {coverage['completed']}/{coverage['planned']} "
                       f"(rate {coverage['coverage_rate']:.4f}), {coverage['missing']} missing, "
-                      f"{coverage['skipped']} skipped, {coverage['limit_excluded']} limit-excluded")
+                      f"{coverage['skipped']} skipped, {coverage['limit_excluded']} limit-excluded, "
+                      f"{coverage['deselected']} not selected")
                 print(f"meta      {meta_path}  termination {termination}")
 
     return exit_code

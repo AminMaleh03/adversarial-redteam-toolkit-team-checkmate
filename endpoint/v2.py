@@ -68,17 +68,27 @@ async def generic_exception_handler(request: Request, exc: Exception):
 def predict_endpoint(request: PredictRequest):
     cleaned = clean_text(request.text)
 
-    # Defense 1: length limit, checked before inference. Uses the same
-    # tokenizer model.py uses, so "too long" means exactly what the
-    # model can't handle — no arbitrary number.
-    # truncation=False passed explicitly, same as model.py: this call must
-    # measure the FULL length, never silently trim it before we can count it.
-    token_count = len(tokenizer.encode(cleaned, add_special_tokens=True, truncation=False))
-    if token_count > MAX_SEQUENCE_LENGTH:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Input exceeds maximum sequence length of {MAX_SEQUENCE_LENGTH} tokens.",
-        )
+    # REGRESSION DEMONSTRATION ONLY -- DO NOT MERGE THIS BRANCH.
+    #
+    # Defense 1 (the length limit) is removed here and nowhere else. Defenses 2
+    # (strict types + extra="forbid"), 3 (the scoped exception handler) and 4
+    # (unicode normalization and whitespace cleanup) are untouched, so a gate
+    # failure on this branch is attributable to this one removal and not to a
+    # weaker endpoint in general.
+    #
+    # What this actually does, measured rather than assumed: over-length input now
+    # reaches predict(), the forward pass raises because the input indexes past the
+    # position-embedding table, and defense 3 converts that exception into a generic
+    # HTTP 500 {"detail": "Internal server error"}. There is no stack trace in the
+    # response body and the uvicorn process does not die -- FastAPI catches per
+    # request. That is the expected and sufficient finding. Do not try to make the
+    # process crash to make the demonstration look better.
+    #
+    # Restore by putting back exactly the two statements this replaced:
+    #   token_count = len(tokenizer.encode(cleaned, add_special_tokens=True,
+    #                                      truncation=False))
+    #   if token_count > MAX_SEQUENCE_LENGTH:
+    #       raise HTTPException(422, f"Input exceeds maximum sequence length ...")
 
     scores = predict(cleaned)
     return format_response(scores)

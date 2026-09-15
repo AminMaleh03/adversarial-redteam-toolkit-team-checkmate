@@ -2112,3 +2112,88 @@ def test_duplicate_generated_ids_are_rejected(tmp_path, field):
 def test_selection_rejects_invalid_version_or_conflicting_lists(tmp_path, overrides):
     with pytest.raises(SelectionError):
         load_case_set(write_selection(tmp_path, **overrides))
+
+
+def _paired_plan(tmp_path, **overrides):
+    args = runner_module.build_parser().parse_args([
+        "--target", TARGET, "--target-id", "emotion_v1", "--no-tokenizer",
+    ])
+    for key, value in overrides.items():
+        setattr(args, key, value)
+    staging = tmp_path / ("plan-" + str(len(list(tmp_path.glob("plan-*")))))
+    staging.mkdir()
+    return args, staging
+
+
+def test_paired_targets_reuse_one_build_and_exact_manifest(cli, tmp_path):
+    _, out, state = cli
+    args, staging = _paired_plan(tmp_path)
+    plan = runner_module.plan_run(args, out, staging)
+    assert runner_module.main([
+        "--target", TARGET, "--target-id", "emotion_v2", "--no-tokenizer",
+        "--out", str(out),
+    ], reuse_plan=plan) == 0
+    assert state["manifest_writes"] == 1
+    assert (out / "manifest.json").read_bytes() == plan.manifest_bytes
+    meta = json.loads((out / "run_meta.json").read_text(encoding="utf-8"))
+    assert meta["case_ids"]["selected"] == plan.selected_keys
+    assert meta["fingerprints"]["planned_suite_sha256"] == plan.planned_fingerprint
+
+
+@pytest.mark.parametrize("change", ["selection", "context", "mutated_cases"])
+def test_paired_plan_rejects_changed_context_or_cases(cli, tmp_path, change):
+    _, out, state = cli
+    args, staging = _paired_plan(tmp_path)
+    plan = runner_module.plan_run(args, out, staging)
+    args, staging = _paired_plan(tmp_path, target_id="emotion_v2")
+    if change == "selection":
+        args.limit = 1
+    elif change == "context":
+        args.no_tokenizer = False
+    else:
+        plan.baselines[0].text = "changed after planning"
+    with pytest.raises((ContractError, SelectionError)):
+        runner_module.plan_run(args, out, staging, reuse_plan=plan)
+    assert not state["posts"]
+    assert state["manifest_writes"] == 1
+
+
+def test_coverage_map_is_copied_byte_for_byte_and_hashed(cli, tmp_path, monkeypatch):
+    invoke, out, _ = cli
+    root = tmp_path / "root"
+    (root / "attacks").mkdir(parents=True)
+    (root / "baseline").mkdir()
+    (root / "baseline" / "baseline.json").write_bytes(b"[]")
+    content = b'{ "coverage_map_version": "fixture-1" }\r\n'
+    (root / "attacks" / "coverage_map.json").write_bytes(content)
+    monkeypatch.setattr(runner_module, "ROOT", root)
+    assert invoke("--target-id", "emotion_v2") == 0
+    meta = json.loads((out / "run_meta.json").read_text(encoding="utf-8"))
+    assert (out / "coverage_map.json").read_bytes() == content
+    assert meta["coverage_map"]["sha256"] == hashlib.sha256(content).hexdigest()
+    assert meta["fingerprints"]["coverage_map_sha256"] == meta["coverage_map"]["sha256"]
+    before = {p.name: p.read_bytes() for p in out.iterdir()}
+    (root / "attacks" / "coverage_map.json").write_bytes(b"{}")
+    assert invoke("--target-id", "emotion_v2") == 2
+    assert {p.name: p.read_bytes() for p in out.iterdir()} == before
+
+
+def test_missing_declared_coverage_map_fails_readiness(cli, monkeypatch):
+    invoke, out, state = cli
+    monkeypatch.setattr(runner_module.library, "write_manifest", lambda path:
+                        Path(path).write_text('{"a":{"coverage_map_version":"1"}}'))
+    assert invoke("--target-id", "emotion_v2") == 2
+    assert not state["posts"]
+    assert not list(out.iterdir())
+
+
+def test_wrong_tokenizer_context_is_rejected(monkeypatch):
+    from endpoint import loader
+    from types import SimpleNamespace
+    from endpoint.targets import load_registry
+    registry = load_registry()
+    context = SimpleNamespace(target_id="emotion_v1", task_id="emotion_7",
+                              model_spec=registry.model_for("emotion_v1"), max_tokens=512)
+    monkeypatch.setattr(loader, "load_target_tokenizer", lambda *a, **k: context)
+    with pytest.raises(ContractError, match="wrong tokenizer context"):
+        runner_module.build_token_counter_for_target("sentiment_v1", registry)

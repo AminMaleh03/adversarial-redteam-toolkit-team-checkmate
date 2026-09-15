@@ -27,6 +27,7 @@ import argparse
 import asyncio
 import base64
 import dataclasses
+import copy
 import hashlib
 import inspect
 import json
@@ -322,6 +323,11 @@ def build_token_counter_for_target(
     from endpoint.loader import load_target_tokenizer
 
     context = load_target_tokenizer(target_id, registry=registry)
+    if (context.target_id != target_id
+            or context.task_id != registry.task_for(target_id).task_id
+            or context.model_spec != registry.model_for(target_id)
+            or context.max_tokens != registry.model_for(target_id).max_sequence_length):
+        raise ContractError(f"{target_id}: wrong tokenizer context or token limit")
     max_tokens = int(context.max_tokens)
     if not MIN_PLAUSIBLE_MAX_TOKENS <= max_tokens <= MAX_PLAUSIBLE_MAX_TOKENS:
         raise RuntimeError(
@@ -1213,6 +1219,7 @@ def build_meta(
     model: dict | None = None,
     baseline_source: dict | None = None,
     registry_source: dict | None = None,
+    coverage_map: dict | None = None,
     case_set: dict | None = None,
     tokenizer: dict | None = None,
     selection_sha256: str | None = None,
@@ -1257,6 +1264,7 @@ def build_meta(
         "model": model,
         "baseline": baseline_source,
         "registry": registry_source,
+        "coverage_map": coverage_map,
         "case_set": case_set,
         "case_set_id": case_set_id,
         "tokenizer": tokenizer,
@@ -1265,6 +1273,7 @@ def build_meta(
             "planned_suite_sha256": planned_fingerprint,
             "manifest_sha256": manifest_sha256,
             "manifest_path": manifest_path,
+            "coverage_map_sha256": coverage_map["sha256"] if coverage_map else None,
             # Of the case-selection FILE this run was pointed at; null when there
             # was none, because there is then no file whose bytes could be hashed.
             "selection_sha256": selection_sha256,
@@ -1445,6 +1454,10 @@ class RunPlan:
     registry_source: dict
     tokenizer: dict
     suite_sizes: dict
+    build_identity: dict = dataclasses.field(default_factory=dict)
+    manifest_bytes: bytes = b""
+    coverage_map_bytes: bytes | None = None
+    coverage_map: dict | None = None
 
 
 def _resolve_baseline_file(resolved: ResolvedTarget) -> str:
@@ -1467,7 +1480,10 @@ def _resolve_baseline_file(resolved: ResolvedTarget) -> str:
     return registry.task_for(resolved.target_id).baseline_file
 
 
-def plan_run(args: argparse.Namespace, out_dir: Path, staging: Path) -> RunPlan:
+def plan_run(
+    args: argparse.Namespace, out_dir: Path, staging: Path, *,
+    reuse_plan: RunPlan | None = None,
+) -> RunPlan:
     """Resolve, load, build and register expectations. Sends nothing."""
     _validate_flag_combinations(args)
 
@@ -1501,7 +1517,27 @@ def plan_run(args: argparse.Namespace, out_dir: Path, staging: Path) -> RunPlan:
         raise ContractError("registry changed during planning")
     (staging / "registry.json").write_bytes(registry_bytes)
 
-    if args.no_tokenizer:
+    build_identity = {
+        "task_id": resolved.task_id,
+        "suite_id": resolved.suite_id,
+        "model": dataclasses.asdict(registry.model_for(resolved.target_id)),
+        "baseline_path": baseline_rel,
+        "baseline_sha256": sha256_file(baseline_path),
+        "approximate": args.no_tokenizer,
+        "registry_sha256": registry.source_sha256,
+    }
+    if reuse_plan is not None:
+        if build_identity != reuse_plan.build_identity:
+            raise ContractError("reused plan has a different task, suite, model, baseline or tokenizer context")
+        if fingerprint_suite(reuse_plan.baselines, reuse_plan.attacks) != reuse_plan.planned_fingerprint:
+            raise ContractError("reused plan cases changed after planning")
+        baselines = copy.deepcopy(reuse_plan.baselines)
+        token_counter = None  # the reused suite is already built
+        max_tokens = reuse_plan.suite_sizes["max_tokens"]
+        tokenizer_meta = copy.deepcopy(reuse_plan.tokenizer)
+        if "target_id" in tokenizer_meta:
+            tokenizer_meta["target_id"] = resolved.target_id
+    elif args.no_tokenizer:
         token_counter, max_tokens = None, None
         tokenizer_meta = {
             "source": "approximate",
@@ -1520,16 +1556,38 @@ def plan_run(args: argparse.Namespace, out_dir: Path, staging: Path) -> RunPlan:
     # is the point: without it, a suite built here would inherit every case already
     # registered in this process, and the manifest written from this build would
     # describe cases from another one.
-    with scoped_registry():
-        attacks = build_suite_once(
-            baselines,
-            token_counter,
-            max_tokens,
-            suite=resolved.suite_id,
-            task_id=resolved.task_id,
-        )
-        # Written from the same isolated build that is about to run.
-        library.write_manifest(str(staging / MANIFEST_NAME))
+    if reuse_plan is None:
+        with scoped_registry():
+            attacks = build_suite_once(
+                baselines, token_counter, max_tokens,
+                suite=resolved.suite_id, task_id=resolved.task_id,
+            )
+            library.write_manifest(str(staging / MANIFEST_NAME))
+        manifest_bytes = (staging / MANIFEST_NAME).read_bytes()
+        map_path = ROOT / "attacks" / "coverage_map.json"
+        coverage_map_bytes = map_path.read_bytes() if map_path.is_file() else None
+    else:
+        attacks = copy.deepcopy(reuse_plan.attacks)
+        manifest_bytes = reuse_plan.manifest_bytes
+        coverage_map_bytes = reuse_plan.coverage_map_bytes
+        (staging / MANIFEST_NAME).write_bytes(manifest_bytes)
+
+    manifest = json.loads(manifest_bytes)
+    versions = {row["coverage_map_version"] for row in manifest.values()
+                if isinstance(row, dict) and row.get("coverage_map_version")}
+    coverage_map = None
+    if coverage_map_bytes is not None:
+        map_data = json.loads(coverage_map_bytes)
+        map_version = map_data.get("coverage_map_version")
+        if not isinstance(map_version, str) or not map_version:
+            raise ContractError("coverage map has no valid coverage_map_version")
+        if versions and versions != {map_version}:
+            raise ContractError("manifest and coverage map versions disagree")
+        (staging / "coverage_map.json").write_bytes(coverage_map_bytes)
+        coverage_map = {"path": "coverage_map.json", "version": map_version,
+                        "sha256": hashlib.sha256(coverage_map_bytes).hexdigest()}
+    elif versions:
+        raise ContractError("manifest declares coverage but its coverage map is missing")
 
     planned_fingerprint = fingerprint_suite(baselines, attacks)
     standalone, derived = partition_attacks(attacks)
@@ -1579,9 +1637,19 @@ def plan_run(args: argparse.Namespace, out_dir: Path, staging: Path) -> RunPlan:
     accounted = set(selected_keys) | set(skipped_keys) | set(limit_excluded)
     deselected = [key for key in planned_keys if key not in accounted]
 
+    if reuse_plan is not None and (
+            selected_keys != reuse_plan.selected_keys
+            or skipped_keys != reuse_plan.skipped_keys
+            or limit_excluded != reuse_plan.limit_excluded
+            or (selection.source_sha256 if selection else None) != reuse_plan.selection_sha256):
+        raise SelectionError("paired runs must use the identical selection and order")
     model_spec = registry.model_for(resolved.target_id)
     return RunPlan(
         resolved=resolved,
+        build_identity=build_identity,
+        manifest_bytes=manifest_bytes,
+        coverage_map_bytes=coverage_map_bytes,
+        coverage_map=coverage_map,
         baselines=baselines,
         attacks=attacks,
         planned_fingerprint=planned_fingerprint,
@@ -1623,13 +1691,15 @@ def plan_run(args: argparse.Namespace, out_dir: Path, staging: Path) -> RunPlan:
             "standalone_attacks": len(standalone),
             "derived_attacks": len(derived),
             "total_cases": len(baselines) + len(attacks),
-            "boundary_source": "approximate" if token_counter is None else "tokenizer",
+            "boundary_source": "approximate" if args.no_tokenizer else "tokenizer",
             "max_tokens": max_tokens,
         },
     )
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(
+    argv: Sequence[str] | None = None, *, reuse_plan: RunPlan | None = None,
+) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     out_dir = Path(args.out)
@@ -1664,8 +1734,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         with tempfile.TemporaryDirectory(prefix=".runner-", dir=out_dir) as staging_name:
             staging = Path(staging_name)
             try:
-                plan = plan_run(args, out_dir, staging)
-            except (ContractError, SelectionError, OSError) as exc:
+                plan = plan_run(args, out_dir, staging, reuse_plan=reuse_plan)
+            except (ContractError, ValueError, OSError) as exc:
                 print(f"\nconfiguration error: {exc}", file=sys.stderr)
                 print("No cases were sent; previous run artifacts were preserved.",
                       file=sys.stderr)
@@ -1726,8 +1796,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 return 2
             staged_manifest.replace(manifest_path)
             (staging / "registry.json").replace(out_dir / "registry.json")
+            if plan.coverage_map is not None:
+                (staging / "coverage_map.json").replace(out_dir / "coverage_map.json")
+            else:
+                (out_dir / "coverage_map.json").unlink(missing_ok=True)
             if plan.selection is not None:
                 (staging / SELECTION_NAME).replace(selection_path)
+            else:
+                selection_path.unlink(missing_ok=True)
 
         writer = ResultWriter(results_path)
         runner.writer = writer
@@ -1807,6 +1883,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     model=plan.model,
                     baseline_source=plan.baseline_source,
                     registry_source=plan.registry_source,
+                    coverage_map=plan.coverage_map,
                     case_set=plan.selection.describe() if plan.selection else None,
                     tokenizer=plan.tokenizer,
                     selection_sha256=plan.selection_sha256,

@@ -1,6 +1,6 @@
 {
   "artifact": "oces",
-  "generator_version": "1.2.0",
+  "generator_version": "1.2.1",
   "authored_utc": "2026-09-15",
   "generator": "baseline/oces/build_oces.py",
   "author": "AI draft (Claude Code); Task 4 owner: Lamei",

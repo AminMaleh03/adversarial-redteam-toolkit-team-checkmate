@@ -165,3 +165,59 @@ equivalence; freeze-hash integrity; freeze-provenance → Freeze A linkage.
   accepts the exact handover commit.
 - Runtime acceptance (Rayyan/Task 2): sentiment weights load at the pinned revision and serve
   the pinned label space; no truncation on the sentiment path. Not run here (no weights loaded).
+
+## Integration repair (Ahsan, added after PR #8 merge — does not amend anything above)
+
+Everything above this section is Lamei's original handover, unchanged. This section is an
+appended, transparently-labelled integration correction per the Task 4 late-change rule
+("any late change to frozen data requires a new visible version ... never a silent
+amendment") — it records what a *generator* repair changed, not a change to OCES content.
+
+**Correction to line 131** ("Determinism: sentiment baseline, coverage map, and OCES
+builders each reproduce byte-for-byte."): on a Windows checkout, that was true for the
+sentiment baseline and coverage map builders, but not for `build_oces.build()` —
+`baseline/oces/build_oces.py::_write_json` opened its output files without
+`newline="\n"`, so on Windows it wrote CRLF and could not reproduce the committed LF
+bytes, even though the on-disk *content* (case ids, texts, families, relations, oracles,
+tiers) was always correctly reproduced. This was found while integrating PR #8: the
+freeze-integrity tests failed on a fresh Windows checkout, and
+`test_rebuild_reproduces_committed_oces_files` silently regenerated
+`freeze_content_hashes.json` with environment-dependent hashes because it compared
+`read_text()` (newline-normalising), not raw bytes.
+
+**Fix:** `_write_json` now opens with `newline="\n"`. Nothing else in the generator
+changed — no seed selection, variant construction, oracle, relation, tier or
+coverage-class logic. **Generator version advanced 1.2.0 → 1.2.1** (visible bump, same
+mechanism Lamei used for every prior generator identity), since the generator's own
+source is one of the seven frozen artifacts and a silent hash change there would be
+exactly the "invisible amendment" Task 4 forbids.
+
+**Effect verified by re-running the real, fixed generator** (not just editing files):
+`baseline/oces/emotion_seeds.json`, `sentiment_seeds.json`, `attacks/data/oces/
+emotion_cases.json` and `sentiment_cases.json` are now **byte-identical** to the versions
+Lamei committed (they were already LF; the generator now also writes LF, so they round-trip
+exactly). Only two files' bytes changed, both because they embed `generator_version`
+textually: `attacks/data/oces/provenance.json` and `baseline/oces/build_oces.py` itself.
+The 82 case ids, and every case's `attacked_text`/`relation`/`oracle`/`family`/
+`validity_tier`, hash identically before and after (verified by an independent sorted-content
+hash, not by trusting the generator's own output). Counts, families, tiers and risk
+distribution are unchanged: 82 total (42 emotion / 40 sentiment, 41 paraphrase / 41
+distractor), `relation=invariant` and `oracle=label_should_match_baseline` throughout,
+SILVER 50 / REVIEW 32 with zero GOLD, all `not_targeted`.
+
+**Old identity (superseded, not deleted):** generator `1.2.0`, `provenance.json`
+`003bdaaaa87aea3…`, `build_oces.py` `2f53e72bfaa52a5…` — still readable in Freeze
+Provenance B (`attacks/data/oces/freeze_provenance.json`'s original
+`frozen_artifacts_sha256` block, untouched) and in this file's own commit history.
+
+**New identity:** generator `1.2.1`, `provenance.json` `6131332e7988f0e5…`, `build_oces.py`
+`437664a5617005e6…`. Full traceability (reason, old/new hashes for both changed files, the
+unchanged-file list, semantic verification) is in `attacks/data/oces/
+freeze_provenance.json`'s appended `integration_repair` block, and
+`attacks/data/oces/freeze_content_hashes.json` is the current authoritative hash record for
+all seven artifacts (`generator_version: "1.2.1"`).
+
+Freeze commits A (`5e01825…`) and B (`f619e51…`) remain exactly as Lamei authored them and
+are not reissued. No model inference occurred as part of this repair. This repair is
+purely mechanical (a Python file-write mode) and touches no seed, variant, id, text, family,
+relation, oracle, tier, risk or coverage-class value anywhere in the OCES corpus.

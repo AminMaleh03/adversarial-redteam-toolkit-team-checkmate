@@ -65,7 +65,11 @@ from attacks import coverage
 from attacks import metadata as md
 
 # --- frozen knobs ---------------------------------------------------------------------
-GENERATOR_VERSION = "1.2.0"
+# 1.2.1: integration repair only (cross-platform LF byte reproducibility in _write_json,
+# see its docstring). No seed, variant, id, text, family, relation, oracle, tier, risk or
+# coverage-class change. Superseded generator identity: 1.2.0, matching the Freeze A
+# content hash baseline/oces/build_oces.py 2f53e72bfaa52a55ce3db4f20c1a6d14ced34d6c6b2551c10dda236b7eeb8357.
+GENERATOR_VERSION = "1.2.1"
 AUTHORED_UTC = "2026-09-15"
 TRANSFORM_VERSION = "oces-v1"
 SOURCE = "oces-authored-v1"
@@ -293,8 +297,18 @@ def _build_task(seeds, task, emo_count, sent_count, map_version):
 
 
 def _write_json(path: Path, obj) -> None:
+    """Write deterministic, cross-platform-identical bytes: UTF-8, LF only, no BOM.
+
+    ``newline="\\n"`` disables Python's universal-newline translation on write, so a
+    freeze produced on Windows and one produced on Linux/macOS hash to the same bytes.
+    Without it, text mode substitutes the platform line separator (CRLF on Windows) for
+    every ``\\n`` this function or ``json.dump`` writes -- the exact defect found during
+    PR #8 integration, which is why the OCES freeze content-hash record and this
+    generator's own version were revised (see GENERATOR_VERSION and
+    docs/stage3/handoffs/lamei.md's integration-repair note).
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
         json.dump(obj, handle, ensure_ascii=False, indent=2)
         handle.write("\n")
 

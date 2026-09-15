@@ -418,3 +418,41 @@ def test_the_served_labels_are_the_registry_labels(sentiment_client):
         "/predict", json={"text": SENTIMENT_TEXT}
     ).json()["all_scores"])
     assert served == declared
+
+
+# --------------------------------------------------------------------------
+# the released V2 keeps its length defense
+#
+# Added after finding that the whole suite still passed with V2's length limit
+# removed: the defense was only ever measured by the attack run, never asserted.
+# That is how a released build loses a defense without anything going red.
+# --------------------------------------------------------------------------
+
+
+def test_v2_rejects_over_length_input_before_inference():
+    """Defense 1. A 500 here means the length check is gone, not that it failed."""
+    from endpoint.model import MAX_SEQUENCE_LENGTH
+
+    oversized = "word " * (MAX_SEQUENCE_LENGTH * 2)
+    response = TestClient(v2_app, raise_server_exceptions=False).post(
+        "/predict", json={"text": oversized}
+    )
+    assert response.status_code == 422, (
+        "V2 must reject over-length input with 422 before it reaches the model. "
+        f"Got {response.status_code}: an unhandled 5xx here means the length limit "
+        "was removed, which is the regression the CI gate exists to catch."
+    )
+    assert str(MAX_SEQUENCE_LENGTH) in response.text
+
+
+def test_v1_does_not_reject_it_and_that_difference_is_the_point():
+    """V1 is unguarded by design: the same payload must NOT come back as 422."""
+    from endpoint.model import MAX_SEQUENCE_LENGTH
+
+    oversized = "word " * (MAX_SEQUENCE_LENGTH * 2)
+    response = TestClient(v1_app, raise_server_exceptions=False).post(
+        "/predict", json={"text": oversized}
+    )
+    assert response.status_code != 422
+    # And it is not silently truncated into a normal prediction either.
+    assert response.status_code != 200

@@ -91,7 +91,9 @@ class LoadedTarget:
 
 def _validate_label_space(model_spec: ModelSpec, id2label: dict) -> None:
     """The loaded model's label space must match the registry, in order and case."""
-    reported = tuple(id2label[i] for i in sorted(id2label))
+    if not isinstance(id2label, dict) or set(id2label) != set(range(len(model_spec.labels))):
+        raise ModelIdentityError("model label ids must be contiguous from zero")
+    reported = tuple(id2label[i] for i in range(len(model_spec.labels)))
     if reported != model_spec.labels:
         raise ModelIdentityError(
             f"{model_spec.model_id}: loaded model reports labels {reported!r}, "

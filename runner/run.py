@@ -414,8 +414,8 @@ def load_case_set(path: Path | str) -> CaseSelection:
             "frozen selection of 'core', not a suite of its own."
         )
     selection_version = raw.get("selection_version", 1)
-    if not isinstance(selection_version, int) or isinstance(selection_version, bool):
-        raise SelectionError(f"{path}: selection_version must be an integer")
+    if type(selection_version) is not int or selection_version < 1:
+        raise SelectionError(f"{path}: selection_version must be a positive integer")
 
     baseline_ids = _string_list(raw.get("baseline_ids", []), f"{path}.baseline_ids")
     if "attack_ids" in raw:
@@ -434,6 +434,11 @@ def load_case_set(path: Path | str) -> CaseSelection:
                 f"{path}: {overlap} appear in both standalone_attack_ids and "
                 "derived_attack_ids"
             )
+    if "attack_ids" in raw and ("standalone_attack_ids" in raw or "derived_attack_ids" in raw):
+        split_ids = _string_list(raw.get("standalone_attack_ids", []), "standalone_attack_ids")
+        split_ids += _string_list(raw.get("derived_attack_ids", []), "derived_attack_ids")
+        if split_ids != attack_ids:
+            raise SelectionError(f"{path}: attack_ids conflicts with split attack lists")
     if not baseline_ids and not attack_ids:
         raise SelectionError(f"{path}: the selection is empty; there is nothing to run")
 
@@ -483,6 +488,10 @@ def apply_case_set(
     suite does not contain describes a different suite, and running the remainder
     would produce coverage numbers over a denominator nobody chose.
     """
+    if len({case.baseline_id for case in baselines}) != len(baselines):
+        raise SelectionError("built suite contains duplicate baseline ids")
+    if len({case.attack_id for case in attacks}) != len(attacks):
+        raise SelectionError("built suite contains duplicate attack ids")
     baseline_index = {case.baseline_id: case for case in baselines}
     attack_index = {case.attack_id: case for case in attacks}
 
@@ -587,40 +596,30 @@ def code_provenance(root: Path | None = None) -> dict:
 # --------------------------------------------------------------------------
 
 
-def build_token_counter(target_id: str = "emotion_v2") -> tuple[Callable[[str], int], int]:
-    """The real tokenizer for `target_id`, so boundary cases land on the true token limit.
+def build_token_counter(target_id: str | None = None) -> tuple[Callable[[str], int], int]:
+    """The real tokenizer, so boundary cases land on the true token limit.
 
-    Imported inside the function rather than at module scope: loading a tokenizer
-    (and, for the legacy emotion path, a whole model) is not free, and callers that
-    only need --help or offline tests must not pay for it.
-
-    Emotion targets keep using the existing, unchanged `endpoint.model` import --
-    zero behavior change to a path this task must leave untouched. Every other
-    target (sentiment_v1, and any future registry target) loads its tokenizer
-    through the registry via `endpoint.loader.load_tokenizer_for_target`, which
-    loads ONLY the tokenizer, never the full model -- counting tokens for a
-    sentiment run must not accidentally load sentiment weights here, any more than
-    it may accidentally load the emotion model's.
+    Imported inside the function rather than at module scope: endpoint.model
+    loads the whole model at import time, and the tests must not pay for that.
 
     truncation=False is required. Silent truncation would neutralise two whole
     attack categories, and this is the only place outside the endpoint folder
     that calls the tokenizer directly.
     """
-    if target_id in LEGACY_VERSION_TARGET_ID.values():
-        from endpoint.model import MAX_SEQUENCE_LENGTH, tokenizer
+    if target_id is not None:
+        counter, limit, _ = build_token_counter_for_target(
+            target_id, target_registry.load_registry()
+        )
+        return counter, limit
 
-        max_tokens = int(MAX_SEQUENCE_LENGTH)
-    else:
-        from endpoint.loader import load_tokenizer_for_target
+    from endpoint.model import MAX_SEQUENCE_LENGTH, tokenizer
 
-        tokenizer, max_tokens = load_tokenizer_for_target(target_id)
-        max_tokens = int(max_tokens)
-
+    max_tokens = int(MAX_SEQUENCE_LENGTH)
     if not MIN_PLAUSIBLE_MAX_TOKENS <= max_tokens <= MAX_PLAUSIBLE_MAX_TOKENS:
         raise RuntimeError(
-            f"target {target_id!r}'s max_sequence_length is {max_tokens}, which is "
-            "not a plausible token limit. Hugging Face reports a huge sentinel when "
-            "a tokenizer config omits model_max_length. Boundary cases built around "
+            f"endpoint.model.MAX_SEQUENCE_LENGTH is {max_tokens}, which is not a "
+            "plausible token limit. Hugging Face reports a huge sentinel when a "
+            "tokenizer config omits model_max_length. Boundary cases built around "
             "that would be meaningless and the manifest would record them as exact."
         )
 
@@ -687,133 +686,6 @@ def default_send_order(
     """
     standalone, derived = partition_attacks(attacks)
     return [*baselines, *standalone, *derived]
-
-
-# --------------------------------------------------------------------------
-# frozen case sets (e.g. CI's ci_core_v1)
-# --------------------------------------------------------------------------
-
-
-def load_case_set(case_set_id: str, directory: Path = CASE_SETS_DIR) -> dict:
-    """Read a frozen selection like analysis/case_sets/ci_core_v1.json.
-
-    Only reads and returns the raw dict -- ownership of the file's content is
-    Khalid's (analysis/case_sets/**); this module only ever consumes it.
-    """
-    path = directory / f"{case_set_id}.json"
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        raise RunnerConfigError(f"case set {case_set_id!r} not found at {path}") from None
-    except json.JSONDecodeError as exc:
-        raise RunnerConfigError(f"case set {case_set_id!r} at {path} is not valid JSON: {exc}") from None
-    if raw.get("case_set_id") != case_set_id:
-        raise RunnerConfigError(
-            f"case set file {path} declares case_set_id "
-            f"{raw.get('case_set_id')!r}, expected {case_set_id!r}"
-        )
-    return raw
-
-
-def _reject_bad_id_list(ids: object, where: str, allow_empty: bool = False) -> list[str]:
-    if not isinstance(ids, list) or not all(isinstance(x, str) for x in ids):
-        raise RunnerConfigError(f"case set {where} must be a list of strings")
-    if not ids and not allow_empty:
-        raise RunnerConfigError(f"case set {where} must not be empty")
-    seen: set[str] = set()
-    duplicates: list[str] = []
-    for value in ids:
-        if value in seen:
-            duplicates.append(value)
-        seen.add(value)
-    if duplicates:
-        raise RunnerConfigError(f"case set {where} has duplicate ids: {sorted(set(duplicates))}")
-    return ids
-
-
-def apply_case_set(
-    case_set: dict,
-    suite_id: str,
-    baselines: Sequence[BaselineCase],
-    attacks: Sequence[AttackCase],
-) -> tuple[list[BaselineCase], list[AttackCase], list[str]]:
-    """Restrict the built suite to exactly a frozen selection, in its exact order.
-
-    Reject unknown, duplicate, empty, incomplete or conflicting selections outright
-    rather than silently dropping anything -- a case set naming an id the built suite
-    doesn't have is a configuration bug (stale freeze, wrong baseline file, wrong
-    suite), not something to skip quietly.
-
-    Returns (selected_baselines, selected_attacks, excluded_keys). excluded_keys
-    covers every planned case NOT in the selection, in planned order -- this is what
-    main() folds into limit_excluded-style bookkeeping for a bounded run.
-    """
-    declared_suite = case_set.get("suite_id")
-    if declared_suite != suite_id:
-        raise RunnerConfigError(
-            f"case set {case_set.get('case_set_id')!r} is for suite "
-            f"{declared_suite!r}, not the requested suite {suite_id!r}"
-        )
-
-    baseline_ids = _reject_bad_id_list(case_set.get("baseline_ids"), "baseline_ids")
-    standalone_ids = _reject_bad_id_list(
-        case_set.get("standalone_attack_ids"), "standalone_attack_ids", allow_empty=True
-    )
-    derived_ids = _reject_bad_id_list(
-        case_set.get("derived_attack_ids"), "derived_attack_ids", allow_empty=True
-    )
-    if not standalone_ids and not derived_ids:
-        raise RunnerConfigError(
-            "case set selects no attacks at all (standalone_attack_ids and "
-            "derived_attack_ids are both empty)"
-        )
-
-    attack_ids = standalone_ids + derived_ids
-    overlap = set(standalone_ids) & set(derived_ids)
-    if overlap:
-        raise RunnerConfigError(
-            f"case set lists {sorted(overlap)} in both standalone_attack_ids and "
-            "derived_attack_ids"
-        )
-
-    baseline_by_id = {b.baseline_id: b for b in baselines}
-    attack_by_id = {a.attack_id: a for a in attacks}
-
-    missing_baselines = [bid for bid in baseline_ids if bid not in baseline_by_id]
-    if missing_baselines:
-        raise RunnerConfigError(
-            f"case set references baseline ids not present in the built suite: "
-            f"{missing_baselines}"
-        )
-    missing_attacks = [aid for aid in attack_ids if aid not in attack_by_id]
-    if missing_attacks:
-        raise RunnerConfigError(
-            f"case set references attack ids not present in the built suite: "
-            f"{missing_attacks}"
-        )
-
-    selected_baselines = [baseline_by_id[bid] for bid in baseline_ids]
-    selected_attacks = [attack_by_id[aid] for aid in attack_ids]
-
-    selected_baseline_id_set = set(baseline_ids)
-    orphaned = [
-        case.attack_id
-        for case in selected_attacks
-        if case.baseline_id is not None and case.baseline_id not in selected_baseline_id_set
-    ]
-    if orphaned:
-        raise RunnerConfigError(
-            f"case set selects derived attacks whose baseline is not itself "
-            f"selected: {orphaned}"
-        )
-
-    selected_attack_id_set = set(attack_ids)
-    excluded_keys = [
-        baseline_key(b.baseline_id) for b in baselines if b.baseline_id not in selected_baseline_id_set
-    ] + [
-        attack_key(a.attack_id) for a in attacks if a.attack_id not in selected_attack_id_set
-    ]
-    return selected_baselines, selected_attacks, excluded_keys
 
 
 # --------------------------------------------------------------------------
@@ -1048,34 +920,6 @@ class Runner:
         return request, request.read()
 
     # -- sending ------------------------------------------------------------
-
-    def _build_request(self, case: AttackCase | None, text: str | None) -> httpx.Request:
-        """Build the exact request HTTPX will send, without sending it.
-
-        For a raw case, the body is used verbatim -- these bytes may be
-        deliberately invalid UTF-8, and the headers are part of the test. Using
-        json= here, or adding a header, would repair the very thing being tested.
-        For an ordinary case, HTTPX's own json= serialization produces the body;
-        this is intentionally not hand-rolled with json.dumps, so the bytes we
-        hash are the exact bytes HTTPX itself would put on the wire.
-
-        No network I/O happens here -- building a request is synchronous and
-        local. A failure in this method means serialization itself failed,
-        before any prepared body existed to capture.
-        """
-        if case is not None and case.is_raw:
-            body = case.raw_body
-            if isinstance(body, str):
-                body = body.encode("utf-8")
-            elif body is None:
-                body = b""
-            return self.client.build_request(
-                "POST", self.predict_url, content=body, headers=dict(case.raw_headers or {}),
-                timeout=self.timeout,
-            )
-        return self.client.build_request(
-            "POST", self.predict_url, json={"text": text}, timeout=self.timeout
-        )
 
     def send(self, case: AttackCase | None, text: str | None) -> dict:
         """One request. No retry: a connection failure is recorded as one.
@@ -1636,6 +1480,11 @@ def plan_run(args: argparse.Namespace, out_dir: Path, staging: Path) -> RunPlan:
         evaluation_id=args.evaluation_id,
     )
     if resolved.evaluation_id is not None:
+        declared_selection = registry.evaluation(resolved.evaluation_id).case_set_id
+        if declared_selection is not None and args.case_set is None:
+            raise SelectionError(
+                f"evaluation {resolved.evaluation_id!r} requires --case-set {declared_selection!r}"
+            )
         # Existence of the module and baseline file, checked immediately before
         # execution rather than at registry load -- see endpoint/targets.py.
         target_registry.require_runnable(registry, resolved.evaluation_id)
@@ -1646,6 +1495,11 @@ def plan_run(args: argparse.Namespace, out_dir: Path, staging: Path) -> RunPlan:
     # fingerprint changes only when the content changes, not when the baseline
     # file happens to be written in a different order.
     baselines = sorted(load_baseline(baseline_path), key=lambda b: b.baseline_id)
+
+    registry_bytes = Path(registry.source_path).read_bytes()
+    if hashlib.sha256(registry_bytes).hexdigest() != registry.source_sha256:
+        raise ContractError("registry changed during planning")
+    (staging / "registry.json").write_bytes(registry_bytes)
 
     if args.no_tokenizer:
         token_counter, max_tokens = None, None
@@ -1682,6 +1536,12 @@ def plan_run(args: argparse.Namespace, out_dir: Path, staging: Path) -> RunPlan:
     planned_keys = [baseline_key(b.baseline_id) for b in baselines] + [
         attack_key(a.attack_id) for a in attacks
     ]
+
+    if len(set(planned_keys)) != len(planned_keys):
+        raise SelectionError("built suite contains duplicate case ids")
+    known_attacks = {case.attack_id for case in attacks}
+    if len(set(args.skip)) != len(args.skip) or set(args.skip) - known_attacks:
+        raise SelectionError("--skip contains duplicate or unknown attack ids")
 
     selection: CaseSelection | None = None
     if args.case_set is not None:
@@ -1772,24 +1632,6 @@ def plan_run(args: argparse.Namespace, out_dir: Path, staging: Path) -> RunPlan:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    registry = _registry()
-
-    # --- resolve which target/version/suite this invocation actually means,
-    # and reject any invalid or conflicting combination -- all before any file
-    # or network access, same as the existing type-level CLI validation above.
-    try:
-        target, version, target_id = resolve_target(args.target, args.version, args.target_id, registry)
-    except (RunnerConfigError, ContractError) as exc:
-        parser.error(str(exc))
-
-    if args.suite == "oces":
-        parser.error(
-            "--suite oces is not runnable yet: OCES case/rule generation has not "
-            "landed. See docs/stage3/tasks/task_2_rayyan.md."
-        )
-    if args.case_set is not None and args.limit is not None:
-        parser.error("--case-set cannot be combined with --limit; the case set is the selection.")
-
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
     # Legacy file names stay legacy. A run that names its target uses the
@@ -1872,16 +1714,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             staged_manifest = staging / MANIFEST_NAME
             manifest_sha = sha256_file(staged_manifest)
             if plan.selection is not None:
-                (staging / SELECTION_NAME).write_text(
-                    json.dumps(plan.selection.describe(), indent=2, ensure_ascii=False),
-                    encoding="utf-8",
-                )
+                selection_bytes = Path(plan.selection.source_path).read_bytes()
+                if hashlib.sha256(selection_bytes).hexdigest() != plan.selection.source_sha256:
+                    print("case selection changed during planning; no cases sent", file=sys.stderr)
+                    return 2
+                (staging / SELECTION_NAME).write_bytes(selection_bytes)
             if not runner.preflight():
-                print(f"the endpoint at {target} is not answering {args.health_path}.")
+                print(f"the endpoint at {args.target} is not answering {args.health_path}.")
                 print("No cases were sent; previous run artifacts were preserved.")
                 print("Start it, or check --target and --health-path.")
                 return 2
             staged_manifest.replace(manifest_path)
+            (staging / "registry.json").replace(out_dir / "registry.json")
             if plan.selection is not None:
                 (staging / SELECTION_NAME).replace(selection_path)
 
@@ -1890,7 +1734,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"manifest  {manifest_path}  sha256 {manifest_sha[:16]}")
         try:
             runner.run_ordered(plan.units, reset_skipped=False)
-            termination = TERM_LIMIT if args.limit is not None else TERM_COMPLETED
+            if runner.counts["serialization_errors"]:
+                termination = TERM_ERROR
+                exit_code = 2
+            else:
+                termination = TERM_LIMIT if args.limit is not None else TERM_COMPLETED
         except EndpointDied as died:
             termination = TERM_HEALTH
             exit_code = 1

@@ -373,7 +373,24 @@ def test_baseline_and_attack_rows_carry_target_id_and_suite_id(tmp_path):
 # --------------------------------------------------------------------------
 
 
-def test_apply_case_set_selects_exact_ids_in_order():
+def _apply_split_selection(tmp_path, document, baselines, attacks):
+    path = tmp_path / "split-selection.json"
+    path.write_text(json.dumps(document), encoding="utf-8")
+    selection = runner_module.load_case_set(path)
+    if selection.suite_id != "core":
+        raise runner_module.SelectionError("selection suite does not match core")
+    units = runner_module.apply_case_set(selection, baselines, attacks)
+    selected_baselines = [case for case in units if isinstance(case, BaselineCase)]
+    selected_attacks = [case for case in units if isinstance(case, AttackCase)]
+    selected = set(selection.order)
+    excluded = [baseline_key(b.baseline_id) for b in baselines
+                if baseline_key(b.baseline_id) not in selected]
+    excluded += [attack_key(a.attack_id) for a in attacks
+                 if attack_key(a.attack_id) not in selected]
+    return selected_baselines, selected_attacks, excluded
+
+
+def test_apply_case_set_selects_exact_ids_in_order(tmp_path):
     baselines, attacks = suite(n_baselines=3, n_standalone=2, n_derived=2)
     case_set = {
         "case_set_id": "mini",
@@ -382,7 +399,7 @@ def test_apply_case_set_selects_exact_ids_in_order():
         "standalone_attack_ids": ["s.malformed.02", "s.malformed.01"],
         "derived_attack_ids": ["b01.encoding.01", "b02.encoding.02"],
     }
-    sel_b, sel_a, excluded = runner_module.apply_case_set(case_set, "core", baselines, attacks)
+    sel_b, sel_a, excluded = _apply_split_selection(tmp_path, case_set, baselines, attacks)
     assert [b.baseline_id for b in sel_b] == ["b02", "b01"]
     assert [a.attack_id for a in sel_a] == [
         "s.malformed.02", "s.malformed.01", "b01.encoding.01", "b02.encoding.02",
@@ -391,7 +408,7 @@ def test_apply_case_set_selects_exact_ids_in_order():
     assert excluded_baseline_keys == {"baseline:b03"}
 
 
-def test_apply_case_set_rejects_unknown_ids():
+def test_apply_case_set_rejects_unknown_ids(tmp_path):
     baselines, attacks = suite()
     case_set = {
         "case_set_id": "mini", "suite_id": "core",
@@ -399,11 +416,11 @@ def test_apply_case_set_rejects_unknown_ids():
         "standalone_attack_ids": ["s.malformed.01"],
         "derived_attack_ids": [],
     }
-    with pytest.raises(runner_module.RunnerConfigError, match="baseline ids not present"):
-        runner_module.apply_case_set(case_set, "core", baselines, attacks)
+    with pytest.raises(runner_module.SelectionError, match="does not contain"):
+        _apply_split_selection(tmp_path, case_set, baselines, attacks)
 
 
-def test_apply_case_set_allows_standalone_only_selection_with_no_derived_attacks():
+def test_apply_case_set_allows_standalone_only_selection_with_no_derived_attacks(tmp_path):
     baselines, attacks = suite()
     case_set = {
         "case_set_id": "mini", "suite_id": "core",
@@ -411,11 +428,11 @@ def test_apply_case_set_allows_standalone_only_selection_with_no_derived_attacks
         "standalone_attack_ids": ["s.malformed.01"],
         "derived_attack_ids": [],
     }
-    sel_b, sel_a, _ = runner_module.apply_case_set(case_set, "core", baselines, attacks)
+    sel_b, sel_a, _ = _apply_split_selection(tmp_path, case_set, baselines, attacks)
     assert [a.attack_id for a in sel_a] == ["s.malformed.01"]
 
 
-def test_apply_case_set_rejects_duplicates():
+def test_apply_case_set_rejects_duplicates(tmp_path):
     baselines, attacks = suite()
     case_set = {
         "case_set_id": "mini", "suite_id": "core",
@@ -423,32 +440,32 @@ def test_apply_case_set_rejects_duplicates():
         "standalone_attack_ids": ["s.malformed.01"],
         "derived_attack_ids": [],
     }
-    with pytest.raises(runner_module.RunnerConfigError, match="duplicate"):
-        runner_module.apply_case_set(case_set, "core", baselines, attacks)
+    with pytest.raises(runner_module.SelectionError, match="duplicate"):
+        _apply_split_selection(tmp_path, case_set, baselines, attacks)
 
 
-def test_apply_case_set_rejects_empty_lists():
+def test_apply_case_set_rejects_empty_lists(tmp_path):
     baselines, attacks = suite()
     case_set = {
         "case_set_id": "mini", "suite_id": "core",
         "baseline_ids": [], "standalone_attack_ids": [], "derived_attack_ids": [],
     }
-    with pytest.raises(runner_module.RunnerConfigError, match="empty"):
-        runner_module.apply_case_set(case_set, "core", baselines, attacks)
+    with pytest.raises(runner_module.SelectionError, match="empty"):
+        _apply_split_selection(tmp_path, case_set, baselines, attacks)
 
 
-def test_apply_case_set_rejects_wrong_suite_id():
+def test_apply_case_set_rejects_wrong_suite_id(tmp_path):
     baselines, attacks = suite()
     case_set = {
         "case_set_id": "mini", "suite_id": "oces",
         "baseline_ids": ["b01"], "standalone_attack_ids": ["s.malformed.01"],
         "derived_attack_ids": [],
     }
-    with pytest.raises(runner_module.RunnerConfigError, match="suite"):
-        runner_module.apply_case_set(case_set, "core", baselines, attacks)
+    with pytest.raises(runner_module.SelectionError, match="suite"):
+        _apply_split_selection(tmp_path, case_set, baselines, attacks)
 
 
-def test_apply_case_set_rejects_derived_attack_whose_baseline_is_not_selected():
+def test_apply_case_set_rejects_derived_attack_whose_baseline_is_not_selected(tmp_path):
     baselines, attacks = suite(n_baselines=2)
     case_set = {
         "case_set_id": "mini", "suite_id": "core",
@@ -457,11 +474,11 @@ def test_apply_case_set_rejects_derived_attack_whose_baseline_is_not_selected():
         "standalone_attack_ids": ["s.malformed.01"],
         "derived_attack_ids": ["b02.encoding.01"],
     }
-    with pytest.raises(runner_module.RunnerConfigError, match="baseline is not itself selected"):
-        runner_module.apply_case_set(case_set, "core", baselines, attacks)
+    with pytest.raises(runner_module.SelectionError, match="baseline is not selected"):
+        _apply_split_selection(tmp_path, case_set, baselines, attacks)
 
 
-def test_apply_case_set_rejects_id_in_both_standalone_and_derived():
+def test_apply_case_set_rejects_id_in_both_standalone_and_derived(tmp_path):
     baselines, attacks = suite()
     case_set = {
         "case_set_id": "mini", "suite_id": "core",
@@ -469,22 +486,24 @@ def test_apply_case_set_rejects_id_in_both_standalone_and_derived():
         "standalone_attack_ids": ["b01.encoding.01"],
         "derived_attack_ids": ["b01.encoding.01"],
     }
-    with pytest.raises(runner_module.RunnerConfigError, match="both standalone"):
-        runner_module.apply_case_set(case_set, "core", baselines, attacks)
+    with pytest.raises(runner_module.SelectionError, match="both standalone"):
+        _apply_split_selection(tmp_path, case_set, baselines, attacks)
 
 
 def test_load_case_set_rejects_missing_file(tmp_path):
-    with pytest.raises(runner_module.RunnerConfigError, match="not found"):
-        runner_module.load_case_set("does-not-exist", directory=tmp_path)
+    with pytest.raises(runner_module.SelectionError, match="cannot read"):
+        runner_module.load_case_set(tmp_path / "does-not-exist.json")
 
 
-def test_load_case_set_rejects_id_mismatch(tmp_path):
-    (tmp_path / "mini.json").write_text(json.dumps({"case_set_id": "wrong-id"}))
-    with pytest.raises(runner_module.RunnerConfigError, match="declares case_set_id"):
-        runner_module.load_case_set("mini", directory=tmp_path)
+def test_load_case_set_uses_declared_id_independent_of_filename(tmp_path):
+    document = {"case_set_id": "declared-id", "suite_id": "core",
+                "baseline_ids": ["b01"], "attack_ids": []}
+    path = tmp_path / "arbitrary-filename.json"
+    path.write_text(json.dumps(document), encoding="utf-8")
+    assert runner_module.load_case_set(path).case_set_id == "declared-id"
 
 
-def test_real_frozen_ci_core_v1_case_set_matches_the_real_emotion_suite():
+def test_real_frozen_ci_core_v1_case_set_matches_the_real_emotion_suite(tmp_path):
     """Full integration check against the actual committed baseline and case set.
 
     Needs a real tokenizer to build boundary.length.* cases (approximate mode
@@ -499,10 +518,13 @@ def test_real_frozen_ci_core_v1_case_set_matches_the_real_emotion_suite():
 
     baselines = sorted(load_baseline(), key=lambda b: b.baseline_id)
     token_counter, max_tokens = runner_module.build_token_counter("emotion_v2")
-    attacks = runner_module.build_suite_once(baselines, token_counter, max_tokens)
-    case_set = runner_module.load_case_set("ci_core_v1")
+    from attacks.metadata import scoped_registry
+    with scoped_registry():
+        attacks = runner_module.build_suite_once(baselines, token_counter, max_tokens)
+    selection_path = runner_module.ROOT / "analysis/case_sets/ci_core_v1.json"
+    case_set = json.loads(selection_path.read_text(encoding="utf-8"))
 
-    sel_b, sel_a, excluded = runner_module.apply_case_set(case_set, "core", baselines, attacks)
+    sel_b, sel_a, excluded = _apply_split_selection(tmp_path, case_set, baselines, attacks)
 
     counts = case_set["counts"]
     assert len(sel_b) == counts["baselines"]
@@ -1067,73 +1089,53 @@ def test_the_manifest_hash_is_recorded_in_the_meta_file():
 
 
 def test_no_address_or_port_is_hardcoded_in_the_runner():
-    """A deployed endpoint has no port that tells us anything.
-
-    The one deliberate exception is resolve_target()'s --target-id path: a
-    target-aware run is only ever allowed to talk to a trusted registry target on
-    127.0.0.1, by design (see docs/stage3/tasks/task_2_rayyan.md: "Bind test
-    services to configured loopback ports. Allow only the trusted registry
-    targets."). That function's body (comments and docstring included, since the
-    prose describes the same deliberate choice) is excluded from this scan; every
-    other line in the file is still held to "no hardcoded address or port".
-    Legacy --target still has no default and is never synthesized anywhere else.
-    """
+    """A deployed endpoint has no port that tells us anything."""
     source = (Path(__file__).resolve().parent.parent / "runner" / "run.py").read_text(
         encoding="utf-8"
     )
-    lines = source.splitlines()
-    start = next(i for i, line in enumerate(lines) if line.startswith("def resolve_target("))
-    end = next(
-        i for i in range(start + 1, len(lines))
-        if lines[i].startswith("def ") or lines[i].startswith("class ")
-    )
-    resolve_target_body = "\n".join(lines[start:end])
-    assert 'f"http://127.0.0.1:{spec.port}"' in resolve_target_body, (
-        "expected the one deliberate loopback derivation inside resolve_target(); "
-        "if it moved, update this test's excluded range to match"
-    )
-
     code = "\n".join(
         line
-        for i, line in enumerate(lines)
-        if not (start <= i < end)
-        and not line.lstrip().startswith("#")
-        and "python -m runner.run" not in line
+        for line in source.splitlines()
+        if not line.lstrip().startswith("#") and "python -m runner.run" not in line
     )
     for forbidden in ("localhost", "127.0.0.1", "0.0.0.0", ":8000", ":8001"):
         assert forbidden not in code, f"{forbidden!r} is hardcoded in runner/run.py"
 
 
-def test_target_id_derives_url_from_the_trusted_registry_loopback_port():
+def test_target_id_keeps_the_registry_configured_port():
     registry = load_registry()
-    target_url, version, target_id = runner_module.resolve_target(
-        None, None, "sentiment_v1", registry
+    resolved = runner_module.resolve_target(
+        registry, target_id="sentiment_v1", version=None, suite="core", evaluation_id=None
     )
-    spec = registry.target("sentiment_v1")
-    assert target_url == f"http://127.0.0.1:{spec.port}"
-    assert (version, target_id) == (spec.version, "sentiment_v1")
+    assert registry.target(resolved.target_id).port == 8002
+    assert (resolved.version, resolved.task_id) == ("v1", "sentiment_2")
 
 
-def test_legacy_target_and_version_still_work_without_target_id():
-    registry = load_registry()
-    target_url, version, target_id = runner_module.resolve_target(
-        "http://caller-supplied.example", "v1", None, registry
+def test_legacy_target_and_version_still_parse_without_target_id():
+    args = runner_module.build_parser().parse_args(
+        ["--target", "http://caller-supplied.example", "--version", "v1"]
     )
-    assert (target_url, version, target_id) == ("http://caller-supplied.example", "v1", "emotion_v1")
+    resolved = runner_module.resolve_target(
+        load_registry(), target_id=args.target_id, version=args.version,
+        suite=args.suite, evaluation_id=args.evaluation_id
+    )
+    assert args.target == "http://caller-supplied.example"
+    assert resolved.target_id == "emotion_v1"
 
 
-def test_target_id_conflicting_with_target_or_version_is_rejected():
-    registry = load_registry()
-    with pytest.raises(runner_module.RunnerConfigError):
-        runner_module.resolve_target("http://x", None, "sentiment_v1", registry)
-    with pytest.raises(runner_module.RunnerConfigError):
-        runner_module.resolve_target(None, "v1", "sentiment_v1", registry)
+def test_target_id_conflicting_with_version_is_rejected():
+    with pytest.raises(ContractError, match="conflict"):
+        runner_module.resolve_target(
+            load_registry(), target_id="sentiment_v1", version="v2",
+            suite="core", evaluation_id=None
+        )
 
 
-def test_neither_target_id_nor_target_and_version_is_rejected():
-    registry = load_registry()
-    with pytest.raises(runner_module.RunnerConfigError):
-        runner_module.resolve_target(None, None, None, registry)
+def test_neither_target_id_nor_version_is_rejected():
+    with pytest.raises(ContractError, match="required"):
+        runner_module.resolve_target(
+            load_registry(), target_id=None, version=None, suite="core", evaluation_id=None
+        )
 
 
 # CLI regressions: exercise main() so artifact and settings bugs cannot be
@@ -1647,7 +1649,8 @@ def test_the_frozen_ci_selection_on_disk_loads_and_keeps_its_counts():
     assert len(selection.attack_ids) == 32 + 88
     assert len(selection.order) == 162
     # Standalone attacks come before derived ones, which is the send order.
-    assert selection.attack_ids[31] == "malformed.oversized_1mb" or True
+    assert all(not key.startswith("dataset-") for key in selection.attack_ids[:32])
+    assert all(key.startswith("dataset-") for key in selection.attack_ids[32:])
     assert selection.exclusions[0]["attack_id"] == "malformed.oversized_10mb"
 
 
@@ -2052,3 +2055,60 @@ def test_default_send_order_is_baselines_then_standalone_then_derived():
     assert kinds[:len(baselines)] == ["BaselineCase"] * len(baselines)
     standalone, derived = partition_attacks(attacks)
     assert units[len(baselines):] == [*standalone, *derived]
+
+
+@pytest.mark.parametrize("flags", [
+    ["--evaluation-id", "ci.emotion"],
+    ["--skip", "unknown-case"],
+    ["--skip", "s.malformed.01", "--skip", "s.malformed.01"],
+])
+def test_invalid_selection_is_rejected_before_any_request(cli, flags):
+    invoke, out, state = cli
+    assert invoke("--target-id", "emotion_v2", *flags) == 2
+    assert not state["posts"]
+    assert not list(out.iterdir())
+
+
+def test_cli_serialization_failure_cannot_report_success(cli, monkeypatch):
+    invoke, out, state = cli
+    def unencodable(self, case, text):
+        raise TypeError("cannot encode payload")
+    monkeypatch.setattr(Runner, "prepare_request", unencodable)
+    assert invoke("--target-id", "emotion_v2") == 2
+    assert not state["posts"]
+    rows = read_rows(out / "results.jsonl")
+    assert rows and all(row["request_body_bytes"] is None for row in rows)
+    assert all(row["error"].startswith("serialization_error") for row in rows)
+    meta = json.loads((out / "run_meta.json").read_text(encoding="utf-8"))
+    assert meta["termination_reason"] == "errored"
+
+
+def test_published_configuration_snapshots_match_recorded_hashes(cli, tmp_path):
+    invoke, out, _ = cli
+    path = write_selection(tmp_path)
+    assert invoke("--target-id", "emotion_v2", "--case-set", str(path)) == 0
+    meta = json.loads((out / "run_meta.json").read_text(encoding="utf-8"))
+    assert (out / "case_selection.json").read_bytes() == path.read_bytes()
+    assert runner_module.sha256_file(out / "registry.json") == meta["registry"]["sha256"]
+    assert runner_module.sha256_file(out / "case_selection.json") == meta["fingerprints"]["selection_sha256"]
+
+
+@pytest.mark.parametrize("field", ["baseline", "attack"])
+def test_duplicate_generated_ids_are_rejected(tmp_path, field):
+    baselines, attacks = suite()
+    if field == "baseline":
+        baselines.append(baselines[0])
+    else:
+        attacks.append(attacks[0])
+    selection = load_case_set(write_selection(tmp_path))
+    with pytest.raises(SelectionError, match="duplicate"):
+        apply_case_set(selection, baselines, attacks)
+
+
+@pytest.mark.parametrize("overrides", [
+    {"selection_version": 0}, {"selection_version": -1},
+    {"standalone_attack_ids": ["different"], "derived_attack_ids": []},
+])
+def test_selection_rejects_invalid_version_or_conflicting_lists(tmp_path, overrides):
+    with pytest.raises(SelectionError):
+        load_case_set(write_selection(tmp_path, **overrides))

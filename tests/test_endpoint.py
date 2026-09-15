@@ -456,3 +456,19 @@ def test_v1_does_not_reject_it_and_that_difference_is_the_point():
     assert response.status_code != 422
     # And it is not silently truncated into a normal prediction either.
     assert response.status_code != 200
+
+
+@pytest.mark.parametrize("ids", [{1: "NEGATIVE", 2: "POSITIVE"}, {0: "NEGATIVE", 2: "POSITIVE"}])
+def test_model_label_ids_must_match_the_actual_output_indices(ids):
+    with pytest.raises(ModelIdentityError, match="contiguous"):
+        _validate_label_space(sentiment_spec(), ids)
+
+
+def test_a_task_cannot_be_reassigned_to_the_other_models_labels(tmp_path):
+    import json
+    document = json.loads((ROOT / "endpoint/targets.json").read_text(encoding="utf-8"))
+    document["tasks"]["sentiment_2"]["model_ref"] = "emotion_distilroberta"
+    path = tmp_path / "targets.json"
+    path.write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(TargetConfigError, match="task/model label mismatch"):
+        load_registry(path)

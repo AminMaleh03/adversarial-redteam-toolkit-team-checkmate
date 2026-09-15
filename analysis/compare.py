@@ -46,6 +46,89 @@ class FingerprintCheck:
         return self.planned_match and self.manifest_match
 
 
+@dataclass
+class PairingCheck:
+    """Whether two recorded runs may be compared at all (CONTRACTS section 5.5).
+
+    Matching target names, or a common task, are not sufficient. ``comparable`` is true
+    only when every prerequisite holds; otherwise ``reasons`` says which failed, so the
+    comparison is withheld with an explanation rather than silently produced. ``corrupt``
+    separates "this metadata cannot be trusted" from "these runs legitimately differ".
+    """
+
+    comparable: bool
+    reasons: list
+    corrupt: bool = False
+    checked: list = None
+
+    def __post_init__(self):
+        if self.checked is None:
+            self.checked = []
+
+
+# Each entry: a human name, and the path into run_meta that must agree across both runs.
+_PAIRING_REQUIREMENTS = (
+    ("parent run", ("evaluation_run_id",)),
+    ("task", ("task_id",)),
+    ("suite", ("suite_id",)),
+    ("case set", ("case_set_id",)),
+    ("model revision", ("model", "revision")),
+    ("model id", ("model", "model_id")),
+    ("tokenizer revision", ("model", "tokenizer_revision")),
+    ("baseline identity", ("baseline", "sha256")),
+    ("planned suite fingerprint", ("fingerprints", "planned_suite_sha256")),
+    ("selection fingerprint", ("fingerprints", "selection_sha256")),
+    ("manifest hash", ("fingerprints", "manifest_sha256")),
+    ("coverage map version", ("coverage_map", "version")),
+    ("coverage map hash", ("coverage_map", "sha256")),
+    ("request timeout", ("runner_settings", "request_timeout_s")),
+    ("slow band", ("runner_settings", "slow_band_from_ms")),
+)
+
+
+def _dig(meta: dict, path: tuple):
+    node = meta
+    for key in path:
+        if not isinstance(node, dict):
+            return None
+        node = node.get(key)
+    return node
+
+
+def check_pairing_identity(meta_a: dict, meta_b: dict) -> PairingCheck:
+    """Verify the full identity two runs must share before any paired claim.
+
+    A value absent from *both* sides is not a mismatch: the preserved historical runs
+    predate the model/baseline/selection blocks entirely, and demanding them would make
+    the original benchmark uncomparable with itself. A value present on one side and
+    absent or different on the other is a real divergence and withholds the comparison.
+    """
+    if not isinstance(meta_a, dict) or not isinstance(meta_b, dict):
+        return PairingCheck(False, ["run metadata is not an object"], corrupt=True)
+
+    reasons: list[str] = []
+    checked: list[str] = []
+    for name, path in _PAIRING_REQUIREMENTS:
+        left, right = _dig(meta_a, path), _dig(meta_b, path)
+        if left is None and right is None:
+            continue  # neither run records it; nothing to disagree about
+        checked.append(name)
+        if left != right:
+            reasons.append(f"{name} differs: {left!r} vs {right!r}")
+
+    # The ordered planned selection must agree case for case, not merely by digest.
+    planned_a = _dig(meta_a, ("case_ids", "planned"))
+    planned_b = _dig(meta_b, ("case_ids", "planned"))
+    if isinstance(planned_a, list) and isinstance(planned_b, list):
+        checked.append("planned case order")
+        if planned_a != planned_b:
+            reasons.append("planned case IDs or their order differ")
+    elif planned_a is not None or planned_b is not None:
+        return PairingCheck(False, ["case_ids.planned is malformed"], corrupt=True, checked=checked)
+
+    return PairingCheck(not reasons, reasons, corrupt=False, checked=checked)
+
+
 def check_fingerprints(meta_v1: dict, meta_v2: dict) -> FingerprintCheck:
     fp1 = meta_v1.get("fingerprints", {}).get("planned_suite_sha256")
     fp2 = meta_v2.get("fingerprints", {}).get("planned_suite_sha256")

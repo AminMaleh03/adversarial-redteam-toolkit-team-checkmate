@@ -725,11 +725,18 @@ def build_comparison_summary(
         v1_evaluable_attack_ids_by_mode=v1_analysis.evaluable_attack_ids_by_mode,
     )
 
+    pairing = compare.check_pairing_identity(meta_v1, meta_v2)
     summary = {
         "fingerprints": {
             "planned_match": result.fingerprints.planned_match,
             "manifest_match": result.fingerprints.manifest_match,
             "whole_suite_comparable": result.fingerprints.whole_suite_comparable,
+        },
+        "pairing_identity": {
+            "comparable": pairing.comparable,
+            "corrupt_metadata": pairing.corrupt,
+            "checked": pairing.checked,
+            "reasons": pairing.reasons,
         },
         "coverage": {
             "v1": result.coverage.v1_coverage,
@@ -747,11 +754,20 @@ def build_comparison_summary(
         "limitations": list(LIMITATION_NOTES),
     }
 
-    if not result.fingerprints.whole_suite_comparable:
+    if pairing.corrupt:
+        raise ValueError(
+            "run metadata is corrupt, so the runs cannot be compared: "
+            + "; ".join(pairing.reasons)
+        )
+    if not result.fingerprints.whole_suite_comparable or not pairing.comparable:
+        causes = list(pairing.reasons)
+        if not result.fingerprints.whole_suite_comparable:
+            causes.insert(0, "planned-suite fingerprint or manifest hash differs")
         summary["comparison_withheld_reason"] = (
-            "planned-suite fingerprint or manifest hash differs between V1 and V2; "
-            "whole-suite equivalence claims (resolved/remaining/newly-appearing findings, "
-            "paired category failure-rate deltas) are withheld rather than reported"
+            "these runs do not share the identity a paired claim requires ("
+            + "; ".join(causes)
+            + "); whole-suite equivalence claims (resolved/remaining/newly-appearing "
+            "findings, paired category failure-rate deltas) are withheld rather than reported"
         )
         return summary
 

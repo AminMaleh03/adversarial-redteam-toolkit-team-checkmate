@@ -5,28 +5,37 @@ Pipeline:
   1. Select seeds DETERMINISTICALLY and MODEL-FREE from the committed baselines
      (emotion: 3 per each of the 7 labels; sentiment: 10 per label), by a fixed ordering
      rule -- never by any model output.
-  2. Join each seed with its hand-authored paraphrase + neutral-distractor variant
-     (baseline/oces/oces_content.py).
-  3. Run mechanical checks on every variant: valid non-empty JSON string, sanitation-
-     invariant (the frozen clean_text is a no-op on it), and within the token limit of BOTH
-     pinned tokenizers (special tokens included, no truncation).
-  4. Freeze:
-       baseline/oces/emotion_seeds.json      (BaselineCase clean requests, verbatim seeds)
-       baseline/oces/sentiment_seeds.json
-       attacks/data/oces/emotion_cases.json  (AttackCase + AttackMetadata per variant)
-       attacks/data/oces/sentiment_cases.json
-       attacks/data/oces/provenance.json     (selection rule, source text, review status,
-                                              tokenizer identities, distributions -- NO
-                                              freeze commit; that is recorded in Phase 5)
-       attacks/data/oces/oces_review_sheet.csv  (fast human-review sheet, decision blank)
+  2. Derive each seed's OCES CLEAN REQUEST = clean_text(raw source). This is the sanitation-
+     invariant request actually sent for OCES; the exact raw source text is retained in
+     provenance. (The committed CORE baselines are NOT modified -- this is a separate OCES
+     artifact.)
+  3. Join each seed with its AI-drafted paraphrase + neutral-distractor variant
+     (baseline/oces/oces_content.py). The distractor is composed as
+     "<clean request> + ' ' + <neutral clause>", so it never rewrites the request's
+     casing/punctuation/tokenization -- it only ADDS one unrelated, affect-free sentence.
+  4. Mechanical checks on EVERY clean request AND EVERY variant (CONTRACTS 6.6): valid non-
+     empty JSON string, sanitation-invariant (frozen clean_text is a no-op), and within the
+     token limit of BOTH pinned tokenizers (special tokens, no truncation).
+  5. Freeze:
+       baseline/oces/emotion_seeds.json      (clean requests: BaselineCase with the cleaned
+       baseline/oces/sentiment_seeds.json     text; raw source kept in provenance)
+       attacks/data/oces/emotion_cases.json  (AttackCase + AttackMetadata per variant;
+       attacks/data/oces/sentiment_cases.json original_text = the clean request)
+       attacks/data/oces/provenance.json     (selection rule, RAW source text, author,
+                                              review status, coverage, tokenizer identities,
+                                              lengths, distributions -- NO freeze commit)
+       attacks/data/oces/oces_review_sheet.csv  (fast human-review sheet; decision blank)
 
 Discipline enforced here:
-  * NO model prediction (inference) is run on any seed or variant. The only model assets
-    touched are the two tokenizers (length counting) -- never predict()/a label.
-  * Candidates are AI-drafted; the frozen output records reviewer=null and
+  * NO model prediction (inference) on any seed or variant. Only the two tokenizers are used
+    (length counting) -- never predict()/a label.
+  * Candidates are AI-DRAFTED: `author` is recorded honestly and reviewer=null,
     review_method="ai_drafted_pending_human_review". Nothing is marked human-reviewed.
-  * OCES is authored AFTER the defenses were frozen, by authors who knew them: recorded as
-    exposure, and NOT called a blind holdout.
+  * OCES authored AFTER the evaluated defenses were frozen, by authors aware of them:
+    recorded as exposure; not a blind holdout, not design-independent.
+  * Every OCES case gets an outcome-independent coverage declaration (CONTRACTS 6.5: a case
+    with no valid declaration fails validation). By construction these are `not_targeted`:
+    ordinary clean English designed to trigger none of V2's declared input controls.
 
 Run from the repo root:  python -m baseline.oces.build_oces
 """
@@ -45,30 +54,43 @@ from transformers import AutoTokenizer
 
 from contract import (
     AttackCase,
+    COVERAGE_NOT_TARGETED,
     OCES_FAMILY_PARAPHRASE,
     OCES_FAMILY_DISTRACTOR,
     SUITE_OCES,
 )
 from baseline.load import load_baseline
 from baseline.oces import oces_content
+from attacks import coverage
 from attacks import metadata as md
 
 # --- frozen knobs ---------------------------------------------------------------------
-GENERATOR_VERSION = "1.0.0"
+GENERATOR_VERSION = "1.1.0"
 AUTHORED_UTC = "2026-09-15"
 TRANSFORM_VERSION = "oces-v1"
 SOURCE = "oces-authored-v1"
+AUTHOR = "AI draft (Claude Code); Task 4 owner: Lamei"
 
 EMOTION_PER_LABEL = 3
 SENTIMENT_PER_LABEL = 10
 TOKEN_LIMIT = 512                 # both models declare 512 incl. special tokens
 
-# Honest exposure wording (Task 4): NOT a blind holdout.
+# Required wording, verbatim in substance (CONTRACTS 6.6).
 EXPOSURE_STATEMENT = (
-    "additional evaluation authored after defense freeze; authors knew the defenses; "
-    "not a blind or design-independent holdout"
+    "additional evaluation authored after the evaluated defenses were frozen; the authors "
+    "were aware of the defenses; not a blind holdout and not design-independent"
 )
 REVIEW_METHOD = "ai_drafted_pending_human_review"
+
+# Outcome-independent coverage for every OCES case: by construction they are ordinary clean
+# English that triggers none of V2's declared input controls, so they are `not_targeted`.
+OCES_COVERAGE_RATIONALE = (
+    "OCES clean semantic transformation (paraphrase / neutral distractor) in ordinary valid "
+    "English: sanitation-invariant, well-formed and within the token limit, so by "
+    "construction it triggers none of V2's declared input controls (normalization / "
+    "strict_type_schema / length). Any label change is model-level, not control-mediated. "
+    "Classification is from construction, never from observed results."
+)
 
 EMOTION_TOKENIZER = ("j-hartmann/emotion-english-distilroberta-base",
                      "0e1cd914e3d46199ed785853e12b57304e04178b")
@@ -136,14 +158,27 @@ def _counters(emo_tok, sent_tok):
     return (lambda t: count(emo_tok, t)), (lambda t: count(sent_tok, t))
 
 
-def _build_variants(seeds, emo_count, sent_count):
-    """Return (cases, provenance_entries, review_rows) for one task's seeds."""
+def _mechanical_check(what: str, text: str, emo_count, sent_count) -> dict:
+    """Valid non-empty JSON string, sanitation-invariant, within both tokenizers' limits."""
+    if not isinstance(text, str) or not text.strip():
+        raise ValueError(f"{what}: empty/invalid text")
+    if _clean_text(text) != text:
+        raise ValueError(f"{what}: not sanitation-invariant (clean_text changes it)")
+    json.loads(json.dumps({"text": text}))                # valid JSON string round-trip
+    lengths = {"emotion": emo_count(text), "sentiment": sent_count(text)}
+    for name, length in lengths.items():
+        if length >= TOKEN_LIMIT:
+            raise ValueError(f"{what}: {length} {name} tokens >= limit {TOKEN_LIMIT}")
+    return lengths
+
+
+def _build_task(seeds, task, emo_count, sent_count, map_version):
+    """Return (seed_records, cases, provenance_entries, review_rows) for one task."""
     seed_by_id = {s.baseline_id: s for s in seeds}
     seed_ids = list(seed_by_id)
-    task = "emotion" if seeds and seeds[0].baseline_id.startswith(("dataset-", "handwritten-")) else "sentiment"
     authored = oces_content.EMOTION_VARIANTS if task == "emotion" else oces_content.SENTIMENT_VARIANTS
 
-    # every seed must have exactly one paraphrase and one distractor
+    # every seed must have exactly one paraphrase and one distractor; no stray references
     fam_by_seed = defaultdict(set)
     for seed_id, family, *_ in authored:
         fam_by_seed[seed_id].add(family)
@@ -156,35 +191,46 @@ def _build_variants(seeds, emo_count, sent_count):
     if extra:
         raise ValueError(f"authored variants reference non-selected seeds: {sorted(extra)}")
 
+    # ---- clean requests (the OCES originals) + their checks ----
+    clean_request = {}
+    request_lengths = {}
+    for seed in seeds:
+        req = _clean_text(seed.text)
+        clean_request[seed.baseline_id] = req
+        request_lengths[seed.baseline_id] = _mechanical_check(
+            f"clean_request[{seed.baseline_id}]", req, emo_count, sent_count
+        )
+
+    seed_records = [
+        {"baseline_id": s.baseline_id, "text": clean_request[s.baseline_id],
+         "label": s.label, "source": s.source}
+        for s in seeds
+    ]
+
     cases, provenance, review_rows = [], {}, []
     seen_attack_ids = set()
-    # deterministic order: seed selection order, paraphrase before distractor
     order = {"paraphrase": 0, "distractor": 1}
-    for seed_id, family, subtype, text, risk, tier, rationale in sorted(
+    for seed_id, family, subtype, payload, risk, tier, rationale in sorted(
         authored, key=lambda e: (seed_ids.index(e[0]), order[e[1]])
     ):
         seed = seed_by_id[seed_id]
+        req = clean_request[seed_id]
         declared_family = _FAMILY[family]
         attack_id = f"{seed_id}.{declared_family}"
         if attack_id in seen_attack_ids:
             raise ValueError(f"duplicate OCES attack_id {attack_id!r}")
         seen_attack_ids.add(attack_id)
 
-        # ---- mechanical checks (no model prediction) ----
-        if not isinstance(text, str) or not text.strip():
-            raise ValueError(f"{attack_id}: empty/invalid variant text")
-        if _clean_text(text) != text:
-            raise ValueError(
-                f"{attack_id}: variant is NOT sanitation-invariant (clean_text changes it); "
-                "OCES must be ordinary clean English"
-            )
-        json.loads(json.dumps({"text": text}))          # valid JSON string round-trip
-        emo_len, sent_len = emo_count(text), sent_count(text)
-        for name, length in (("emotion", emo_len), ("sentiment", sent_len)):
-            if length >= TOKEN_LIMIT:
-                raise ValueError(f"{attack_id}: {length} {name} tokens >= limit {TOKEN_LIMIT}")
+        # paraphrase carries the full text; distractor = clean request + " " + neutral clause
+        if family == "paraphrase":
+            variant_text = payload
+        else:
+            variant_text = f"{req} {payload}"
+            if not variant_text.startswith(req + " "):          # causal-isolation guarantee
+                raise ValueError(f"{attack_id}: distractor prefix != clean request")
 
-        # ---- frozen metadata (constructed via the dataclass, so values are validated) ----
+        variant_lengths = _mechanical_check(attack_id, variant_text, emo_count, sent_count)
+
         meta = md.AttackMetadata(
             attack_id=attack_id, family=declared_family, subfamily=subtype,
             relation=md.REL_INVARIANT, oracle=md.ORACLE_LABEL_MATCH_BASELINE,
@@ -192,40 +238,44 @@ def _build_variants(seeds, emo_count, sent_count):
             requires_baseline=True, transform_version=TRANSFORM_VERSION,
             suite_id=SUITE_OCES, exposure=EXPOSURE_STATEMENT,
             declared_family=declared_family, notes=rationale,
+            # outcome-independent coverage declaration (CONTRACTS 6.5)
+            coverage_class=COVERAGE_NOT_TARGETED, controls_targeted=[],
+            coverage_rationale=OCES_COVERAGE_RATIONALE, coverage_map_version=map_version,
         )
         case = AttackCase(
             attack_id=attack_id, baseline_id=seed_id, category=declared_family,
-            original_text=seed.text, attacked_text=text, is_raw=False,
+            original_text=req, attacked_text=variant_text, is_raw=False,
         )
         cases.append({"case": asdict(case), "metadata": asdict(meta)})
 
         provenance[attack_id] = {
             "seed_baseline_id": seed_id,
-            "source_text": seed.text,                    # verbatim seed
+            "raw_source_text": seed.text,               # exact distributed text
+            "clean_request": req,                        # sanitation-invariant OCES original
             "expected_label": seed.label,
             "family": declared_family,
             "transform_subtype": subtype,
-            "variant_text": text,
+            "distractor_clause": payload if family == "distractor" else None,
+            "variant_text": variant_text,
             "rationale": rationale,
+            "author": AUTHOR,
+            "reviewer": None,
+            "review_method": REVIEW_METHOD,
             "semantic_risk": risk,
             "proposed_tier": tier,
-            "review_method": REVIEW_METHOD,
-            "reviewer": None,
+            "coverage_class": COVERAGE_NOT_TARGETED,
+            "controls_targeted": [],
             "clean_text_invariant": True,
-            "tokenizer_lengths": {"emotion": emo_len, "sentiment": sent_len},
+            "tokenizer_lengths": {"clean_request": request_lengths[seed_id],
+                                  "variant": variant_lengths},
         }
         review_rows.append({
             "case_id": attack_id, "task": task, "expected_label": seed.label,
-            "clean_text_seed": seed.text, "family": declared_family,
-            "variant_text": text, "rationale": rationale,
+            "clean_request": req, "raw_source_text": seed.text, "family": declared_family,
+            "variant_text": variant_text, "rationale": rationale, "author": AUTHOR,
             "semantic_risk": risk, "proposed_tier": tier, "Lamei_decision": "",
         })
-    return cases, provenance, review_rows
-
-
-def _seed_records(seeds):
-    return [{"baseline_id": s.baseline_id, "text": s.text, "label": s.label, "source": s.source}
-            for s in seeds]
+    return seed_records, cases, provenance, review_rows
 
 
 def _write_json(path: Path, obj) -> None:
@@ -239,22 +289,27 @@ def build():
     emo_tok = AutoTokenizer.from_pretrained(EMOTION_TOKENIZER[0], revision=EMOTION_TOKENIZER[1])
     sent_tok = AutoTokenizer.from_pretrained(SENTIMENT_TOKENIZER[0], revision=SENTIMENT_TOKENIZER[1])
     emo_count, sent_count = _counters(emo_tok, sent_tok)
+    map_version = coverage.load_coverage_map()["coverage_map_version"]
 
     emo_seeds = select_emotion_seeds()
     sent_seeds = select_sentiment_seeds()
 
-    emo_cases, emo_prov, emo_rows = _build_variants(emo_seeds, emo_count, sent_count)
-    sent_cases, sent_prov, sent_rows = _build_variants(sent_seeds, emo_count, sent_count)
+    emo_seed_rec, emo_cases, emo_prov, emo_rows = _build_task(
+        emo_seeds, "emotion", emo_count, sent_count, map_version)
+    sent_seed_rec, sent_cases, sent_prov, sent_rows = _build_task(
+        sent_seeds, "sentiment", emo_count, sent_count, map_version)
 
     all_prov = {**emo_prov, **sent_prov}
     tier_dist = Counter(v["proposed_tier"] for v in all_prov.values())
     risk_dist = Counter(v["semantic_risk"] for v in all_prov.values())
+    coverage_dist = Counter(v["coverage_class"] for v in all_prov.values())
 
     provenance = {
         "artifact": "oces",
         "generator_version": GENERATOR_VERSION,
         "authored_utc": AUTHORED_UTC,
         "generator": "baseline/oces/build_oces.py",
+        "author": AUTHOR,
         "exposure_statement": EXPOSURE_STATEMENT,
         "oracle": "label_should_match_baseline (relation=invariant)",
         "families": [OCES_FAMILY_PARAPHRASE, OCES_FAMILY_DISTRACTOR],
@@ -263,7 +318,23 @@ def build():
             "No predict()/label was run on any seed or variant while authoring or checking "
             "OCES. The only model assets used were the two tokenizers, for length counting."
         ),
-        "review": {"method": REVIEW_METHOD, "reviewer": None,
+        "clean_request_note": (
+            "The OCES clean request is clean_text(raw source); it is sanitation-invariant and "
+            "is the request actually sent. The exact raw source text is retained per variant. "
+            "The committed core baselines are unchanged."
+        ),
+        "distractor_construction": (
+            "distractor = clean_request + ' ' + neutral_clause; the clean request is the exact "
+            "prefix, so no casing/punctuation/tokenization is rewritten -- only a neutral "
+            "sentence is added."
+        ),
+        "coverage": {
+            "note": "Every OCES case carries an outcome-independent declaration (CONTRACTS 6.5). "
+                    "By construction all are not_targeted with zero targeted controls.",
+            "coverage_map_version": map_version,
+            "distribution": dict(sorted(coverage_dist.items())),
+        },
+        "review": {"method": REVIEW_METHOD, "reviewer": None, "author": AUTHOR,
                    "note": "AI-drafted candidates; human semantic review pending; "
                            "proposed_tier is not a claim of human review"},
         "seed_selection": {
@@ -285,11 +356,13 @@ def build():
             "emotion": {"id": EMOTION_TOKENIZER[0], "revision": EMOTION_TOKENIZER[1]},
             "sentiment": {"id": SENTIMENT_TOKENIZER[0], "revision": SENTIMENT_TOKENIZER[1]},
             "token_limit_checked": TOKEN_LIMIT,
-            "check": "add_special_tokens=True, truncation=False; both tokenizers per variant",
+            "check": "add_special_tokens=True, truncation=False; both tokenizers per clean "
+                     "request AND per variant",
         },
         "counts": {
             "emotion_seeds": len(emo_seeds), "sentiment_seeds": len(sent_seeds),
             "emotion_variants": len(emo_cases), "sentiment_variants": len(sent_cases),
+            "clean_requests": len(emo_seeds) + len(sent_seeds),
             "total_variants": len(emo_cases) + len(sent_cases),
         },
         "proposed_tier_distribution": dict(sorted(tier_dist.items())),
@@ -298,15 +371,16 @@ def build():
     }
 
     # ---- write frozen artifacts ----
-    _write_json(SEEDS_DIR / "emotion_seeds.json", _seed_records(emo_seeds))
-    _write_json(SEEDS_DIR / "sentiment_seeds.json", _seed_records(sent_seeds))
+    _write_json(SEEDS_DIR / "emotion_seeds.json", emo_seed_rec)
+    _write_json(SEEDS_DIR / "sentiment_seeds.json", sent_seed_rec)
     _write_json(CASES_DIR / "emotion_cases.json", emo_cases)
     _write_json(CASES_DIR / "sentiment_cases.json", sent_cases)
     _write_json(CASES_DIR / "provenance.json", provenance)
 
     review_path = CASES_DIR / "oces_review_sheet.csv"
-    fields = ["case_id", "task", "expected_label", "clean_text_seed", "family",
-              "variant_text", "rationale", "semantic_risk", "proposed_tier", "Lamei_decision"]
+    fields = ["case_id", "task", "expected_label", "clean_request", "raw_source_text",
+              "family", "variant_text", "rationale", "author", "semantic_risk",
+              "proposed_tier", "Lamei_decision"]
     with review_path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
@@ -320,9 +394,10 @@ def main():
     c = prov["counts"]
     print(f"emotion: {c['emotion_seeds']} seeds -> {c['emotion_variants']} variants")
     print(f"sentiment: {c['sentiment_seeds']} seeds -> {c['sentiment_variants']} variants")
-    print(f"total variants: {c['total_variants']}")
+    print(f"clean requests checked: {c['clean_requests']}; total variants: {c['total_variants']}")
     print("proposed tiers:", prov["proposed_tier_distribution"])
     print("semantic risk :", prov["semantic_risk_distribution"])
+    print("coverage      :", prov["coverage"]["distribution"])
     print("no model inference:", prov["no_model_inference"])
 
 

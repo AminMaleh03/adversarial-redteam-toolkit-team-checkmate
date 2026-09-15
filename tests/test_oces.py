@@ -67,14 +67,38 @@ def test_seed_selection_is_deterministic_and_matches_committed():
     assert sent == [s["baseline_id"] for s in _load(SENT_SEEDS)]
 
 
-def test_oces_seeds_are_verbatim_slices_of_the_committed_baselines():
-    """Seeds are drawn from the committed baselines and their text is unchanged."""
+def test_oces_clean_requests_are_clean_text_of_the_committed_baselines():
+    """The OCES clean request (seed 'text') is clean_text(committed baseline); the exact raw
+    source is preserved separately in provenance. The core baselines are NOT modified."""
+    prov = _load(PROVENANCE)["variants"]
+    raw_by_seed = {}
+    for v in prov.values():
+        raw_by_seed[v["seed_baseline_id"]] = (v["raw_source_text"], v["clean_request"])
+
     emo_base = {b.baseline_id: b.text for b in load_baseline(REPO / "baseline" / "baseline.json")}
     for s in load_baseline(EMO_SEEDS):
-        assert emo_base[s.baseline_id] == s.text
+        raw, req = raw_by_seed[s.baseline_id]
+        assert raw == emo_base[s.baseline_id]                       # raw source unchanged
+        assert s.text == req == build_oces._clean_text(emo_base[s.baseline_id])
     sent_base = {b.baseline_id: b.text for b in load_baseline(REPO / "baseline" / "sentiment_baseline.json")}
     for s in load_baseline(SENT_SEEDS):
-        assert sent_base[s.baseline_id] == s.text
+        raw, req = raw_by_seed[s.baseline_id]
+        assert raw == sent_base[s.baseline_id]
+        assert s.text == req == build_oces._clean_text(sent_base[s.baseline_id])
+
+
+def test_all_clean_requests_are_sanitation_invariant_and_bounded():
+    """CONTRACTS 6.6: every OCES original (clean request) must itself pass the input gates."""
+    prov = _load(PROVENANCE)["variants"]
+    seen = set()
+    for v in prov.values():
+        req = v["clean_request"]
+        assert build_oces._clean_text(req) == req                  # sanitation-invariant
+        lens = v["tokenizer_lengths"]["clean_request"]
+        assert lens["emotion"] < build_oces.TOKEN_LIMIT
+        assert lens["sentiment"] < build_oces.TOKEN_LIMIT
+        seen.add(v["seed_baseline_id"])
+    assert len(seen) == 41                                          # all 41 clean requests
 
 
 # ------------------------------------------------------------------------- cases
@@ -92,6 +116,7 @@ def test_counts_and_one_paraphrase_plus_one_distractor_per_seed():
 
 
 def test_every_case_has_valid_frozen_metadata_and_contract_shape():
+    from contract import COVERAGE_NOT_TARGETED
     for entry in _load(EMO_CASES) + _load(SENT_CASES):
         case = AttackCase(**entry["case"])                       # reconstructs / validates shape
         m = entry["metadata"]
@@ -106,6 +131,26 @@ def test_every_case_has_valid_frozen_metadata_and_contract_shape():
         assert meta.semantic_risk in md.SEMANTIC_RISK
         assert case.baseline_id is not None and meta.requires_baseline is True
         assert case.is_raw is False and case.attacked_text
+        # every OCES case carries an outcome-independent coverage declaration (CONTRACTS 6.5)
+        assert meta.coverage_class == COVERAGE_NOT_TARGETED
+        assert meta.controls_targeted == []
+        assert meta.coverage_rationale and meta.coverage_map_version
+
+
+def test_distractor_prefix_equals_clean_request_exactly():
+    """Causal isolation: a distractor only ADDS a neutral clause; it never rewrites the
+    request's casing/punctuation/tokenization."""
+    prov = _load(PROVENANCE)["variants"]
+    n = 0
+    for entry in _load(EMO_CASES) + _load(SENT_CASES):
+        if entry["metadata"]["declared_family"] != OCES_FAMILY_DISTRACTOR:
+            continue
+        req = entry["case"]["original_text"]
+        variant = entry["case"]["attacked_text"]
+        clause = prov[entry["case"]["attack_id"]]["distractor_clause"]
+        assert variant == f"{req} {clause}"                     # prefix is the exact request
+        n += 1
+    assert n == 41                                              # one distractor per seed
 
 
 def test_only_the_two_oces_families_no_negation_or_new_families():
@@ -131,7 +176,7 @@ def test_every_variant_is_sanitation_invariant_and_under_limit_in_provenance():
     for entry in _load(EMO_CASES) + _load(SENT_CASES):
         text = entry["case"]["attacked_text"]
         assert build_oces._clean_text(text) == text            # ordinary clean English
-        lens = prov[entry["case"]["attack_id"]]["tokenizer_lengths"]
+        lens = prov[entry["case"]["attack_id"]]["tokenizer_lengths"]["variant"]
         assert lens["emotion"] < build_oces.TOKEN_LIMIT
         assert lens["sentiment"] < build_oces.TOKEN_LIMIT
 
@@ -152,14 +197,16 @@ def test_clean_text_mirror_matches_frozen_sanitizer():
 
 
 # ------------------------------------------------------------------------- honesty / discipline
-def test_no_case_is_marked_human_reviewed():
+def test_no_case_is_marked_human_reviewed_and_author_is_honest():
     prov = _load(PROVENANCE)
     assert prov["review"]["reviewer"] is None
     assert prov["no_model_inference"] is True
     assert "not a blind" in prov["exposure_statement"].lower()
+    assert "AI draft" in prov["author"]                        # honest authorship, not hand-written
     for v in prov["variants"].values():
         assert v["reviewer"] is None
         assert v["review_method"] == "ai_drafted_pending_human_review"
+        assert "AI draft" in v["author"]
     # ambiguous/high-risk candidates stay visible as REVIEW, never silently scored
     for v in prov["variants"].values():
         if v["semantic_risk"] == "high":

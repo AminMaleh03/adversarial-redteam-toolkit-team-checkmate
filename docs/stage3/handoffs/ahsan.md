@@ -13,6 +13,13 @@ Published implementation commit: `3c606fb6e5ece562ed739bccabc12a17a3e495db`. Dra
 https://github.com/AminMaleh03/adversarial-redteam-toolkit-team-checkmate/pull/11, base
 `stage3/integration`, compare `stage3/ahsan`. The PR is intentionally unmerged.
 
+PR workflow run: https://github.com/AminMaleh03/adversarial-redteam-toolkit-team-checkmate/actions/runs/35002778576.
+It completed `failure` as expected for the missing frozen CI policy: dependency setup and the
+gate invocation completed, evidence artifact publication succeeded, identity verification and
+gate enforcement failed, and deployment was skipped. Published artifact:
+`stage3-gate-4e900b7964b6357a2ee4e66f20a673968c055a90`. This is blocker evidence, not a
+candidate policy verdict.
+
 ## Integrated dependency identity
 
 - Rayyan handover: `44ce8d438fbe79afbb6c0bf04b2aae900ab7ef27`, merged to integration by PR #10.

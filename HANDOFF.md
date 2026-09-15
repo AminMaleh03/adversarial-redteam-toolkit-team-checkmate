@@ -13,6 +13,11 @@ Implementation commit `3c606fb6e5ece562ed739bccabc12a17a3e495db` is published on
 https://github.com/AminMaleh03/adversarial-redteam-toolkit-team-checkmate/pull/11. It is not
 merged. This factual handoff checkpoint follows the implementation commit.
 
+PR workflow run 35002778576 completed `failure` on the documented missing-policy path:
+setup and gate invocation succeeded, the evidence artifact was published, identity/enforcement
+failed because no candidate verdict was available, and deploy was skipped. URL:
+https://github.com/AminMaleh03/adversarial-redteam-toolkit-team-checkmate/actions/runs/35002778576.
+
 Implemented in Ahsan-owned files: registry-selected orchestration with collision-safe run
 IDs/indexes, exact plan reuse for pairs, sequential lifecycle and process-tree memory
 measurement; schema-v2/v3 report validation and a target-aware v3 template; structured,

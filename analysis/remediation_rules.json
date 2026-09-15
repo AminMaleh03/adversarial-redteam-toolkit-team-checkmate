@@ -1,0 +1,97 @@
+{
+  "rules_version": "1.0.0",
+  "description": "Reusable remediation rules keyed by observed failure mode and family. Selection is by what was actually observed, never by a finding's sequence number.",
+  "rules": [
+    {
+      "rule_id": "RM-5XX-OVERSIZED",
+      "applies_to": {"failure_mode": "unhandled_5xx", "subfamily_prefix": "oversized_"},
+      "significance": "A request body larger than the endpoint will handle produced a server-error response instead of a bounded rejection. The size at which this starts is the useful number, because it says where the limit actually is.",
+      "fix": "Enforce a maximum request-body size at the ASGI/server layer, before the JSON body is read and parsed, and return a bounded 413 or 422. A token-count limit does not cover this: tokenization happens after the body has already been read and parsed, so it cannot prevent an oversized body from being accepted.",
+      "diagnosis_confidence": "supported",
+      "verification_expected": "the same oversized case returns the documented rejection status with no 5xx and no timeout"
+    },
+    {
+      "rule_id": "RM-5XX-OVERLENGTH",
+      "applies_to": {"failure_mode": "unhandled_5xx", "families": ["truncation", "boundary"]},
+      "significance": "Input at or beyond the model's sequence limit produced a server-error response rather than a defined rejection. The settled architecture forbids silent truncation, so rejecting is the intended behaviour and erroring is not.",
+      "fix": "Check the tokenized length against the model's maximum sequence length before inference and reject over-limit input with a typed 4xx response. Do not add truncation: silently shortening the input would hide the failure this case exists to measure.",
+      "diagnosis_confidence": "supported",
+      "verification_expected": "over-limit cases return the documented 4xx rejection and under-limit cases still return 200"
+    },
+    {
+      "rule_id": "RM-5XX-GENERIC",
+      "applies_to": {"failure_mode": "unhandled_5xx"},
+      "significance": "The endpoint returned a server-error response for this input. What that response proves is bounded: it is an observed 5xx, not evidence of an internal model crash, process death or information disclosure.",
+      "fix": "Add a scoped exception handler for this input class that returns a typed error response, and keep validation errors on their own path so a 422 is never converted into a 500.",
+      "diagnosis_confidence": "suspected",
+      "verification_expected": "the same cases return a typed error response and no unhandled 5xx"
+    },
+    {
+      "rule_id": "RM-INVALID-ACCEPTED",
+      "applies_to": {"failure_mode": "invalid_input_accepted"},
+      "significance": "The pre-registered oracle for this case says the request should have been rejected, but the endpoint accepted it and answered. A confident answer to a structurally invalid request is a schema-enforcement gap, not a model problem.",
+      "fix": "Tighten request-model validation so this shape is rejected with a 422: strict field types and forbidding unexpected fields, checked before any inference call.",
+      "diagnosis_confidence": "supported",
+      "verification_expected": "the same request returns 422 with standard validation fields and no prediction"
+    },
+    {
+      "rule_id": "RM-LEAK",
+      "applies_to": {"failure_mode": "info_leak"},
+      "significance": "An error response carried internal implementation detail. Ordinary FastAPI/Pydantic validation output is not counted here; what was detected is a stack trace, an absolute filesystem path, or an internal module or function name.",
+      "fix": "Strip internal detail from error responses: return a typed message and keep tracebacks and paths in server-side logs only.",
+      "diagnosis_confidence": "supported",
+      "verification_expected": "the same error responses carry no stack trace, absolute path or internal module name"
+    },
+    {
+      "rule_id": "RM-TIMEOUT",
+      "applies_to": {"failure_mode": "timeout"},
+      "significance": "No response was produced inside the request deadline. The recorded error is client-side and carries no server-stage information, so where the time went is not established by this evidence.",
+      "fix": "Bound the work a single request can do before the deadline: reject oversized bodies at the server layer and cap per-request inference time. Establishing the cause needs server-side timing instrumentation this run did not collect.",
+      "diagnosis_confidence": "suspected",
+      "verification_expected": "the same case returns a bounded response or a documented rejection inside the deadline"
+    },
+    {
+      "rule_id": "RM-UNAVAILABLE",
+      "applies_to": {"failure_mode": "service_unavailable"},
+      "significance": "The health check after this request did not answer. That is observed unavailability; it is not evidence that the operating-system process died.",
+      "fix": "Add resource limits and supervision so one request cannot make the service stop answering, and alert on health-check failure.",
+      "diagnosis_confidence": "supported",
+      "verification_expected": "health answers after every selected request in a repeat run"
+    },
+    {
+      "rule_id": "RM-FLIP-MODEL",
+      "applies_to": {"failure_mode": "prediction_flip"},
+      "significance": "The top label changed under a transformation intended to preserve meaning, while the clean prediction was confident. This is a model-level sensitivity: the input reached the model unchanged in the ways the input controls check, so no endpoint control addresses it.",
+      "fix": "This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+      "diagnosis_confidence": "supported",
+      "verification_expected": "after retraining or augmentation, the same case ids are re-run and the flip rate over the same eligible denominator is compared",
+      "model_level": true
+    },
+    {
+      "rule_id": "RM-FLIP-NORMALISABLE",
+      "applies_to": {"failure_mode": "prediction_flip", "subfamilies": ["homoglyph", "homoglyph_greek"]},
+      "significance": "The top label changed under a cross-script confusable substitution. Unicode compatibility normalisation does not fold these: confusables are a security mapping (UTS #39), separate from the compatibility mapping NFKC applies.",
+      "fix": "Mixed-script confusables need a confusables-aware input check rather than more normalisation. The model-level sensitivity remains underneath, so this reduces exposure to this family without making the classifier robust to it.",
+      "diagnosis_confidence": "supported",
+      "verification_expected": "the same homoglyph case ids are re-run and the substituted characters are folded or the request is rejected",
+      "model_level": true
+    },
+    {
+      "rule_id": "RM-SLOW",
+      "applies_to": {"failure_mode": "slow_response"},
+      "significance": "The response landed in the slow band. Latency is environment-sensitive, so this is a signal about this run's conditions as much as about the endpoint.",
+      "fix": "Profile the slow path for this input class and bound it, or document the expected latency for inputs of this size.",
+      "diagnosis_confidence": "suspected",
+      "verification_expected": "the same cases return inside the normal band on comparable hardware"
+    },
+    {
+      "rule_id": "RM-FALLBACK",
+      "applies_to": {},
+      "significance": "This failure mode has no specific rule yet, so the advice below is generic. The observations attached to this finding are still specific to it.",
+      "fix": "Review the recorded rows for this finding and decide the appropriate control. Do not infer a cause the evidence does not establish.",
+      "diagnosis_confidence": "suspected",
+      "verification_expected": "the same case ids are re-run and the recorded behaviour is compared",
+      "is_fallback": true
+    }
+  ]
+}

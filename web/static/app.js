@@ -123,12 +123,21 @@
     checking = true;
     var wasExecution = executionRoute();
     var current = generation;
+    var selected = evaluationSelect ? evaluationSelect.value : "emotion.core";
     fetch("/api/status", { cache: "no-store" })
       .then(function (res) { if (!res.ok) throw new Error(); return res.json(); })
       .then(function (state) {
         checking = false;
         if (current !== generation) return;
+        // A server-side job can keep running after Back leaves the execution view (Back
+        // only stops client polling). Reattaching here must never bind the freshly
+        // selected evaluation to a different in-flight run's progress.
+        if (state.status === "running" && state.evaluation_id && state.evaluation_id !== selected) {
+          showFailure("Red Lab is running another experiment. Please try again shortly.");
+          return;
+        }
         if (state.status === "running" || (wasExecution && state.status === "complete")) {
+          activeRunId = state.run_id; activeEvaluationId = state.evaluation_id;
           activateExecutionView(); applyState(state);
         } else startRun();
       })

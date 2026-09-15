@@ -201,3 +201,104 @@ class TestRequestBodyEvidence:
     def test_historical_null_body_evidence_is_legitimate(self):
         # None means unavailable and never zero; historical rows are always None.
         assert validate_rows([legacy_row()], "v1") == "v1"
+
+
+class TestSchemaV3Envelope:
+    """The v3 document shape (CONTRACTS section 6.1)."""
+
+    def _doc(self):
+        from analysis import analyze
+        return analyze.run_analysis_from_dir("artifacts/benchmark_v6/run")
+
+    def test_envelope_keys(self):
+        doc = self._doc()
+        assert doc["schema_version"] == 3
+        assert doc["contracts_version"] == "3.0.0"
+        for key in ("run_identity", "evaluations", "limitations"):
+            assert key in doc
+
+    def test_summaries_are_keyed_by_target_id_not_version(self):
+        block = self._doc()["evaluations"][0]
+        assert sorted(block["summaries"]) == ["emotion_v1", "emotion_v2"]
+        assert block["targets"] == ["emotion_v1", "emotion_v2"]
+
+    def test_canonical_evaluation_id(self):
+        # "emotion.core", never "emotion_7.core".
+        assert self._doc()["evaluations"][0]["evaluation_id"] == "emotion.core"
+
+    def test_legacy_provenance_is_marked_inferred_not_declared(self):
+        block = self._doc()["evaluations"][0]
+        identity = block["summaries"]["emotion_v1"]["identity"]
+        assert identity["provenance"] == PROVENANCE_INFERRED_LEGACY
+        assert identity["declared"]["target_id"] is None
+        assert "inferred" in identity
+
+    def test_paired_block_carries_a_comparison(self):
+        assert self._doc()["evaluations"][0]["comparison"] is not None
+
+    def test_legacy_v2_view_preserves_the_published_numbers(self):
+        import json
+        from analysis import analyze
+        view = analyze.legacy_v2_view(self._doc())
+        published = json.loads(
+            open("artifacts/benchmark_v6/analysis/analysis.json", encoding="utf-8").read()
+        )
+        assert view["schema_version"] == 2
+        for version in ("summary_v1", "summary_v2"):
+            assert view[version]["drift"]["qualifying_flips"] == \
+                published[version]["drift"]["qualifying_flips"]
+            assert view[version]["operational"]["unhandled_5xx"] == \
+                published[version]["operational"]["unhandled_5xx"]
+            assert len(view[version]["findings"]) == len(published[version]["findings"])
+
+
+class TestSingleTargetComparisonIsNull:
+    """Acceptance check 4: single-target output has comparison null and no fabricated
+    comparison metrics."""
+
+    def test_single_block_comparison_is_null_and_present(self):
+        from analysis import analyze
+        block = analyze.build_evaluation_block(
+            evaluation_id="sentiment.core", kind="single", task_id="sentiment_2",
+            suite_id="core", targets=["sentiment_v1"],
+            summaries={"sentiment_v1": {"target_id": "sentiment_v1"}}, comparison=None,
+        )
+        assert "comparison" in block
+        assert block["comparison"] is None
+
+    def test_single_block_refuses_a_fabricated_comparison(self):
+        from analysis import analyze
+        with pytest.raises(ValueError, match="cannot carry a comparison"):
+            analyze.build_evaluation_block(
+                evaluation_id="sentiment.core", kind="single", task_id="sentiment_2",
+                suite_id="core", targets=["sentiment_v1"],
+                summaries={"sentiment_v1": {}},
+                comparison={"improvement": 0.5},
+            )
+
+    def test_paired_block_requires_two_targets(self):
+        from analysis import analyze
+        with pytest.raises(ValueError, match="exactly two targets"):
+            analyze.build_evaluation_block(
+                evaluation_id="emotion.core", kind="paired", task_id="emotion_7",
+                suite_id="core", targets=["emotion_v1"],
+                summaries={"emotion_v1": {}}, comparison={},
+            )
+
+    def test_summaries_must_match_the_target_list(self):
+        from analysis import analyze
+        with pytest.raises(ValueError, match="summaries keys must match"):
+            analyze.build_evaluation_block(
+                evaluation_id="sentiment.core", kind="single", task_id="sentiment_2",
+                suite_id="core", targets=["sentiment_v1"],
+                summaries={"emotion_v1": {}}, comparison=None,
+            )
+
+    def test_single_target_document_has_no_v2_projection(self):
+        from analysis import analyze
+        doc = {"evaluations": [analyze.build_evaluation_block(
+            evaluation_id="sentiment.core", kind="single", task_id="sentiment_2",
+            suite_id="core", targets=["sentiment_v1"],
+            summaries={"sentiment_v1": {}}, comparison=None)]}
+        with pytest.raises(ValueError, match="no v2 representation"):
+            analyze.legacy_v2_view(doc)

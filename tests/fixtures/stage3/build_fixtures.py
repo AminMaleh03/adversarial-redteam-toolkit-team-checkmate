@@ -1418,7 +1418,7 @@ def build_genuine_legacy(out: Path) -> dict:
     ``analysis.run_analysis``. Small enough to read, genuine enough to test legacy
     upcasting against something that really came out of the pipeline.
     """
-    from analysis.analyze import run_analysis
+    from analysis.analyze import legacy_v2_view, run_analysis
 
     keep_baselines = ["dataset-anger-0", "dataset-anger-1"]
     manifest_bytes = (BENCH / "run" / "manifest.json").read_bytes()
@@ -1503,7 +1503,11 @@ def build_genuine_legacy(out: Path) -> dict:
             return dataclasses.asdict(o)
         raise TypeError(type(o))
 
-    payload = json.loads(json.dumps(result, default=enc, allow_nan=False))
+    # run_analysis now returns the v3 envelope (schema_version 3, evaluations[]).
+    # This fixture specifically exercises legacy v2 upcasting, so project the real
+    # result back onto the v2 shape with the official compatibility adapter rather
+    # than reading v2-only keys off the v3 document directly.
+    payload = json.loads(json.dumps(legacy_v2_view(result), default=enc, allow_nan=False))
     payload["_provenance"] = {
         "is_synthetic": False,
         "genuine": True,

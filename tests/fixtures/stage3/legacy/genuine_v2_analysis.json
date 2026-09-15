@@ -1,401 +1,31 @@
 {
   "schema_version": 2,
-  "findings_v1": [
-    {
-      "finding_id": "F-v1-001",
-      "title": "encoding/compatibility_fullwidth: prediction flip",
-      "category": "encoding",
-      "severity_score": 59.5504230260849,
-      "severity_tier": "Medium",
-      "description": "2 case(s) in encoding/compatibility_fullwidth produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 2 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-0.encoding.compatibility_fullwidth.whole",
-        "dataset-anger-1.encoding.compatibility_fullwidth.whole"
-      ]
-    },
-    {
-      "finding_id": "F-v1-002",
-      "title": "encoding/deletion_backspace: prediction flip",
-      "category": "encoding",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in encoding/deletion_backspace produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.encoding.deletion_backspace.leading.d1"
-      ]
-    },
-    {
-      "finding_id": "F-v1-003",
-      "title": "encoding/homoglyph: prediction flip",
-      "category": "encoding",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in encoding/homoglyph produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.encoding.homoglyph.leading.d3"
-      ]
-    },
-    {
-      "finding_id": "F-v1-004",
-      "title": "encoding/homoglyph_greek: prediction flip",
-      "category": "encoding",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "2 case(s) in encoding/homoglyph_greek produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 2 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.encoding.homoglyph_greek.leading.d1",
-        "dataset-anger-1.encoding.homoglyph_greek.leading.d3"
-      ]
-    },
-    {
-      "finding_id": "F-v1-005",
-      "title": "encoding/invisible_zero_width: prediction flip",
-      "category": "encoding",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in encoding/invisible_zero_width produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.encoding.invisible_zero_width.leading.d3"
-      ]
-    },
-    {
-      "finding_id": "F-v1-006",
-      "title": "perturbation/capitalization: prediction flip",
-      "category": "perturbation",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in perturbation/capitalization produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.perturbation.capitalization"
-      ]
-    },
-    {
-      "finding_id": "F-v1-007",
-      "title": "perturbation/delete_char: prediction flip",
-      "category": "perturbation",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in perturbation/delete_char produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.perturbation.delete_char"
-      ]
-    },
-    {
-      "finding_id": "F-v1-008",
-      "title": "perturbation/insert_char: prediction flip",
-      "category": "perturbation",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in perturbation/insert_char produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.perturbation.insert_char"
-      ]
-    },
-    {
-      "finding_id": "F-v1-009",
-      "title": "perturbation/keyboard_typo: prediction flip",
-      "category": "perturbation",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in perturbation/keyboard_typo produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.perturbation.keyboard_typo"
-      ]
-    },
-    {
-      "finding_id": "F-v1-010",
-      "title": "perturbation/misspell: prediction flip",
-      "category": "perturbation",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in perturbation/misspell produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.perturbation.misspell"
-      ]
-    },
-    {
-      "finding_id": "F-v1-011",
-      "title": "perturbation/swap_adjacent: prediction flip",
-      "category": "perturbation",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in perturbation/swap_adjacent produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.perturbation.swap_adjacent"
-      ]
-    },
-    {
-      "finding_id": "F-v1-012",
-      "title": "perturbation/word_split: prediction flip",
-      "category": "perturbation",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in perturbation/word_split produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.perturbation.word_split"
-      ]
-    },
-    {
-      "finding_id": "F-v1-013",
-      "title": "truncation/signal_end_over_limit: unhandled server error",
-      "category": "truncation",
-      "severity_score": 70.0,
-      "severity_tier": "High",
-      "description": "2 case(s) in truncation/signal_end_over_limit produced unhandled server error -- the endpoint returned an unhandled 5xx; where health still answered afterwards the request failed but the service survived, which is not unavailability. Severity is scored from the single highest-scoring instance; the 2 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Add a scoped exception handler for this failure mode that returns a typed error response instead of an unhandled traceback.",
-      "evidence": [
-        "dataset-anger-0.truncation.signal_end_over_limit",
-        "dataset-anger-1.truncation.signal_end_over_limit"
-      ]
-    },
-    {
-      "finding_id": "F-v1-014",
-      "title": "truncation/signal_end_short: prediction flip",
-      "category": "truncation",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in truncation/signal_end_short produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.truncation.signal_end_short"
-      ]
-    },
-    {
-      "finding_id": "F-v1-015",
-      "title": "truncation/signal_start_over_limit: unhandled server error",
-      "category": "truncation",
-      "severity_score": 70.0,
-      "severity_tier": "High",
-      "description": "2 case(s) in truncation/signal_start_over_limit produced unhandled server error -- the endpoint returned an unhandled 5xx; where health still answered afterwards the request failed but the service survived, which is not unavailability. Severity is scored from the single highest-scoring instance; the 2 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Add a scoped exception handler for this failure mode that returns a typed error response instead of an unhandled traceback.",
-      "evidence": [
-        "dataset-anger-0.truncation.signal_start_over_limit",
-        "dataset-anger-1.truncation.signal_start_over_limit"
-      ]
-    },
-    {
-      "finding_id": "F-v1-016",
-      "title": "truncation/signal_start_short: prediction flip",
-      "category": "truncation",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in truncation/signal_start_short produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.truncation.signal_start_short"
-      ]
-    },
-    {
-      "finding_id": "F-v1-017",
-      "title": "whitespace/interior_runs: prediction flip",
-      "category": "whitespace",
-      "severity_score": 59.5504230260849,
-      "severity_tier": "Medium",
-      "description": "2 case(s) in whitespace/interior_runs produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 2 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-0.whitespace.interior_runs",
-        "dataset-anger-1.whitespace.interior_runs"
-      ]
-    },
-    {
-      "finding_id": "F-v1-018",
-      "title": "whitespace/newlines: prediction flip",
-      "category": "whitespace",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in whitespace/newlines produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.whitespace.newlines"
-      ]
-    },
-    {
-      "finding_id": "F-v1-019",
-      "title": "whitespace/tabs: prediction flip",
-      "category": "whitespace",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in whitespace/tabs produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.whitespace.tabs"
-      ]
-    },
-    {
-      "finding_id": "F-v1-020",
-      "title": "whitespace/unicode_spaces: prediction flip",
-      "category": "whitespace",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in whitespace/unicode_spaces produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.whitespace.unicode_spaces"
-      ]
-    }
-  ],
-  "findings_v2": [
-    {
-      "finding_id": "F-v2-001",
-      "title": "encoding/deletion_backspace: prediction flip",
-      "category": "encoding",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in encoding/deletion_backspace produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.encoding.deletion_backspace.leading.d1"
-      ]
-    },
-    {
-      "finding_id": "F-v2-002",
-      "title": "encoding/homoglyph: prediction flip",
-      "category": "encoding",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in encoding/homoglyph produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.encoding.homoglyph.leading.d3"
-      ]
-    },
-    {
-      "finding_id": "F-v2-003",
-      "title": "encoding/homoglyph_greek: prediction flip",
-      "category": "encoding",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "2 case(s) in encoding/homoglyph_greek produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 2 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.encoding.homoglyph_greek.leading.d1",
-        "dataset-anger-1.encoding.homoglyph_greek.leading.d3"
-      ]
-    },
-    {
-      "finding_id": "F-v2-004",
-      "title": "perturbation/capitalization: prediction flip",
-      "category": "perturbation",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in perturbation/capitalization produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.perturbation.capitalization"
-      ]
-    },
-    {
-      "finding_id": "F-v2-005",
-      "title": "perturbation/delete_char: prediction flip",
-      "category": "perturbation",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in perturbation/delete_char produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.perturbation.delete_char"
-      ]
-    },
-    {
-      "finding_id": "F-v2-006",
-      "title": "perturbation/insert_char: prediction flip",
-      "category": "perturbation",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in perturbation/insert_char produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.perturbation.insert_char"
-      ]
-    },
-    {
-      "finding_id": "F-v2-007",
-      "title": "perturbation/keyboard_typo: prediction flip",
-      "category": "perturbation",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in perturbation/keyboard_typo produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.perturbation.keyboard_typo"
-      ]
-    },
-    {
-      "finding_id": "F-v2-008",
-      "title": "perturbation/misspell: prediction flip",
-      "category": "perturbation",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in perturbation/misspell produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.perturbation.misspell"
-      ]
-    },
-    {
-      "finding_id": "F-v2-009",
-      "title": "perturbation/swap_adjacent: prediction flip",
-      "category": "perturbation",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in perturbation/swap_adjacent produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.perturbation.swap_adjacent"
-      ]
-    },
-    {
-      "finding_id": "F-v2-010",
-      "title": "perturbation/word_split: prediction flip",
-      "category": "perturbation",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in perturbation/word_split produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.perturbation.word_split"
-      ]
-    },
-    {
-      "finding_id": "F-v2-011",
-      "title": "truncation/signal_end_short: prediction flip",
-      "category": "truncation",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in truncation/signal_end_short produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.truncation.signal_end_short"
-      ]
-    },
-    {
-      "finding_id": "F-v2-012",
-      "title": "truncation/signal_start_short: prediction flip",
-      "category": "truncation",
-      "severity_score": 40.89542090892792,
-      "severity_tier": "Medium",
-      "description": "1 case(s) in truncation/signal_start_short produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
-      "remediation": "Model robustness gap rather than an endpoint defect; consider augmenting training data with this perturbation family.",
-      "evidence": [
-        "dataset-anger-1.truncation.signal_start_short"
-      ]
-    }
-  ],
   "summary_v1": {
     "version": "v1",
+    "target_id": "emotion_v1",
+    "task_id": "emotion_7",
+    "suite_id": "core",
+    "identity": {
+      "target_id": "emotion_v1",
+      "task_id": "emotion_7",
+      "suite_id": "core",
+      "provenance": "inferred_legacy",
+      "declared": {
+        "target_id": null,
+        "task_id": null,
+        "suite_id": null
+      },
+      "model": null,
+      "baseline": null,
+      "evaluation_run_id": null,
+      "evaluation_id": null,
+      "case_set_id": null,
+      "inferred": {
+        "reason": "recognised historical emotion artifact: no target_id on any row",
+        "rule": "version v1 -> emotion_v1, v2 -> emotion_v2",
+        "label_space": "emotion_7 (not recorded by the run itself)"
+      }
+    },
     "coverage": {
       "planned": 90,
       "skipped": 0,
@@ -1119,6 +749,30 @@
   },
   "summary_v2": {
     "version": "v2",
+    "target_id": "emotion_v2",
+    "task_id": "emotion_7",
+    "suite_id": "core",
+    "identity": {
+      "target_id": "emotion_v2",
+      "task_id": "emotion_7",
+      "suite_id": "core",
+      "provenance": "inferred_legacy",
+      "declared": {
+        "target_id": null,
+        "task_id": null,
+        "suite_id": null
+      },
+      "model": null,
+      "baseline": null,
+      "evaluation_run_id": null,
+      "evaluation_id": null,
+      "case_set_id": null,
+      "inferred": {
+        "reason": "recognised historical emotion artifact: no target_id on any row",
+        "rule": "version v1 -> emotion_v1, v2 -> emotion_v2",
+        "label_space": "emotion_7 (not recorded by the run itself)"
+      }
+    },
     "coverage": {
       "planned": 90,
       "skipped": 0,
@@ -1624,6 +1278,18 @@
       "planned_match": true,
       "manifest_match": true,
       "whole_suite_comparable": true
+    },
+    "pairing_identity": {
+      "comparable": true,
+      "corrupt_metadata": false,
+      "checked": [
+        "planned suite fingerprint",
+        "manifest hash",
+        "request timeout",
+        "slow band",
+        "planned case order"
+      ],
+      "reasons": []
     },
     "coverage": {
       "v1": {

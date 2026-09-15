@@ -27,6 +27,7 @@ artifacts/** binary
 tests/fixtures/stage3/** -text
 analysis/case_sets/*.json -text
 analysis/policies/*.json -text
+analysis/remediation_rules.json -text
 endpoint/targets.json -text
 
 # Everything else keeps the project's existing text rules, unchanged.

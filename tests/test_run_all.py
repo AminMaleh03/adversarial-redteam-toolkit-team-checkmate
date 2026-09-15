@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import run_all  # noqa: E402
+from contract import EVAL_KIND_PAIRED  # noqa: E402
 
 
 def test_demo_excluded_attack_ids_contains_oversized_10mb():
@@ -140,9 +141,21 @@ def test_run_experiment_emits_expected_stage_sequence(mocked_experiment, tmp_pat
 
 def test_run_analysis_and_report_emits_analyzing_then_generating_results(monkeypatch, tmp_path):
     monkeypatch.setattr(run_all, "VERIFIED_FULL_REPORT_DIR", tmp_path / "no_such_verified_dir")
+    # run_analysis_from_dir now returns the v3 envelope (schema_version 3, evaluations[]);
+    # run_all.run_analysis_and_report projects it through the official legacy_v2_view()
+    # adapter, so the stub here must be a minimal but genuine v3 paired evaluation block,
+    # not the pre-v3 {"schema_version": 2, ...} shape legacy_v2_view no longer accepts.
     monkeypatch.setattr(
         run_all.analysis_mod, "run_analysis_from_dir",
-        lambda run_dir: {"schema_version": 2, "summary_v1": {}, "summary_v2": {}, "comparison": {}},
+        lambda run_dir: {
+            "schema_version": 3,
+            "evaluations": [{
+                "kind": EVAL_KIND_PAIRED,
+                "targets": ["emotion_v1", "emotion_v2"],
+                "summaries": {"emotion_v1": {}, "emotion_v2": {}},
+                "comparison": {},
+            }],
+        },
     )
     monkeypatch.setattr(
         run_all, "build_demo_evidence",

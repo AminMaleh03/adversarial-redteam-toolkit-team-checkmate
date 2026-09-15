@@ -536,7 +536,11 @@ def build_demo_evidence(run_dir: Path, analysis: dict, attack_index: dict) -> di
 def run_analysis_and_report(run_dir: Path, attack_index: dict, *, html_only: bool, mode: str,
                             progress_callback=None) -> dict:
     _emit_progress(progress_callback, "analyzing", "Comparing V1 and V2 results")
-    analysis = analysis_mod.run_analysis_from_dir(str(run_dir))
+    # run_analysis_from_dir returns the v3 envelope (schema_version 3, evaluations[]).
+    # This orchestrator, its demo-evidence selection and the report/web layer downstream
+    # all still consume the paired emotion v2 shape; project onto it with the official
+    # compatibility adapter rather than reading v2-only keys off the v3 document.
+    analysis = analysis_mod.legacy_v2_view(analysis_mod.run_analysis_from_dir(str(run_dir)))
     demo_evidence = build_demo_evidence(run_dir, analysis, attack_index)
 
     report_payload = {

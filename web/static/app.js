@@ -7,11 +7,16 @@
   var navLiveDemo = document.getElementById("nav-live-demo");
   var runBtn = document.getElementById("run-btn");
   var retryBtn = document.getElementById("retry-btn");
+  var evaluationSelect = document.getElementById("demo-evaluation");
+  var modelDescription = document.getElementById("model-description");
+  var modelIdentity = document.getElementById("model-identity");
   var stageItems = document.querySelectorAll(".stage-list li");
   var timer = null;
   var launching = false;
   var checking = false;
   var generation = 0;
+  var activeRunId = null;
+  var activeEvaluationId = null;
   var POLL_MS = 1500;
   function executionRoute() { return window.location.hash === "#demo"; }
   function showHome() {
@@ -46,6 +51,9 @@
   }
   function applyState(state) {
     if (!executionRoute()) return;
+    // A late response from a previous model/run must never replace the selected view.
+    if ((activeRunId && state.run_id && state.run_id !== activeRunId) ||
+        (activeEvaluationId && state.evaluation_id && state.evaluation_id !== activeEvaluationId)) return;
     if (state.status === "complete") {
       // Replace transient execution on completion, reload and BFCache reattachment.
       // Fresh Home visits must never redirect to a previous visitor's result.
@@ -88,9 +96,23 @@
     if (launching) return;
     launching = true; activateExecutionView();
     execHeading.textContent = "Launching adversarial test…";
-    fetch("/api/run", { method: "POST" })
-      .then(function (res) { return res.json(); })
-      .then(function (state) { launching = false; applyState(state); })
+    activeEvaluationId = evaluationSelect ? evaluationSelect.value : "emotion.core";
+    fetch("/api/run", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ evaluation_id: activeEvaluationId, mode: "demo" })
+    })
+      .then(function (res) {
+        return res.json().then(function (data) { return { ok: res.ok, status: res.status, data: data }; });
+      })
+      .then(function (response) {
+        launching = false;
+        if (!response.ok) {
+          showFailure(response.data.detail || "Red Lab is running another experiment. Please try again shortly.");
+          return;
+        }
+        activeRunId = response.data.run_id;
+        applyState(response.data);
+      })
       .catch(function () {
         // The POST may have succeeded before the response was lost: reconcile, never repost.
         launching = false; poll();
@@ -135,7 +157,11 @@
         var current = generation;
         fetch("/api/status", { cache: "no-store" }).then(function (res) { return res.json(); })
           .then(function (state) {
-            if (current === generation && state.status === "running") { activateExecutionView(); applyState(state); }
+            if (current === generation && state.status === "running") {
+              activeRunId = state.run_id; activeEvaluationId = state.evaluation_id;
+              if (evaluationSelect && state.evaluation_id) evaluationSelect.value = state.evaluation_id;
+              activateExecutionView(); applyState(state);
+            }
           }).catch(function () {});
       }
     }
@@ -143,5 +169,20 @@
   window.addEventListener("popstate", function () { reconcile(false); });
   window.addEventListener("pageshow", function (event) { if (event.persisted) reconcile(false); });
   window.addEventListener("pagehide", function () { generation++; clearTimeout(timer); timer = null; });
+  function updateModelCopy() {
+    var sentiment = evaluationSelect && evaluationSelect.value === "sentiment.core";
+    if (modelDescription) modelDescription.textContent = sentiment ?
+      "Single-target, two-label sentiment robustness evaluation; no before/after claim is made." :
+      "Paired, seven-label emotion robustness comparison.";
+    if (modelIdentity) modelIdentity.textContent = sentiment ?
+      "Model: distilbert-base-uncased-finetuned-sst-2-english · 2 sentiment labels" :
+      "Model: j-hartmann/emotion-english-distilroberta-base · 7 emotion labels";
+  }
+  if (evaluationSelect) evaluationSelect.addEventListener("change", function () {
+    generation++; clearTimeout(timer); timer = null;
+    activeRunId = null; activeEvaluationId = null;
+    updateModelCopy(); showHome();
+  });
+  updateModelCopy();
   reconcile(true);
 })();

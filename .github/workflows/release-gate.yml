@@ -1,0 +1,109 @@
+name: Stage 3 release gate
+
+on:
+  pull_request:
+    branches: [stage3/integration]
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stage3-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: Frozen candidate gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Cache pinned Hugging Face assets
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ runner.os }}-${{ hashFiles('endpoint/targets.json') }}
+      - name: Install pinned dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Run candidate against frozen policy
+        id: candidate_gate
+        shell: bash
+        run: |
+          set +e
+          python -m runner.gate \
+            --policy analysis/policies/ci_core_v1.json \
+            --out results/gate \
+            --results-root results/gate-runs \
+            --run-name "ci-${GITHUB_SHA}" \
+            --html-only 2>&1 | tee results/gate.log
+          code=${PIPESTATUS[0]}
+          echo "$code" > results/gate-exit-code.txt
+          exit 0
+      - name: Verify tested commit and model pin
+        if: always()
+        shell: bash
+        run: |
+          python -c "import json,os,pathlib; p=json.loads(pathlib.Path('results/gate/gate_result.json').read_text()); c=p.get('candidate',{}); assert c.get('commit')==os.environ['GITHUB_SHA'], (c.get('commit'),os.environ['GITHUB_SHA']); r=json.loads(pathlib.Path('endpoint/targets.json').read_text()); expected=r['models']['emotion_distilroberta']['revision']; assert c.get('model_revision')==expected, (c.get('model_revision'),expected)"
+      - name: Publish gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage3-gate-${{ github.sha }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            results/gate/gate_result.json
+            results/gate.log
+            results/gate-exit-code.txt
+            results/gate-runs/**/run.json
+            results/gate-runs/**/registry.json
+            results/gate-runs/**/case_selection.json
+            results/gate-runs/**/results.jsonl
+            results/gate-runs/**/run_meta.json
+            results/gate-runs/**/manifest.json
+            results/gate-runs/**/analysis.json
+            results/gate-runs/**/report.html
+      - name: Enforce gate outcome
+        if: always()
+        shell: bash
+        run: |
+          code=$(cat results/gate-exit-code.txt 2>/dev/null || echo 2)
+          test "$code" -eq 0
+
+  deploy:
+    name: Deploy tested release to Hugging Face Space
+    needs: gate
+    if: github.event_name == 'release' && github.event.action == 'published'
+    runs-on: ubuntu-24.04
+    environment: huggingface
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Require release configuration
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
+        shell: bash
+        run: |
+          test -n "$HF_TOKEN" || { echo "Missing environment secret HF_TOKEN"; exit 2; }
+          test -n "$HF_SPACE_ID" || { echo "Missing environment variable HF_SPACE_ID"; exit 2; }
+      - name: Publish this tested commit
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
+        run: |
+          python -m pip install "huggingface_hub==0.27.1"
+          python -c "import os; from huggingface_hub import HfApi; HfApi(token=os.environ['HF_TOKEN']).upload_folder(repo_id=os.environ['HF_SPACE_ID'], repo_type='space', folder_path='.', ignore_patterns=['.git/**','results/**','.venv/**','__pycache__/**'], commit_message='Deploy tested GitHub commit ${{ github.sha }}')"

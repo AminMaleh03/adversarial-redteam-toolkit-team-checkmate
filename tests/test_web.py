@@ -284,6 +284,61 @@ def test_status_starts_idle(client):
     assert resp.json()["status"] == "idle"
 
 
+def test_targets_api_exposes_only_trusted_core_choices(client):
+    body = client.get("/api/targets").json()
+    assert [item["target_id"] for item in body["targets"]] == [
+        "emotion_v1", "emotion_v2", "sentiment_v1",
+    ]
+    assert [item["evaluation_id"] for item in body["evaluations"]] == [
+        "emotion.core", "sentiment.core",
+    ]
+    assert all("url" not in item for item in body["targets"])
+
+
+def test_unknown_target_uses_frozen_422_shape(client):
+    response = client.post("/api/run", json={"target_id": "gpt_v9"})
+    assert response.status_code == 422
+    assert response.json() == {
+        "detail": [{
+            "loc": ["body", "target_id"],
+            "msg": "unknown target_id 'gpt_v9'; configured: ['emotion_v1', 'emotion_v2', 'sentiment_v1']",
+            "type": "value_error.unknown_target",
+        }]
+    }
+
+
+def test_sentiment_demo_carries_identity_and_calls_selected_evaluation(monkeypatch, client, tmp_path):
+    monkeypatch.setattr(run_all, "RESULTS_ROOT", tmp_path)
+    called = {}
+
+    def fake_run_experiment(mode, run_name=None, progress_callback=None, **kwargs):
+        called.update(mode=mode, **kwargs)
+        report = tmp_path / run_name / "report"
+        report.mkdir(parents=True)
+        (report / "report.html").write_text("ok", encoding="utf-8")
+        (report / "analysis.json").write_text("{}", encoding="utf-8")
+        return {"report_html": report / "report.html", "analysis_json": report / "analysis.json"}
+
+    monkeypatch.setattr(run_all, "run_experiment", fake_run_experiment)
+    started = client.post("/api/run", json={"evaluation_id": "sentiment.core"})
+    assert started.status_code == 202
+    body = started.json()
+    assert body["run_id"] and body["evaluation_id"] == "sentiment.core"
+    assert body["target_ids"] == ["sentiment_v1"]
+    final = _wait_until_not_running(client)
+    assert final["state"] == "complete"
+    assert final["report_url"].endswith("/report/report.html")
+    assert called["mode"] == "demo"
+    assert called["evaluation_ids"] == ["sentiment.core"]
+
+
+def test_frontend_discards_stale_run_or_evaluation_status(client):
+    js = client.get("/static/app.js").text
+    assert "state.run_id !== activeRunId" in js
+    assert "state.evaluation_id !== activeEvaluationId" in js
+    assert 'body: JSON.stringify({ evaluation_id: activeEvaluationId, mode: "demo" })' in js
+
+
 def test_start_run_returns_accepted_running_state(monkeypatch, client, tmp_path):
     monkeypatch.setattr(run_all, "RESULTS_ROOT", tmp_path)
     release = threading.Event()
@@ -307,7 +362,7 @@ def test_start_run_returns_accepted_running_state(monkeypatch, client, tmp_path)
         _wait_until_not_running(client)
 
 
-def test_second_start_during_active_run_returns_same_job_not_a_new_one(monkeypatch, client, tmp_path):
+def test_second_start_during_active_run_returns_contract_busy(monkeypatch, client, tmp_path):
     monkeypatch.setattr(run_all, "RESULTS_ROOT", tmp_path)
     release = threading.Event()
     calls = []
@@ -323,8 +378,10 @@ def test_second_start_during_active_run_returns_same_job_not_a_new_one(monkeypat
     monkeypatch.setattr(run_all, "run_experiment", fake_run_experiment)
     try:
         first = client.post("/api/run").json()
-        second = client.post("/api/run").json()
-        assert first["run_name"] == second["run_name"]
+        second_response = client.post("/api/run")
+        second = second_response.json()
+        assert second_response.status_code == 409
+        assert second == {"detail": "A run is already in progress.", "run_id": first["run_id"]}
         assert len(calls) == 1  # never a second run_experiment() call while one is active
     finally:
         release.set()

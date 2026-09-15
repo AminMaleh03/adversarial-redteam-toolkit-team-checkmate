@@ -1,8 +1,16 @@
 # Robustness report
 
-The report consumes the [analysis schema v2 JSON](../analysis/README.md), renders an
+The report consumes historical schema-v2 or target-aware schema-v3
+[analysis JSON](../analysis/README.md), renders an
 offline HTML report with Jinja2, and exports an A4 PDF with WeasyPrint. It does not load
 the classifier, import another component, rescore attacks, or infer finding resolution.
+
+Schema v3 renders each target independently, shows a comparison only for a valid paired
+evaluation, and explains why a single-target comparison is null. Core evaluations require
+coverage evidence; OCES evaluations require their frozen additional-evaluation block. Every
+new finding must carry observed evidence, significance, diagnosis confidence, a specific
+fix, and a runnable target-aware verification route. Missing required evidence fails
+validation instead of producing an empty successful panel.
 
 ## Generate a report
 

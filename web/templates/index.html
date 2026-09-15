@@ -51,6 +51,14 @@
         <div class="hero-control" aria-label="Experiment design">
           <span class="control-v1">V1 &middot; Unhardened</span><span class="control-model">Same model</span><span class="control-v2">V2 &middot; Hardened</span>
         </div>
+        <div class="model-picker">
+          <label for="demo-evaluation">Model journey</label>
+          <select id="demo-evaluation" name="evaluation_id">
+            <option value="emotion.core">Emotion &mdash; compare unhardened V1 with hardened V2</option>
+            <option value="sentiment.core">Sentiment &mdash; evaluate the configured sentiment endpoint</option>
+          </select>
+          <p id="model-description" class="caption">Paired, seven-label emotion robustness comparison.</p>
+        </div>
         <div class="cta-row hero-actions" id="run">
           <div class="hero-path"><button id="run-btn" class="button primary" type="button">Run Live Demo</button><p class="caption">Explore a curated attack suite</p></div>
           <div class="hero-path"><a class="button secondary" href="/lab">Try Your Own Input</a><p class="caption">Put your own sentence to the test</p></div>
@@ -59,7 +67,7 @@
         <a class="button tertiary hero-report" href="{{ verified_full_href }}">View Technical Report</a>
         {% endif %}
         <p id="cta-note" class="caption">Real requests. Recorded outcomes. Evidence you can inspect.</p>
-        <p class="model">Model: j-hartmann/emotion-english-distilroberta-base &middot; 7 emotion labels</p>
+        <p class="model" id="model-identity">Model: j-hartmann/emotion-english-distilroberta-base &middot; 7 emotion labels</p>
       </section>
     </div>
 

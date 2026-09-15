@@ -1,3 +1,41 @@
+# TASK 1 — AHSAN PRODUCT INTEGRATION PARTIALLY COMPLETE; DEPENDENCIES BLOCK FINAL ACCEPTANCE
+
+2026-09-15, Codex, Asia/Dubai. Assigned branch `stage3/ahsan`; observed HEAD
+`d5c5a7bbf789bd858da021c9ccc114e349fb8448`, a normal merge of tested
+`stage3/integration` (`40ceef06cfecd10fb34ab53c5e41de35cd694ae8`) into the assigned
+foundation branch. User authorized completing Task 1, committing and pushing only this
+branch, then opening a PR to `stage3/integration`; no merge is authorized. Work is in the
+isolated clone `results/task1-stage3-ahsan` so the main checkout's intentional uncommitted
+HANDOFF.md and local `.claude` settings remain untouched.
+
+Implemented in Ahsan-owned files: registry-selected orchestration with collision-safe run
+IDs/indexes, exact plan reuse for pairs, sequential lifecycle and process-tree memory
+measurement; schema-v2/v3 report validation and a target-aware v3 template; structured,
+target-specific remediation rendering; trusted `/api/targets`, identity-bearing Demo/status
+contracts, stale-response rejection and emotion/sentiment model switching; genuine paired
+emotion and single-target sentiment interactive paths; a GitHub gate/release workflow whose
+deploy job depends on gate success; and Docker caching for both registry-pinned models.
+
+Real acceptance by this agent: emotion demo run `0e947d4a63484cd8` completed 162/1928
+selected rows on each target and rendered v3 HTML/JSON; sentiment demo run
+`066e4f2f00324a68` completed 162/1931 selected rows and rendered a v3 single-target
+HTML/JSON report with `comparison: null`. All internal endpoint ports were reaped. Corrected
+Windows process-tree measurement observed 294,629,376 bytes for a loaded sentiment service;
+the measurement is the launcher plus descendants and is not a concurrency claim.
+
+Validation: Ahsan-owned focused tests `254 passed`; full non-browser suite `1033 passed,
+28 skipped`; opt-in Playwright suite `27 passed`; workflow YAML parsed; `git diff --check`
+clean apart from local autocrlf notices. The browser run found and verified a compatibility
+repair for legacy status payloads that omit the new optional run/evaluation identities.
+
+Final Task 1 acceptance is blocked by two missing other-owner deliverables, both reproduced:
+`attacks.library.build_suite(..., suite="oces")` raises because no public frozen-data runtime
+loader exists, and `analysis/policies/ci_core_v1.json` is absent. The real gate therefore
+returns `execution_error`, exit 2, at `results/task1_gate_missing_policy/gate_result.json`.
+Without those dependencies, same-policy fail/pass proof, OCES inference, final container/live
+deployment, and the five-page competition PDF cannot honestly be completed. No deployment or
+final robustness claim was made. See `docs/stage3/handoffs/ahsan.md` for detailed evidence.
+
 # STAGE 3 FOUNDATION — COMPLETE AND PUBLISHED
 
 2026-09-15, Claude Opus 5, Asia/Dubai. Worktree `C:/Users/ahsan/OneDrive/Desktop/stage3-foundation`,

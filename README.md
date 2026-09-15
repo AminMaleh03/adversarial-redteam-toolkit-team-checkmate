@@ -19,6 +19,15 @@ benchmark report. V5.5 visual design is approved; V6 fixes internal report histo
 packages the existing application for deployment. See `HANDOFF.md` for verified release
 and cloud status. Model, attacks and analysis semantics remain unchanged.
 
+**Stage 3 integration candidate.** Registry-selected emotion and sentiment core journeys,
+target-aware schema-v3 reports, model switching in Demo and the private interactive Lab,
+and a release-gated GitHub workflow are implemented on `stage3/ahsan`. The historical
+schema-v2 report path remains supported. The frozen OCES files are present, but their public
+runtime loader has not yet landed in `attacks.library`; the frozen CI policy file
+`analysis/policies/ci_core_v1.json` is also not present. Accordingly, additional-evaluation
+execution, a real gate pass/failure demonstration, release deployment, and the final
+competition PDF remain blocked rather than being presented as completed evidence.
+
 ## What This Project Does
 
 This toolkit fires adversarial and malformed inputs at an AI inference endpoint and produces a
@@ -129,6 +138,30 @@ requests. Only Ahsan merges to `main`.
 it, starts V2, runs the same suite against V2, stops it, then runs analysis and renders the
 report -- using the existing runner/analysis/report components unchanged. From the repository
 root with `.venv` active:
+
+The Stage 3 target-aware form selects trusted registry evaluations explicitly:
+
+```powershell
+python run_all.py --mode demo --evaluation emotion.core --no-open
+python run_all.py --mode demo --evaluation sentiment.core --no-open
+python run_all.py --mode full --evaluation emotion.core --evaluation sentiment.core --no-open
+```
+
+`--evaluation` may be repeated and evaluations run sequentially. A single sentiment report
+always carries `comparison: null`; it never invents a V1/V2 improvement. New runs use
+`results/<name>_<run-id>/run.json`, copied registry/selection evidence, per-target directories,
+and schema-v3 JSON/HTML/PDF. Omitting `--evaluation` preserves the original emotion behavior
+and output layout. `--html-only` skips PDF rendering for CI or machines without its native
+runtime.
+
+The internal release gate is:
+
+```powershell
+python -m runner.gate --policy analysis/policies/ci_core_v1.json --out results/gate --html-only
+```
+
+It returns 0 for pass, 1 for policy failure, and 2 for execution error. Until the frozen
+policy named above exists, exit 2 is the required honest result.
 
 **Full experiment** (all 42 baselines + 1,886 attacks per version, including the 10 MB case).
 Renders the complete technical/audit report: full results, the complete finding register,

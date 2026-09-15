@@ -212,8 +212,11 @@ def _isolated_attack_registry():
 
 
 def send_case(base_url: str, version: str, text: Optional[str], case: Optional[AttackCase],
-             baseline_id: Optional[str]) -> RunResult:
-    runner_obj = runner_run.Runner(target=base_url, version=version, writer=None)
+             baseline_id: Optional[str], *, target_id: str = "", suite_id: str = "") -> RunResult:
+    runner_obj = runner_run.Runner(
+        target=base_url, version=version, writer=None,
+        target_id=target_id, suite_id=suite_id,
+    )
     try:
         outcome = runner_obj.send(case, text)
         label, confidence, scores = runner_run.parse_prediction(outcome["response_body"])
@@ -235,6 +238,8 @@ def send_case(base_url: str, version: str, text: Optional[str], case: Optional[A
         latency_ms=outcome["latency_ms"],
         latency_band=outcome["latency_band"],
         endpoint_alive_after=alive,
+        target_id=target_id,
+        suite_id=suite_id,
     )
 
 
@@ -375,9 +380,39 @@ def diagnose(v1_clean: RunResult, v1_attacked: RunResult,
 # ----------------------------------------------------------------------------------------
 
 
-def run_custom_lab(job_id: str, text: str, progress_callback: Callable[[str, str], None]) -> dict:
+def run_custom_lab(job_id: str, text: str, progress_callback: Callable[[str, str], None],
+                   *, evaluation_id: str = "emotion.core") -> dict:
     baseline = build_lab_baseline(text, job_id)
     variants = select_lab_variants(baseline)
+
+    if evaluation_id == "sentiment.core":
+        progress_callback("starting_v1", "Starting sentiment endpoint")
+        tmp_dir = Path(tempfile.mkdtemp(prefix="redlab_lab_sentiment_v1_"))
+        registry = run_all.target_registry.load_registry()
+        handle = run_all.start_target("sentiment_v1", tmp_dir, registry)
+        try:
+            progress_callback("clean_v1", "Running clean sentiment reference")
+            clean = send_case(
+                handle.url, "v1", text, None, baseline.baseline_id,
+                target_id="sentiment_v1", suite_id="core",
+            )
+            progress_callback("attacking_v1", "Testing sentiment adversarial variants")
+            attacked = [
+                send_case(
+                    handle.url, "v1", case.attacked_text, case, baseline.baseline_id,
+                    target_id="sentiment_v1", suite_id="core",
+                )
+                for case, _label, _desc in variants
+            ]
+        finally:
+            handle.stop()
+            _cleanup_temp_dir(tmp_dir)
+        progress_callback("analyzing", LAB_STAGE_LABELS["analyzing"])
+        payload = _build_single_result_payload(text, variants, clean, attacked)
+        progress_callback("complete", LAB_STAGE_LABELS["complete"])
+        return payload
+    if evaluation_id != "emotion.core":
+        raise LabValidationError(f"Unsupported interactive evaluation {evaluation_id!r}.")
 
     per_version: dict[str, dict] = {}
     for version in ("v1", "v2"):
@@ -404,6 +439,50 @@ def run_custom_lab(job_id: str, text: str, progress_callback: Callable[[str, str
     payload = _build_result_payload(text, variants, per_version)
     progress_callback("complete", LAB_STAGE_LABELS["complete"])
     return payload
+
+
+def _build_single_result_payload(text: str, variants, clean: RunResult,
+                                 attacked_rows: list[RunResult]) -> dict:
+    variants_payload = []
+    flips = 0
+    endpoint_errors = 0
+    for (case, label, desc), attacked in zip(variants, attacked_rows):
+        flip = label_flipped(clean, attacked)
+        flips += int(flip is True)
+        endpoint_errors += int(attacked.status_code is None or attacked.status_code >= 500)
+        diff_original_html, diff_attacked_html = run_all.highlight_diff_html(
+            case.original_text, case.attacked_text,
+        )
+        variants_payload.append({
+            "attack_id": case.attack_id, "label": label, "description": desc,
+            "category": case.category, "attacked_text": case.attacked_text,
+            "diff_original_html": diff_original_html,
+            "diff_attacked_html": diff_attacked_html,
+            "target": {
+                "result": _result_dict(attacked), "flip": flip,
+                "tv_distance": total_variation_distance(clean.all_scores, attacked.all_scores),
+                "confidence_change": confidence_change(clean, attacked),
+            },
+            "diagnosis": "OBSERVED",
+            "diagnosis_label": "Single-target observation",
+            "remediation": (
+                "This is a single-target exploratory result. Reproduce it against the same "
+                "pinned sentiment target before changing model or endpoint controls."
+            ),
+        })
+    return {
+        "evaluation_id": "sentiment.core", "target_ids": ["sentiment_v1"],
+        "single_target": True, "original_text": text, "clean": _result_dict(clean),
+        "variants": variants_payload,
+        "summary": {
+            "variants_tested": len(variants_payload), "label_flips": flips,
+            "safe_rejections": sum(
+                1 for row in attacked_rows
+                if row.status_code is not None and 400 <= row.status_code < 500
+            ),
+            "endpoint_errors": endpoint_errors,
+        },
+    }
 
 
 def _build_result_payload(text: str, variants: list[tuple[AttackCase, str, str]],
@@ -500,7 +579,8 @@ def _now_iso() -> str:
 def _idle_lab_state() -> dict:
     return {
         "status": "idle", "job_id": None, "stage": None, "stage_index": -1, "percent": 0,
-        "message": "", "started_at": None, "completed_at": None, "result": None, "error": None,
+        "message": "", "evaluation_id": None, "target_ids": [],
+        "started_at": None, "completed_at": None, "result": None, "error": None,
     }
 
 
@@ -523,7 +603,8 @@ def validate_text(text: str) -> str:
     return stripped
 
 
-def start_lab_job(text: str, demo_is_running: Callable[[], bool]) -> dict:
+def start_lab_job(text: str, demo_is_running: Callable[[], bool],
+                  *, evaluation_id: str = "emotion.core") -> dict:
     """Validate, then atomically check-and-start under the one shared JOB_LOCK.
 
     Returns either the new job's public snapshot (status "running") or {"status": "busy"} --
@@ -531,17 +612,23 @@ def start_lab_job(text: str, demo_is_running: Callable[[], bool]) -> dict:
     section 27).
     """
     stripped = validate_text(text)
+    if evaluation_id not in ("emotion.core", "sentiment.core"):
+        raise LabValidationError(f"Unknown evaluation_id {evaluation_id!r}.")
+    target_ids = ["sentiment_v1"] if evaluation_id == "sentiment.core" else ["emotion_v1", "emotion_v2"]
     with JOB_LOCK:
         if _lab_state["status"] == "running" or demo_is_running():
             return {"status": "busy"}
         job_id = secrets.token_urlsafe(24)  # cryptographically random, never sequential
         _lab_state.update(
             status="running", job_id=job_id, stage="preparing", stage_index=0,
+            evaluation_id=evaluation_id, target_ids=target_ids,
             percent=LAB_STAGE_PERCENT["preparing"], message=LAB_STAGE_LABELS["preparing"],
             started_at=_now_iso(), completed_at=None, result=None, error=None,
         )
         snapshot = dict(_lab_state)
-        thread = threading.Thread(target=_run_lab_job, args=(job_id, stripped), daemon=True)
+        thread = threading.Thread(
+            target=_run_lab_job, args=(job_id, stripped, evaluation_id), daemon=True
+        )
         thread.start()
     return snapshot
 
@@ -552,6 +639,11 @@ def is_running_unlocked() -> bool:
     acquires the lock itself, so it's safe to call from inside an existing `with JOB_LOCK:`
     block without deadlocking a non-reentrant threading.Lock."""
     return _lab_state["status"] == "running"
+
+
+def active_job_id_unlocked() -> Optional[str]:
+    """Return the active opaque job id while the caller holds ``JOB_LOCK``."""
+    return _lab_state.get("job_id") if _lab_state["status"] == "running" else None
 
 
 def lab_status(job_id: str) -> Optional[dict]:
@@ -574,10 +666,13 @@ def _make_progress_callback(job_id: str) -> Callable[[str, str], None]:
     return callback
 
 
-def _run_lab_job(job_id: str, text: str) -> None:
+def _run_lab_job(job_id: str, text: str, evaluation_id: str = "emotion.core") -> None:
     callback = _make_progress_callback(job_id)
     try:
-        result = run_custom_lab(job_id, text, callback)
+        if evaluation_id == "emotion.core":
+            result = run_custom_lab(job_id, text, callback)
+        else:
+            result = run_custom_lab(job_id, text, callback, evaluation_id=evaluation_id)
         with JOB_LOCK:
             if _lab_state.get("job_id") != job_id:
                 return

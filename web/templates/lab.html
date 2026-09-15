@@ -47,6 +47,14 @@
 
         <form id="lab-form" class="lab-editor" novalidate>
           <p class="eyebrow">01 / Start with a clean reference</p>
+          <div class="model-picker">
+            <label for="lab-evaluation">Model journey</label>
+            <select id="lab-evaluation" name="evaluation_id">
+              <option value="emotion.core">Emotion &mdash; V1 and V2 comparison</option>
+              <option value="sentiment.core">Sentiment &mdash; single configured target</option>
+            </select>
+            <p id="lab-model-description" class="caption">The same emotion model through two endpoint configurations.</p>
+          </div>
           <label for="lab-text" class="lab-label">Your sentence</label>
           <textarea id="lab-text" name="text" rows="4" maxlength="{{ lab_max_chars }}"
                    placeholder="I feel excited about what we can build together." aria-describedby="lab-counter lab-error" required></textarea>
@@ -74,8 +82,8 @@
 
 
 
-          <p class="same-model-label">Same model <span>Two endpoint configurations</span></p>
-          <div class="version-context">
+          <p id="lab-comparison-label" class="same-model-label">Same model <span>Two endpoint configurations</span></p>
+          <div id="lab-endpoint-context" class="version-context">
             <div class="version-card v1" data-lane="v1" data-state="not-started">
               <span class="lane-status">Not started</span>
               <p class="version-card-title">V1 &mdash; Unhardened Endpoint</p>
@@ -93,7 +101,7 @@
             <li data-stage="{{ stage }}">{{ lab_stage_labels[stage] }}</li>
             {% endfor %}
           </ol>
-          <p class="exec-model-note">Same underlying AI model in both cases &mdash; only the endpoint hardening differs.</p>
+          <p id="lab-exec-model-note" class="exec-model-note">Same underlying AI model in both cases &mdash; only the endpoint hardening differs.</p>
         </div>
 
         <div class="exec-failure" id="lab-exec-failure" hidden>
@@ -122,7 +130,7 @@
         <p class="exec-identity">{{ creator_name }} / {{ product_version_label }}</p>
         <h1 class="lab-heading">Live Red-Team Lab Results</h1>
         <p class="notice warning">Interactive result &mdash; not part of the verified 1,928-case benchmark.</p>
-        <p class="caption lab-model-note">Same underlying AI model in both cases &mdash; only the endpoint hardening differs.</p>
+        <p id="lab-results-model-note" class="caption lab-model-note">Same underlying AI model in both cases &mdash; only the endpoint hardening differs.</p>
 
         <div id="lab-summary" class="lab-summary" aria-live="polite"></div>
 

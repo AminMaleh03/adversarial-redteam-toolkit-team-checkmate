@@ -1123,3 +1123,52 @@ def test_full_report_rubric_block_hidden_on_narrow_mobile_sidebar_drawer():
     css = (ROOT / "report" / "style.css").read_text(encoding="utf-8")
     mobile_block = css[css.index("@media (max-width: 760px)"):]
     assert ".rubric-block { display: none; }" in mobile_block
+
+
+def _stage3_document():
+    return json.loads((ROOT / "tests" / "fixtures" / "stage3" /
+                       "expected_analysis_v3.json").read_text(encoding="utf-8"))
+
+
+def test_v3_report_renders_targets_single_explanation_and_structured_remediation():
+    result = report.render_html(_stage3_document(), source_sha256="b" * 64, include_pdf=False)
+    assert "emotion_v1" in result and "sentiment_v1" in result
+    assert "There is no V1/V2 hardening comparison for this model" in result
+    assert "Observed evidence" in result
+    assert "Why it matters" in result
+    assert "Verification" in result
+    assert "Additional evaluation" in result
+
+
+def test_v3_single_target_cannot_claim_a_comparison():
+    payload = _stage3_document()
+    payload["evaluations"][1]["comparison"] = {"common_denominator": 1}
+    with pytest.raises(ValueError, match="single-target comparison must be null"):
+        report.validate_report(payload)
+
+
+def test_v3_missing_required_core_coverage_is_not_rendered_as_success():
+    payload = _stage3_document()
+    payload["evaluations"][0]["coverage"] = None
+    with pytest.raises(ValueError, match="requires coverage evidence"):
+        report.validate_report(payload)
+
+
+def test_v3_zero_denominator_renders_na_not_zero():
+    payload = _stage3_document()
+    payload["evaluations"][0]["comparison"]["flip_rate_on_common"]["emotion_v1"] = {
+        "numerator": 0, "denominator": 0, "rate": None,
+    }
+    result = report.render_html(payload, source_sha256="c" * 64, include_pdf=False)
+    assert "N/A (0/0)" in result
+
+
+def test_v3_bundle_preserves_source_bytes_and_records_schema(tmp_path):
+    raw = (ROOT / "tests" / "fixtures" / "stage3" /
+           "expected_analysis_v3.json").read_bytes()
+    output = tmp_path / "v3"
+    report.generate_report(raw, output, html_only=True)
+    assert (output / "analysis.json").read_bytes() == raw
+    meta = json.loads((output / "export_meta.json").read_text(encoding="utf-8"))
+    assert meta["analysis_schema_version"] == 3
+    assert meta["source_sha256"] == hashlib.sha256(raw).hexdigest()

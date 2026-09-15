@@ -84,9 +84,11 @@ def _red_lab_logo_data_uri() -> str:
 
 def _idle_state() -> dict:
     return {
-        "status": "idle", "stage": None, "stage_index": -1, "percent": 0, "message": "",
+        "status": "idle", "state": "idle", "stage": None, "stage_index": -1,
+        "percent": 0, "message": "",
+        "run_id": None, "evaluation_id": None, "target_ids": [], "results": None,
         "run_name": None, "started_at": None, "completed_at": None,
-        "result_url": None, "error": None,
+        "result_url": None, "report_url": None, "error": None,
     }
 
 
@@ -118,32 +120,57 @@ def _generate_run_name() -> str:
     return f"hf_demo_{stamp}_{secrets.token_hex(3)}"
 
 
-def _progress_callback(stage: str, message: str) -> None:
-    with _job_lock:
-        if _job_state["status"] != "running":
-            return
-        _job_state["stage"] = stage
-        _job_state["stage_index"] = STAGE_ORDER.index(stage)
-        _job_state["percent"] = STAGE_PERCENT[stage]
-        _job_state["message"] = message
+def _make_progress_callback(run_id: str):
+    def callback(stage: str, message: str) -> None:
+        aliases = {
+            "starting_emotion_v1": "starting_v1", "attacking_emotion_v1": "attacking_v1",
+            "starting_emotion_v2": "starting_v2", "attacking_emotion_v2": "attacking_v2",
+            "starting_sentiment_v1": "starting_v1", "attacking_sentiment_v1": "attacking_v1",
+        }
+        display_stage = aliases.get(stage, stage)
+        with _job_lock:
+            if _job_state.get("run_id") != run_id or _job_state["status"] != "running":
+                return
+            _job_state["stage"] = stage
+            if display_stage in STAGE_ORDER:
+                _job_state["stage_index"] = STAGE_ORDER.index(display_stage)
+                _job_state["percent"] = STAGE_PERCENT[display_stage]
+            _job_state["message"] = message
+    return callback
 
 
-def _run_job(run_name: str) -> None:
+def _run_job(run_name: str, run_id: str, evaluation_id: str, mode: str) -> None:
     try:
         result = run_all.run_experiment(
-            mode="demo", run_name=run_name, progress_callback=_progress_callback,
+            mode=mode, run_name=run_name, progress_callback=_make_progress_callback(run_id),
+            evaluation_ids=[evaluation_id],
         )
         report_html = Path(result["report_html"]).resolve()
         rel = report_html.relative_to(Path(run_all.RESULTS_ROOT).resolve())
         result_url = f"{RESULTS_MOUNT}/{rel.as_posix()}"
         with _job_lock:
-            _job_state["status"] = "complete"
+            if _job_state.get("run_id") != run_id:
+                return
+            analysis_path = result.get("analysis_json")
+            analysis_url = None
+            if analysis_path is not None:
+                analysis_json = Path(analysis_path).resolve()
+                analysis_rel = analysis_json.relative_to(Path(run_all.RESULTS_ROOT).resolve())
+                analysis_url = f"{RESULTS_MOUNT}/{analysis_rel.as_posix()}"
+            _job_state["status"] = _job_state["state"] = "complete"
+            _job_state["stage"] = "done"
+            _job_state["stage_index"] = len(STAGE_ORDER) - 1
+            _job_state["percent"] = 100
+            _job_state["message"] = "Run complete."
             _job_state["completed_at"] = datetime.now(timezone.utc).isoformat()
-            _job_state["result_url"] = result_url
+            _job_state["result_url"] = _job_state["report_url"] = result_url
+            _job_state["results"] = {"analysis_json": analysis_url} if analysis_url else None
     except Exception:  # noqa: BLE001 -- orchestration failure; never let it kill the thread silently
         logger.exception("Live demo run failed for run_name=%s", run_name)
         with _job_lock:
-            _job_state["status"] = "failed"
+            if _job_state.get("run_id") != run_id:
+                return
+            _job_state["status"] = _job_state["state"] = "failed"
             _job_state["completed_at"] = datetime.now(timezone.utc).isoformat()
             _job_state["error"] = "The live attack run failed. Please try again in a moment."
 
@@ -232,25 +259,122 @@ def healthz() -> dict:
     return {"status": "ok", "service": "team-checkmate-web"}
 
 
+def _target_choices() -> dict:
+    registry = run_all.target_registry.load_registry()
+    labels = {
+        "emotion_v1": "Emotion (unhardened)",
+        "emotion_v2": "Emotion (hardened)",
+        "sentiment_v1": "Sentiment",
+    }
+    return {
+        "targets": [
+            {
+                "target_id": target_id,
+                "task_id": target.task_id,
+                "label": labels[target_id],
+                "hardened": target.hardened,
+            }
+            for target_id, target in registry.targets.items()
+        ],
+        "evaluations": [
+            {
+                "evaluation_id": evaluation_id,
+                "kind": registry.evaluation(evaluation_id).kind,
+                "suite_id": registry.evaluation(evaluation_id).suite_id,
+            }
+            for evaluation_id in ("emotion.core", "sentiment.core")
+        ],
+        "note": "Only trusted configured choices are offered. There is no free-form URL entry.",
+    }
+
+
+@app.get("/api/targets")
+def targets() -> dict:
+    return _target_choices()
+
+
+def _validation_error(field: str, message: str, error_type: str) -> JSONResponse:
+    return JSONResponse({"detail": [{
+        "loc": ["body", field], "msg": message, "type": error_type,
+    }]}, status_code=422)
+
+
+def _resolve_public_evaluation(body) -> tuple[str, str] | JSONResponse:
+    if body is None:
+        body = {}
+    if not isinstance(body, dict):
+        return _validation_error("body", "request body must be an object", "type_error.object")
+    mode = body.get("mode", "demo")
+    if mode not in ("demo", "full"):
+        return _validation_error(
+            "mode", f"unknown mode {mode!r}; configured: ['demo', 'full']",
+            "value_error.unknown_mode",
+        )
+    registry = run_all.target_registry.load_registry()
+    target_id = body.get("target_id")
+    evaluation_id = body.get("evaluation_id")
+    if target_id is not None:
+        if target_id not in registry.targets:
+            return _validation_error(
+                "target_id",
+                f"unknown target_id {target_id!r}; configured: {sorted(registry.targets)}",
+                "value_error.unknown_target",
+            )
+        target_evaluation = "sentiment.core" if target_id == "sentiment_v1" else "emotion.core"
+        if evaluation_id is not None and evaluation_id != target_evaluation:
+            return _validation_error(
+                "evaluation_id", "target_id and evaluation_id identify different tasks",
+                "value_error.incompatible_selection",
+            )
+        evaluation_id = target_evaluation
+    evaluation_id = evaluation_id or "emotion.core"
+    if evaluation_id not in ("emotion.core", "sentiment.core"):
+        configured = ["emotion.core", "sentiment.core"]
+        return _validation_error(
+            "evaluation_id",
+            f"unknown evaluation_id {evaluation_id!r}; configured: {configured}",
+            "value_error.unknown_evaluation",
+        )
+    return evaluation_id, mode
+
+
 @app.post("/api/run")
-def start_run() -> JSONResponse:
+async def start_run(request: Request) -> JSONResponse:
+    raw = await request.body()
+    if raw:
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001 - normalized to the public 422 contract
+            return _validation_error("body", "request body is not valid JSON", "value_error.json")
+    else:
+        body = {}
+    resolved = _resolve_public_evaluation(body)
+    if isinstance(resolved, JSONResponse):
+        return resolved
+    evaluation_id, mode = resolved
+    registry = run_all.target_registry.load_registry()
+    evaluation = registry.evaluation(evaluation_id)
     with _job_lock:
-        if _job_state["status"] == "running":
-            return JSONResponse(dict(_job_state), status_code=202)
-        if lab_module.is_running_unlocked():
-            # A Live Red-Team Lab job holds the shared slot -- distinct from the branch above
-            # (which reattaches to demo's own already-running job): this is a real "try again"
-            # busy signal, in the same shape as Lab's own busy response (brief section 9).
-            return JSONResponse({"status": "busy"}, status_code=409)
+        if _job_state["status"] == "running" or lab_module.is_running_unlocked():
+            active_id = _job_state.get("run_id") or lab_module.active_job_id_unlocked()
+            return JSONResponse(
+                {"detail": "A run is already in progress.", "run_id": active_id},
+                status_code=409,
+            )
         run_name = _generate_run_name()
+        run_id = secrets.token_hex(8)
         _job_state.update(
-            status="running", stage="initializing", stage_index=0,
+            status="running", state="running", run_id=run_id,
+            evaluation_id=evaluation_id, target_ids=list(evaluation.target_ids),
+            stage="initializing", stage_index=0,
             percent=STAGE_PERCENT["initializing"], message=STAGE_LABELS["initializing"],
             run_name=run_name, started_at=datetime.now(timezone.utc).isoformat(),
-            completed_at=None, result_url=None, error=None,
+            completed_at=None, results=None, result_url=None, report_url=None, error=None,
         )
         snapshot = dict(_job_state)
-        thread = threading.Thread(target=_run_job, args=(run_name,), daemon=True)
+        thread = threading.Thread(
+            target=_run_job, args=(run_name, run_id, evaluation_id, mode), daemon=True
+        )
         thread.start()
     return JSONResponse(snapshot, status_code=202)
 
@@ -269,12 +393,25 @@ async def start_lab(request: Request) -> JSONResponse:
     text = body.get("text") if isinstance(body, dict) else None
     if not isinstance(text, str):
         return JSONResponse({"status": "invalid", "error": "Text is required."}, status_code=422)
+    resolved = _resolve_public_evaluation(body)
+    if isinstance(resolved, JSONResponse):
+        return resolved
+    evaluation_id, _mode = resolved
     try:
-        result = lab_module.start_lab_job(text, lambda: _job_state["status"] == "running")
+        result = lab_module.start_lab_job(
+            text, lambda: _job_state["status"] == "running",
+            evaluation_id=evaluation_id,
+        )
     except lab_module.LabValidationError as exc:
         return JSONResponse({"status": "invalid", "error": str(exc)}, status_code=422)
-    status_code = 409 if result.get("status") == "busy" else 202
-    return JSONResponse(result, status_code=status_code)
+    if result.get("status") == "busy":
+        with _job_lock:
+            active_id = _job_state.get("run_id") or lab_module.active_job_id_unlocked()
+        return JSONResponse(
+            {"detail": "A run is already in progress.", "run_id": active_id},
+            status_code=409,
+        )
+    return JSONResponse(result, status_code=202)
 
 
 @app.get("/api/lab/status/{job_id}")

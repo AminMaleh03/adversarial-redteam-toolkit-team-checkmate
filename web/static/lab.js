@@ -10,6 +10,10 @@
 
   var form = document.getElementById("lab-form");
   var textarea = document.getElementById("lab-text");
+  var evaluationSelect = document.getElementById("lab-evaluation");
+  var modelDescription = document.getElementById("lab-model-description");
+  var execModelNote = document.getElementById("lab-exec-model-note");
+  var resultsModelNote = document.getElementById("lab-results-model-note");
   var counter = document.getElementById("lab-counter");
   var errorEl = document.getElementById("lab-error");
   var submitBtn = document.getElementById("lab-submit");
@@ -39,6 +43,7 @@
   var generation = 0;
   var launching = false;
   var lastText = "";
+  var lastEvaluationId = "emotion.core";
 
   // ---- view switching -----------------------------------------------------------------
   // navTestAnother (the sticky masthead action) is visible ONLY while viewing results --
@@ -214,6 +219,26 @@
 
   function renderSummary(summary) {
     summaryEl.textContent = "";
+    if (summary.label_flips !== undefined) {
+      var singleRows = [
+        ["Variants tested", summary.variants_tested],
+        ["Label flips", summary.label_flips],
+        ["Safe rejections", summary.safe_rejections],
+        ["Endpoint errors", summary.endpoint_errors]
+      ];
+      var singleList = document.createElement("dl");
+      singleList.className = "lab-summary-list";
+      singleRows.forEach(function (row) {
+        var metric = el("div", "lab-metric");
+        metric.appendChild(el("dt", null, row[0]));
+        metric.appendChild(el("dd", "lab-metric-value", row[1]));
+        singleList.appendChild(metric);
+      });
+      summaryEl.appendChild(singleList);
+      summaryEl.appendChild(el("p", "lab-summary-verdict",
+        "Single-target observations only; no hardening improvement is inferred."));
+      return;
+    }
     var rows = [
       ["Variants tested", summary.variants_tested, "variants", "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z"],
       ["V1 label flips", summary.v1_flips, "v1", "M4 7h16m-4-4 4 4-4 4 M20 17H4m4-4-4 4 4 4"],
@@ -298,8 +323,12 @@
     card.appendChild(diffBlock);
 
     var versions = el("div", "lab-variant-versions");
-    renderVersionOutcome(versions, "V1 — Unhardened Endpoint", variant.v1);
-    renderVersionOutcome(versions, "V2 — Hardened Endpoint", variant.v2);
+    if (variant.target) {
+      renderVersionOutcome(versions, "Sentiment — Configured Target", variant.target);
+    } else {
+      renderVersionOutcome(versions, "V1 — Unhardened Endpoint", variant.v1);
+      renderVersionOutcome(versions, "V2 — Hardened Endpoint", variant.v2);
+    }
     card.appendChild(versions);
 
     return card;
@@ -312,8 +341,19 @@
     var inputLine = el("p", "lab-field", "Your input: " + data.original_text);
     cleanCardsEl.appendChild(inputLine);
     var pair = el("div", "version-context");
-    pair.appendChild(renderCleanCard("v1", data.v1_clean));
-    pair.appendChild(renderCleanCard("v2", data.v2_clean));
+    if (data.single_target) {
+      var card = el("div", "version-card v1");
+      card.appendChild(el("p", "version-card-title", "Sentiment — Configured Target"));
+      renderResultOutcome(card, data.clean);
+      pair.appendChild(card);
+      if (resultsModelNote) resultsModelNote.textContent =
+        "Single-target sentiment result; no V1/V2 comparison is available or implied.";
+    } else {
+      pair.appendChild(renderCleanCard("v1", data.v1_clean));
+      pair.appendChild(renderCleanCard("v2", data.v2_clean));
+      if (resultsModelNote) resultsModelNote.textContent =
+        "Same underlying AI model in both cases — only endpoint hardening differs.";
+    }
     cleanCardsEl.appendChild(pair);
 
     variantsEl.textContent = "";
@@ -368,7 +408,7 @@
   }
 
   // ---- starting a run ---------------------------------------------------------------------
-  function startLabRun(text) {
+  function startLabRun(text, evaluationId) {
     if (launching) return;
     launching = true;
     clearValidationError();
@@ -377,7 +417,7 @@
     fetch("/api/lab/run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: text }),
+      body: JSON.stringify({ text: text, evaluation_id: evaluationId || "emotion.core" }),
     })
       .then(function (response) {
         return response.json().then(function (data) { return { status: response.status, data: data }; });
@@ -423,15 +463,16 @@
         return;
       }
       lastText = text;
-      startLabRun(text);
+      lastEvaluationId = evaluationSelect ? evaluationSelect.value : "emotion.core";
+      startLabRun(text, lastEvaluationId);
     });
   }
 
   if (retryBtn) {
-    retryBtn.addEventListener("click", function () { startLabRun(lastText); });
+    retryBtn.addEventListener("click", function () { startLabRun(lastText, lastEvaluationId); });
   }
   if (busyRetryBtn) {
-    busyRetryBtn.addEventListener("click", function () { startLabRun(lastText); });
+    busyRetryBtn.addEventListener("click", function () { startLabRun(lastText, lastEvaluationId); });
   }
   if (editBtn) {
     editBtn.addEventListener("click", function () {
@@ -463,6 +504,22 @@
   if (navTestAnother) {
     navTestAnother.addEventListener("click", resetToInput);
   }
+
+  function updateModelJourney() {
+    var sentiment = evaluationSelect && evaluationSelect.value === "sentiment.core";
+    if (modelDescription) modelDescription.textContent = sentiment ?
+      "Explore one pinned two-label sentiment target without a fabricated before/after comparison." :
+      "The same emotion model through two endpoint configurations.";
+    if (execModelNote) execModelNote.textContent = sentiment ?
+      "Single-target sentiment evaluation; results are observations, not hardening claims." :
+      "Same underlying AI model in both cases — only endpoint hardening differs.";
+  }
+  if (evaluationSelect) evaluationSelect.addEventListener("change", function () {
+    generation++; clearTimeout(pollTimer); clearJobId(); lastText = "";
+    cleanCardsEl.textContent = ""; variantsEl.textContent = "";
+    updateModelJourney(); showInput();
+  });
+  updateModelJourney();
 
   window.addEventListener("pagehide", function () { generation++; clearTimeout(pollTimer); });
   window.addEventListener("pageshow", function (event) {

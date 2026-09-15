@@ -1,4 +1,4 @@
-"""Render analysis schema v2 into an offline HTML/PDF evidence bundle.
+"""Render analysis schema v2 or v3 into an offline HTML/PDF evidence bundle.
 
 No model loading or cross-component imports: analysis JSON is the public interface.
 Run ``python -m report.generate --help`` for the file and stdin interfaces.
@@ -40,6 +40,12 @@ CREATOR_NAME = "Team Checkmate"
 PRODUCT_NAME = "RED LAB"
 PRODUCT_TAGLINE = "Adversarial Testing Redefined"
 PRODUCT_VERSION_LABEL = "Red Lab v5.0"
+
+V3_REQUIRED_SUMMARY_FIELDS = (
+    "target_id", "version", "task_id", "suite_id", "identity", "coverage",
+    "category_stats", "operational", "drift", "findings",
+    "validity_tier_census", "diagnostic_observations", "review_cases", "limitations",
+)
 
 
 @functools.lru_cache(maxsize=1)
@@ -239,8 +245,8 @@ def validate_summary(summary, version):
     return groups
 
 
-def validate_report(data):
-    """Validate the consumed schema and joins; do not score or resolve findings."""
+def _validate_v2(data):
+    """Validate the historical paired-emotion schema; do not rescore it."""
     obj(data, "report", ("schema_version", "summary_v1", "summary_v2", "comparison"))
     require(type(data["schema_version"]) is int and data["schema_version"] == 2, "schema_version", "only version 2 is supported")
     groups = {v: validate_summary(data[f"summary_{v}"], v) for v in ("v1", "v2")}
@@ -326,6 +332,115 @@ def validate_report(data):
         require(ids == set(groups["v2"][key]["finding"]["evidence"]), "comparison", "missing new V2 case qualifications")
 
 
+def _validate_rate_object(value, path):
+    value = obj(value, path, ("numerator", "denominator", "rate"))
+    count(value["numerator"], path + ".numerator")
+    count(value["denominator"], path + ".denominator")
+    numerator = value["numerator"]
+    denominator = value["denominator"]
+    require(numerator <= denominator, path, "numerator exceeds denominator")
+    observed = value["rate"]
+    if denominator == 0:
+        require(observed is None, path + ".rate", "zero denominator must render as null/N/A")
+    else:
+        require(type(observed) in (int, float) and math.isfinite(observed), path + ".rate", "expected a finite ratio")
+        require(0 <= observed <= 1, path + ".rate", "ratio outside 0..1")
+        require(abs(observed - numerator / denominator) <= 0.000001, path + ".rate", "rate differs from its counts")
+    return value
+
+
+def _validate_remediation(entry, path, target_id):
+    obj(entry, path, ("finding", "subfamily", "failure_mode", "validity_tiers", "affected_cases", "remediation_detail"))
+    finding = obj(entry["finding"], path + ".finding", (
+        "finding_id", "title", "category", "severity_score", "severity_tier",
+        "description", "remediation", "evidence",
+    ))
+    require(finding["severity_tier"] in TIERS, path + ".finding.severity_tier", "unknown severity tier")
+    require(type(finding["remediation"]) is str and finding["remediation"].strip(), path + ".finding.remediation", "required")
+    detail = obj(entry["remediation_detail"], path + ".remediation_detail", (
+        "rule_id", "rule_version", "rule_sha256", "observed", "significance",
+        "diagnosis_confidence", "fix", "verification", "unavailable_evidence",
+    ))
+    for key in ("rule_id", "rule_version", "rule_sha256", "observed", "significance", "fix"):
+        require(type(detail[key]) is str and detail[key].strip(), path + ".remediation_detail." + key, "required")
+    require(detail["diagnosis_confidence"] in {"supported", "suspected"}, path + ".remediation_detail.diagnosis_confidence", "unknown value")
+    verification = obj(detail["verification"], path + ".remediation_detail.verification", (
+        "target_id", "command", "case_set_file", "includes_baselines", "expected",
+    ))
+    require(verification["target_id"] == target_id, path + ".remediation_detail.verification.target_id", "must verify the affected target")
+    require(type(verification["command"]) is str and verification["command"].strip(), path + ".remediation_detail.verification.command", "required")
+    require(type(verification["includes_baselines"]) is bool, path + ".remediation_detail.verification.includes_baselines", "expected boolean")
+    strings(detail["unavailable_evidence"], path + ".remediation_detail.unavailable_evidence")
+
+
+def _validate_v3(data):
+    require("summary_v1" not in data and "summary_v2" not in data, "schema_version", "version 3 requires the target-aware evaluations envelope")
+    obj(data, "report", ("schema_version", "contracts_version", "run_identity", "evaluations", "limitations"))
+    require(data["schema_version"] == 3, "schema_version", "only version 2 or 3 is supported")
+    require(data["contracts_version"] == "3.0.0", "contracts_version", "unsupported contract version")
+    obj(data["run_identity"], "run_identity")
+    strings(data["limitations"], "limitations")
+    evaluations = array(data["evaluations"], "evaluations")
+    require(bool(evaluations), "evaluations", "at least one evaluation is required")
+    seen_evaluations = set()
+    for index, evaluation in enumerate(evaluations):
+        path = f"evaluations[{index}]"
+        obj(evaluation, path, ("evaluation_id", "kind", "task_id", "suite_id", "targets", "summaries", "comparison", "coverage", "oces"))
+        string(evaluation["evaluation_id"], path + ".evaluation_id")
+        evaluation_id = evaluation["evaluation_id"]
+        require(evaluation_id not in seen_evaluations, path + ".evaluation_id", "duplicate evaluation")
+        seen_evaluations.add(evaluation_id)
+        kind = evaluation["kind"]
+        require(kind in {"paired", "single"}, path + ".kind", "expected paired or single")
+        suite_id = evaluation["suite_id"]
+        require(suite_id in {"core", "oces"}, path + ".suite_id", "unknown suite")
+        targets = strings(evaluation["targets"], path + ".targets")
+        require(len(targets) == (2 if kind == "paired" else 1), path + ".targets", "target count disagrees with kind")
+        require(len(set(targets)) == len(targets), path + ".targets", "duplicate target")
+        summaries = obj(evaluation["summaries"], path + ".summaries")
+        require(set(summaries) == set(targets), path + ".summaries", "keys must match targets")
+        declared_categories = None
+        for target_id in targets:
+            summary_path = path + f".summaries.{target_id}"
+            summary = obj(summaries[target_id], summary_path, V3_REQUIRED_SUMMARY_FIELDS)
+            require(summary["target_id"] == target_id, summary_path + ".target_id", "identity mismatch")
+            require(summary["task_id"] == evaluation["task_id"], summary_path + ".task_id", "task mismatch")
+            require(summary["suite_id"] == suite_id, summary_path + ".suite_id", "suite mismatch")
+            categories = tuple(summary["category_stats"].keys()) if isinstance(summary["category_stats"], dict) else ()
+            require(bool(categories), summary_path + ".category_stats", "declared families are missing")
+            if declared_categories is None:
+                declared_categories = categories
+            else:
+                require(set(categories) == set(declared_categories), summary_path + ".category_stats", "paired targets declare different families")
+            require(set(categories) <= (set(CATEGORIES) if suite_id == "core" else {"oces.paraphrase", "oces.distractor"}), summary_path + ".category_stats", "family is not declared for this suite")
+            array(summary["findings"], summary_path + ".findings")
+            for finding_index, entry in enumerate(summary["findings"]):
+                _validate_remediation(entry, f"{summary_path}.findings[{finding_index}]", target_id)
+            strings(summary["limitations"], summary_path + ".limitations")
+        if kind == "single":
+            require(evaluation["comparison"] is None, path + ".comparison", "single-target comparison must be null")
+        else:
+            require(isinstance(evaluation["comparison"], dict), path + ".comparison", "paired comparison is required")
+        if suite_id == "core":
+            require(isinstance(evaluation["coverage"], dict), path + ".coverage", "core evaluation requires coverage evidence")
+            require(evaluation["oces"] is None, path + ".oces", "core evaluation cannot contain OCES results")
+        else:
+            require(evaluation["coverage"] is None, path + ".coverage", "OCES coverage is expressed by its frozen declarations")
+            oces = obj(evaluation["oces"], path + ".oces", ("families",))
+            require(set(strings(oces["families"], path + ".oces.families")) == {"oces.paraphrase", "oces.distractor"}, path + ".oces.families", "exactly two OCES families are required")
+
+
+def validate_report(data):
+    """Validate a report input without inventing missing evidence or rescoring it."""
+    require(isinstance(data, dict), "report", "expected an object")
+    version = data.get("schema_version")
+    if version == 2:
+        return _validate_v2(data)
+    if version == 3:
+        return _validate_v3(data)
+    raise ValueError(f"schema_version: only version 2 or 3 is supported (got {version!r})")
+
+
 def _unique_object(pairs):
     result = {}
     for key, value in pairs:
@@ -363,13 +478,38 @@ def score_display(finding):
 TEMPLATE_BY_MODE = {"full": "template.html", "demo": "demo_template.html"}
 
 
-def render_html(data, *, source_sha256, include_pdf=True, mode="full"):
-    require(mode in TEMPLATE_BY_MODE, "mode", f"unknown report mode {mode!r}")
-    validate_report(data)
+def rate_object(value):
+    if not isinstance(value, dict):
+        return "N/A"
+    ratio = value.get("rate")
+    denominator = value.get("denominator")
+    numerator = value.get("numerator")
+    if ratio is None:
+        return f"N/A ({numerator}/{denominator})"
+    return f"{ratio * 100:.2f}% ({numerator}/{denominator})"
+
+
+def _environment():
     env = Environment(loader=FileSystemLoader(HERE), autoescape=select_autoescape(("html",)),
                       undefined=StrictUndefined, trim_blocks=True, lstrip_blocks=True)
     env.filters.update(percent=percent, score=score_display, label=lambda s: s.replace("_", " "),
-                       delta=lambda v: "N/A" if v is None else f"{v:+.4f}")
+                       delta=lambda v: "N/A" if v is None else f"{v:+.4f}",
+                       rate_object=rate_object)
+    return env
+
+
+def render_html(data, *, source_sha256, include_pdf=True, mode="full"):
+    require(mode in TEMPLATE_BY_MODE, "mode", f"unknown report mode {mode!r}")
+    validate_report(data)
+    env = _environment()
+    if data["schema_version"] == 3:
+        return env.get_template("template_v3.html").render(
+            data=data, source_sha256=source_sha256, include_pdf=include_pdf,
+            css=HERE.joinpath("style.css").read_text(encoding="utf-8"),
+            logo_data_uri=_logo_data_uri(), creator_name=CREATOR_NAME,
+            product_name=PRODUCT_NAME, product_tagline=PRODUCT_TAGLINE,
+            product_version_label=PRODUCT_VERSION_LABEL,
+        )
     comparison = data["comparison"]
     withheld = comparison.get("comparison_withheld_reason")
     # No inferred status. Absent evidence stays absent; stale fields are ignored when withheld.
@@ -430,7 +570,8 @@ def generate_report(raw: bytes, output: Path | str, *, html_only=False, mode="fu
     files = {"report.html": html.encode("utf-8"), "analysis.json": raw}
     if pdf is not None:
         files["report.pdf"] = pdf
-    metadata = {"report_version": 1, "analysis_schema_version": 2, "source_sha256": digest,
+    metadata = {"report_version": 2 if data["schema_version"] == 3 else 1,
+                "analysis_schema_version": data["schema_version"], "source_sha256": digest,
                 "files": {name: hashlib.sha256(content).hexdigest() for name, content in files.items()}}
     files["export_meta.json"] = (json.dumps(metadata, indent=2) + "\n").encode("utf-8")
     output.mkdir(parents=True, exist_ok=False)
@@ -441,7 +582,7 @@ def generate_report(raw: bytes, output: Path | str, *, html_only=False, mode="fu
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Render analysis schema v2 as an offline HTML/PDF report bundle.")
+    parser = argparse.ArgumentParser(description="Render analysis schema v2 or v3 as an offline HTML/PDF report bundle.")
     parser.add_argument("--input", required=True, help="analysis JSON path, or - to read UTF-8 JSON from stdin")
     parser.add_argument("--out", required=True, type=Path, help="new output directory under results/ (must not already exist)")
     parser.add_argument("--html-only", action="store_true", help="generate HTML without loading WeasyPrint")

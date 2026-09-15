@@ -226,7 +226,9 @@ def test_second_lab_submission_while_active_returns_busy_without_leaking_data(mo
         assert first.status_code == 202
         second = client.post("/api/lab/run", json={"text": "someone else's sentence"})
         assert second.status_code == 409
-        assert second.json() == {"status": "busy"}
+        assert second.json() == {
+            "detail": "A run is already in progress.", "run_id": first.json()["job_id"],
+        }
         assert secret_text not in second.text
     finally:
         release.set()
@@ -238,7 +240,7 @@ def test_lab_run_busy_while_demo_running(monkeypatch, client):
     try:
         resp = client.post("/api/lab/run", json={"text": "hello"})
         assert resp.status_code == 409
-        assert resp.json() == {"status": "busy"}
+        assert resp.json()["detail"] == "A run is already in progress."
     finally:
         web_app._reset_state_for_tests()
 
@@ -248,14 +250,14 @@ def test_demo_run_busy_while_lab_running(client):
     try:
         resp = client.post("/api/run")
         assert resp.status_code == 409
-        assert resp.json() == {"status": "busy"}
+        assert resp.json() == {
+            "detail": "A run is already in progress.", "run_id": "fixture-job",
+        }
     finally:
         lab_module._reset_state_for_tests()
 
 
-def test_demo_vs_demo_busy_behavior_unaffected(monkeypatch, client, tmp_path):
-    # Regression guard: the pre-existing demo-vs-demo reattachment behavior (202 + same
-    # run_name) must be untouched by the shared-lock change.
+def test_demo_vs_demo_uses_one_job_and_contract_busy_response(monkeypatch, client, tmp_path):
     monkeypatch.setattr(run_all, "RESULTS_ROOT", tmp_path)
     release = threading.Event()
     calls = []
@@ -271,8 +273,9 @@ def test_demo_vs_demo_busy_behavior_unaffected(monkeypatch, client, tmp_path):
     monkeypatch.setattr(run_all, "run_experiment", fake_run_experiment)
     try:
         first = client.post("/api/run").json()
-        second = client.post("/api/run").json()
-        assert first["run_name"] == second["run_name"]
+        second_response = client.post("/api/run")
+        assert second_response.status_code == 409
+        assert second_response.json()["run_id"] == first["run_id"]
         assert len(calls) == 1
     finally:
         release.set()
@@ -453,6 +456,52 @@ def test_run_custom_lab_pipeline_produces_real_counts(monkeypatch):
     for variant in payload["variants"]:
         assert variant["v1"]["tv_distance"] == 0.0
         assert variant["diff_original_html"] and variant["diff_attacked_html"]
+
+
+def test_sentiment_custom_lab_is_single_target_without_fake_v2(monkeypatch):
+    class FakeHandle:
+        url = "http://127.0.0.1:8002"
+        def stop(self):
+            pass
+
+    monkeypatch.setattr(run_all, "start_target", lambda *args: FakeHandle())
+
+    def fake_send(base_url, version, text, case, baseline_id, **identity):
+        return _fake_run_result(
+            version="v1", case=case, label="POSITIVE", confidence=0.9,
+            all_scores={"NEGATIVE": 0.1, "POSITIVE": 0.9},
+        )
+
+    monkeypatch.setattr(lab_module, "send_case", fake_send)
+    payload = lab_module.run_custom_lab(
+        "job-sentiment", "This film was pleasant and memorable",
+        lambda *_: None, evaluation_id="sentiment.core",
+    )
+    assert payload["single_target"] is True
+    assert payload["target_ids"] == ["sentiment_v1"]
+    assert "v1_clean" not in payload and "v2_clean" not in payload
+    assert all("target" in item and "v2" not in item for item in payload["variants"])
+    assert payload["clean"]["label"] == "POSITIVE"
+
+
+def test_lab_api_carries_sentiment_evaluation_identity(monkeypatch, client):
+    release = threading.Event()
+
+    def fake_run(job_id, text, progress_callback, *, evaluation_id="emotion.core"):
+        release.wait(timeout=5)
+        return {"evaluation_id": evaluation_id, "single_target": True, "variants": []}
+
+    monkeypatch.setattr(lab_module, "run_custom_lab", fake_run)
+    try:
+        response = client.post(
+            "/api/lab/run", json={"text": "A useful film", "evaluation_id": "sentiment.core"}
+        )
+        assert response.status_code == 202
+        assert response.json()["evaluation_id"] == "sentiment.core"
+        assert response.json()["target_ids"] == ["sentiment_v1"]
+    finally:
+        release.set()
+        _wait_until_lab_not_running(client)
 
 
 def test_custom_lab_run_never_writes_under_results_or_verified_artifacts(monkeypatch, tmp_path):

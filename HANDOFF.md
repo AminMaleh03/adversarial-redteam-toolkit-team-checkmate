@@ -8,6 +8,11 @@ branch, then opening a PR to `stage3/integration`; no merge is authorized. Work 
 isolated clone `results/task1-stage3-ahsan` so the main checkout's intentional uncommitted
 HANDOFF.md and local `.claude` settings remain untouched.
 
+Implementation commit `3c606fb6e5ece562ed739bccabc12a17a3e495db` is published on
+`stage3/ahsan`. Draft PR #11 targets `stage3/integration`:
+https://github.com/AminMaleh03/adversarial-redteam-toolkit-team-checkmate/pull/11. It is not
+merged. This factual handoff checkpoint follows the implementation commit.
+
 Implemented in Ahsan-owned files: registry-selected orchestration with collision-safe run
 IDs/indexes, exact plan reuse for pairs, sequential lifecycle and process-tree memory
 measurement; schema-v2/v3 report validation and a target-aware v3 template; structured,

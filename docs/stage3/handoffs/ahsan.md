@@ -9,6 +9,10 @@ Implementation base: merge `d5c5a7bbf789bd858da021c9ccc114e349fb8448` over integ
 Status: **implemented and core-verified; final Task 1 acceptance blocked by two missing
 cross-owner runtime inputs.** This is not a completion or deployment claim.
 
+Published implementation commit: `3c606fb6e5ece562ed739bccabc12a17a3e495db`. Draft PR:
+https://github.com/AminMaleh03/adversarial-redteam-toolkit-team-checkmate/pull/11, base
+`stage3/integration`, compare `stage3/ahsan`. The PR is intentionally unmerged.
+
 ## Integrated dependency identity
 
 - Rayyan handover: `44ce8d438fbe79afbb6c0bf04b2aae900ab7ef27`, merged to integration by PR #10.

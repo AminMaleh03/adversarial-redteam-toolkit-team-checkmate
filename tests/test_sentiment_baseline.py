@@ -121,6 +121,14 @@ def test_provenance_records_exclusions_and_replacement_rule():
 
 
 # ----------------------------------------------------------------- builder invariants
+def test_invalid_selection_fails_loudly_when_pool_too_small():
+    """A deterministic selection that cannot meet its per-label quota must raise, never
+    silently return fewer rows or fall back to model-based picking."""
+    too_few = [bsb._Row(idx=i, sentence=f"row {i}", label=0) for i in range(bsb.PER_LABEL - 1)]
+    with pytest.raises(ValueError):
+        bsb._select(too_few)
+
+
 def test_builder_constants_are_frozen():
     assert bsb.PER_LABEL == 21
     assert bsb.DATASET_REVISION == "8d51e7e4887a4caaa95b3fbebbf53c0490b58bbb"

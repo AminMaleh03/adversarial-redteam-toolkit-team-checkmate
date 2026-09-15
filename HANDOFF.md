@@ -1,3 +1,54 @@
+# TASK 2 (RAYYAN) — ENDPOINT, RUNNER AND GATE, HANDED OVER
+
+2026-09-15, Claude Opus 5, Asia/Dubai. Branch `stage3/rayyan`, code head
+`d6143aec181bac63ae0e2bb664640310fe56d0d4` (the branch tip is this checkpoint's own
+documentation-only commit), base `257e15f` (the tagged foundation).
+macOS/Apple silicon, Python 3.11.14 `.venv`. Full report:
+[`docs/stage3/handoffs/rayyan.md`](docs/stage3/handoffs/rayyan.md) — read that, not this
+summary, before accepting.
+
+**Status: handed over, with named gaps.** Four commits on top of `9813c13`: loader identity
+validation and tokenizer-only loading; the target-aware runner; the gate CLI; a regression
+guard for V2's length defense. Endpoint/runner and gate are separate commits so the first two
+can merge ahead of Khalid's `analysis.policy` and Ahsan's orchestration.
+
+**Validation by Claude (not historical).** `TOKENIZERS_PARALLELISM=false python -m pytest -q`
+= **790 passed, 30 skipped, 3 failed**. The three failures are pre-existing: confirmed
+identical on the untouched tip `9813c13` in a separate worktree (3 failed, 98 passed). Baseline
+was 674 passed, so 116 tests added and none removed. The 30 skips are all pre-existing browser
+tests; nothing in `test_endpoint.py`/`test_runner.py`/`test_gate.py` is skipped. `git diff
+--check` clean.
+
+**Real runs.** Frozen `ci_core_v1` (162 cases) against a live `emotion_v2` on its configured
+loopback port: 162 completed, 0 missing, 0 × 5xx, 6 s, reproducing `planned_suite_sha256`
+`7fcccf16…a430` — the preserved V6 benchmark's fingerprint — through the new registry-driven
+tokenizer path. Legacy `--version v1 --limit 30` still writes the legacy file names. Real
+sentiment endpoint verified at the pinned revision (both labels uppercase, full `all_scores`,
+health 200, over-length input reaching the model and failing rather than being truncated).
+
+**Not done, stated plainly.** No real sentiment core/OCES run — blocked on
+`baseline/sentiment_baseline.json` (Lamei) and the OCES freeze; no case count claimed. No gate
+pass on real evidence — `analysis.policy` does not exist, so exit 0/1 are fixture-driven shape
+checks and only the exit-2 paths are demonstrated for real. No paired two-target run in one
+parent directory — the `run.json` index is Ahsan's.
+
+**Four defects found, none mine to fix** (detail and suggested fixes in the handoff §9):
+the OCES freeze-point hash `cf364b70…` is the CRLF rendering of `endpoint/v2.py` and fails on
+any macOS/Linux checkout; the frozen CI `manifest_sha256` `0471bccb…` has the same CRLF
+relationship and **will fail on a Linux CI runner** unless `attacks.metadata.write_manifest`
+writes with `newline="\n"`; the fixture builder sorts platform-dependently and also dirties
+`tests/fixtures/stage3/MANIFEST.json` on every `pytest` run; and
+`test_module_paths_are_recorded_not_imported` is the stale assertion it warns about itself.
+Separately: V2's length defense had **no test at all** — the whole suite passed with it
+removed — so `d6143ae` adds one.
+
+**Regression demo branch:** `stage3/rayyan-regression-demo` @ `d0a5fda`. Never merge. Measured,
+not assumed: over-length input returns a flat HTTP 500 with no stack trace and the process
+stays alive. Against the frozen selection the released build shows 0 × 5xx and the demo branch
+7 × 5xx, exactly the over-limit cases.
+
+---
+
 # STAGE 3 FOUNDATION — COMPLETE AND PUBLISHED
 
 2026-09-15, Claude Opus 5, Asia/Dubai. Worktree `C:/Users/ahsan/OneDrive/Desktop/stage3-foundation`,

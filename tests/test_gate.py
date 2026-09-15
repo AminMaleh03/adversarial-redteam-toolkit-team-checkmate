@@ -544,3 +544,13 @@ def test_gate_rejects_a_non_ci_evaluation_before_execution(monkeypatch, tmp_path
     calls = install_doubles(monkeypatch, tmp_path, outcome=outcome_from_fixture("gate_pass"))
     assert invoke(tmp_path, "--evaluation", "sentiment.core")[0] == 2
     assert "experiment" not in calls
+
+
+@pytest.mark.parametrize("flags", [[], ["--policy", "unused", "--unknown"]])
+def test_cli_argument_errors_write_error_artifact(tmp_path, flags):
+    out = tmp_path / "gate-error"
+    assert gate.main(["--out", str(out), *flags]) == 2
+    result = json.loads((out / "gate_result.json").read_text(encoding="utf-8"))
+    assert result["exit_code"] == 2
+    assert result["outcome"] == "execution_error"
+    assert result["checks"][0]["check_id"] == "gate_cli_configuration"

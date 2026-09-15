@@ -594,8 +594,17 @@ def run_gate(args: argparse.Namespace) -> GateOutcome:
 # --------------------------------------------------------------------------
 
 
+class GateArgumentError(ValueError):
+    """CLI configuration that cannot produce a gate verdict."""
+
+
+class GateParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        raise GateArgumentError(message)
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = GateParser(
         prog="runner.gate",
         description="Run the CI evaluation and turn the policy result into an exit code.",
         epilog=(
@@ -622,7 +631,24 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Return the gate's exit code. Never returns 0 for anything but a real pass."""
-    args = build_parser().parse_args(argv)
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    try:
+        args = build_parser().parse_args(arguments)
+    except GateArgumentError as exc:
+        # Recover only an unambiguous destination; never guess evidence identities.
+        destination = argparse.ArgumentParser(add_help=False, allow_abbrev=False)
+        destination.add_argument("--out", action="append")
+        try:
+            recovered, _ = destination.parse_known_args(arguments)
+        except SystemExit:
+            recovered = None
+        outcome = execution_error(CheckResult(
+            check_id="gate_cli_configuration", status=CHECK_ERROR, reason=str(exc),
+        ))
+        if recovered is not None and recovered.out and len(set(recovered.out)) == 1:
+            write_gate_result(Path(recovered.out[0]), outcome)
+        print(f"gate configuration error: {exc}", file=sys.stderr)
+        return 2
     out_dir = Path(args.out)
 
     try:

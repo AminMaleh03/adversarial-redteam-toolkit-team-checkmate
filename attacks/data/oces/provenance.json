@@ -1,0 +1,1589 @@
+{
+  "artifact": "oces",
+  "generator_version": "1.0.0",
+  "authored_utc": "2026-09-15",
+  "generator": "baseline/oces/build_oces.py",
+  "exposure_statement": "additional evaluation authored after defense freeze; authors knew the defenses; not a blind or design-independent holdout",
+  "oracle": "label_should_match_baseline (relation=invariant)",
+  "families": [
+    "oces.paraphrase",
+    "oces.distractor"
+  ],
+  "no_model_inference": true,
+  "no_inference_note": "No predict()/label was run on any seed or variant while authoring or checking OCES. The only model assets used were the two tokenizers, for length counting.",
+  "review": {
+    "method": "ai_drafted_pending_human_review",
+    "reviewer": null,
+    "note": "AI-drafted candidates; human semantic review pending; proposed_tier is not a claim of human review"
+  },
+  "seed_selection": {
+    "emotion": {
+      "rule": "within each of the 7 labels, sort baselines by baseline_id and take the first 3; model-free and deterministic",
+      "per_label": 3,
+      "labels": [
+        "anger",
+        "disgust",
+        "fear",
+        "joy",
+        "neutral",
+        "sadness",
+        "surprise"
+      ],
+      "seed_ids": [
+        "dataset-anger-0",
+        "dataset-anger-1",
+        "dataset-anger-2",
+        "handwritten-disgust-0",
+        "handwritten-disgust-1",
+        "handwritten-disgust-2",
+        "dataset-fear-0",
+        "dataset-fear-1",
+        "dataset-fear-2",
+        "dataset-joy-0",
+        "dataset-joy-1",
+        "dataset-joy-2",
+        "handwritten-neutral-0",
+        "handwritten-neutral-1",
+        "handwritten-neutral-2",
+        "dataset-sadness-0",
+        "dataset-sadness-1",
+        "dataset-sadness-2",
+        "dataset-surprise-0",
+        "dataset-surprise-1",
+        "dataset-surprise-2"
+      ]
+    },
+    "sentiment": {
+      "rule": "within each label, sort baselines by ascending dataset idx and take the first 10; model-free and deterministic",
+      "per_label": 10,
+      "seed_ids": [
+        "sst2-val-18",
+        "sst2-val-35",
+        "sst2-val-59",
+        "sst2-val-110",
+        "sst2-val-111",
+        "sst2-val-121",
+        "sst2-val-136",
+        "sst2-val-162",
+        "sst2-val-211",
+        "sst2-val-319",
+        "sst2-val-13",
+        "sst2-val-17",
+        "sst2-val-52",
+        "sst2-val-109",
+        "sst2-val-120",
+        "sst2-val-201",
+        "sst2-val-227",
+        "sst2-val-248",
+        "sst2-val-290",
+        "sst2-val-341"
+      ]
+    }
+  },
+  "tokenizers": {
+    "emotion": {
+      "id": "j-hartmann/emotion-english-distilroberta-base",
+      "revision": "0e1cd914e3d46199ed785853e12b57304e04178b"
+    },
+    "sentiment": {
+      "id": "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+      "revision": "714eb0fa89d2f80546fda750413ed43d93601a13"
+    },
+    "token_limit_checked": 512,
+    "check": "add_special_tokens=True, truncation=False; both tokenizers per variant"
+  },
+  "counts": {
+    "emotion_seeds": 21,
+    "sentiment_seeds": 20,
+    "emotion_variants": 42,
+    "sentiment_variants": 40,
+    "total_variants": 82
+  },
+  "proposed_tier_distribution": {
+    "REVIEW": 32,
+    "SILVER": 50
+  },
+  "semantic_risk_distribution": {
+    "high": 10,
+    "low": 50,
+    "medium": 22
+  },
+  "variants": {
+    "dataset-anger-0.oces.paraphrase": {
+      "seed_baseline_id": "dataset-anger-0",
+      "source_text": "i didnt think i was angry but now that im typing away feeling my words evaporate into cyberspace i am very pissed that this is happening",
+      "expected_label": "anger",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "I didn't think I was angry, but now, as I type and watch my words vanish into cyberspace, I'm really furious that this is happening.",
+      "rationale": "Lexical swaps (pissed->furious, evaporate->vanish); anger preserved but intensity wording changed, so kept visible for review.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 35,
+        "sentiment": 36
+      }
+    },
+    "dataset-anger-0.oces.distractor": {
+      "seed_baseline_id": "dataset-anger-0",
+      "source_text": "i didnt think i was angry but now that im typing away feeling my words evaporate into cyberspace i am very pissed that this is happening",
+      "expected_label": "anger",
+      "family": "oces.distractor",
+      "transform_subtype": "logistical",
+      "variant_text": "I didn't think I was angry, but now that I am typing away, feeling my words evaporate into cyberspace, I am very pissed that this is happening. The document was last saved at 4:15 pm.",
+      "rationale": "Wording preserved; one neutral logistical clause appended; affective content untouched.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 48,
+        "sentiment": 49
+      }
+    },
+    "dataset-anger-1.oces.paraphrase": {
+      "seed_baseline_id": "dataset-anger-1",
+      "source_text": "i feel tortured every moment and theres nowhere i can go to get away from it or to get back to what i was used to",
+      "expected_label": "anger",
+      "family": "oces.paraphrase",
+      "transform_subtype": "syntactic",
+      "variant_text": "Every moment feels like torture, and there is nowhere I can escape to or return to the life I once knew.",
+      "rationale": "Syntactic recast of a strong-affect sentence; meaning preserved but re-review for intensity.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 25,
+        "sentiment": 25
+      }
+    },
+    "dataset-anger-1.oces.distractor": {
+      "seed_baseline_id": "dataset-anger-1",
+      "source_text": "i feel tortured every moment and theres nowhere i can go to get away from it or to get back to what i was used to",
+      "expected_label": "anger",
+      "family": "oces.distractor",
+      "transform_subtype": "ordinary_observation",
+      "variant_text": "I feel tortured every moment, and there is nowhere I can go to get away from it or to get back to what I was used to. The building has four floors and two staircases.",
+      "rationale": "Wording preserved; one neutral ordinary-observation clause appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 41,
+        "sentiment": 41
+      }
+    },
+    "dataset-anger-2.oces.paraphrase": {
+      "seed_baseline_id": "dataset-anger-2",
+      "source_text": "i never kissed a guy because every time i d try i d freak out and feel disgusted",
+      "expected_label": "anger",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "I never kissed a guy because every time I tried, I would panic and feel disgusted.",
+      "rationale": "Dataset label 'anger' is noisy here (reads fear/disgust); 7-way prediction is unstable, so flagged high and kept for review.",
+      "semantic_risk": "high",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 20,
+        "sentiment": 20
+      }
+    },
+    "dataset-anger-2.oces.distractor": {
+      "seed_baseline_id": "dataset-anger-2",
+      "source_text": "i never kissed a guy because every time i d try i d freak out and feel disgusted",
+      "expected_label": "anger",
+      "family": "oces.distractor",
+      "transform_subtype": "temporal",
+      "variant_text": "I never kissed a guy, because every time I tried, I would freak out and feel disgusted. The cafe across the street opens at eight each morning.",
+      "rationale": "Noisy underlying label; even with wording preserved the seed's emotion is ambiguous, so kept visible.",
+      "semantic_risk": "high",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 33,
+        "sentiment": 33
+      }
+    },
+    "handwritten-disgust-0.oces.paraphrase": {
+      "seed_baseline_id": "handwritten-disgust-0",
+      "source_text": "The milk had curdled into lumps and the smell made me gag.",
+      "expected_label": "disgust",
+      "family": "oces.paraphrase",
+      "transform_subtype": "syntactic",
+      "variant_text": "The milk had turned lumpy and curdled, and its stench made me gag.",
+      "rationale": "Clear disgust cue (curdled/stench/gag) preserved with lexical/syntactic variation.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 21,
+        "sentiment": 20
+      }
+    },
+    "handwritten-disgust-0.oces.distractor": {
+      "seed_baseline_id": "handwritten-disgust-0",
+      "source_text": "The milk had curdled into lumps and the smell made me gag.",
+      "expected_label": "disgust",
+      "family": "oces.distractor",
+      "transform_subtype": "mundane_factual",
+      "variant_text": "The milk had curdled into lumps and the smell made me gag. The carton listed a best-before date of the twelfth.",
+      "rationale": "Wording preserved; neutral factual clause appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 32,
+        "sentiment": 31
+      }
+    },
+    "handwritten-disgust-1.oces.paraphrase": {
+      "seed_baseline_id": "handwritten-disgust-1",
+      "source_text": "There were maggots crawling through the rotting meat in the bin.",
+      "expected_label": "disgust",
+      "family": "oces.paraphrase",
+      "transform_subtype": "syntactic",
+      "variant_text": "Maggots were crawling through the rotting meat inside the bin.",
+      "rationale": "Strong disgust imagery preserved; minor reordering only.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 15,
+        "sentiment": 15
+      }
+    },
+    "handwritten-disgust-1.oces.distractor": {
+      "seed_baseline_id": "handwritten-disgust-1",
+      "source_text": "There were maggots crawling through the rotting meat in the bin.",
+      "expected_label": "disgust",
+      "family": "oces.distractor",
+      "transform_subtype": "logistical",
+      "variant_text": "There were maggots crawling through the rotting meat in the bin. Rubbish collection happens on Wednesdays.",
+      "rationale": "Wording preserved; neutral logistical clause appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 25,
+        "sentiment": 23
+      }
+    },
+    "handwritten-disgust-2.oces.paraphrase": {
+      "seed_baseline_id": "handwritten-disgust-2",
+      "source_text": "He spat the mouldy bread out, revolted by the taste.",
+      "expected_label": "disgust",
+      "family": "oces.paraphrase",
+      "transform_subtype": "clause_restructuring",
+      "variant_text": "Revolted by the taste, he spat out the mouldy bread.",
+      "rationale": "Clause order swapped; disgust cue (revolted/mouldy) preserved.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 17,
+        "sentiment": 17
+      }
+    },
+    "handwritten-disgust-2.oces.distractor": {
+      "seed_baseline_id": "handwritten-disgust-2",
+      "source_text": "He spat the mouldy bread out, revolted by the taste.",
+      "expected_label": "disgust",
+      "family": "oces.distractor",
+      "transform_subtype": "temporal",
+      "variant_text": "He spat the mouldy bread out, revolted by the taste. The loaf had been sitting on the counter since Monday.",
+      "rationale": "Wording preserved; neutral temporal clause appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 27,
+        "sentiment": 28
+      }
+    },
+    "dataset-fear-0.oces.paraphrase": {
+      "seed_baseline_id": "dataset-fear-0",
+      "source_text": "i feel scared that i own it",
+      "expected_label": "fear",
+      "family": "oces.paraphrase",
+      "transform_subtype": "syntactic",
+      "variant_text": "It frightens me that I own it.",
+      "rationale": "Very short, semantically thin seed; a 7-way model may be unstable, so kept for review.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 11,
+        "sentiment": 11
+      }
+    },
+    "dataset-fear-0.oces.distractor": {
+      "seed_baseline_id": "dataset-fear-0",
+      "source_text": "i feel scared that i own it",
+      "expected_label": "fear",
+      "family": "oces.distractor",
+      "transform_subtype": "administrative",
+      "variant_text": "I feel scared that I own it. The receipt is filed in the top drawer.",
+      "rationale": "Short/ambiguous seed even with wording preserved; flagged for review.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 19,
+        "sentiment": 19
+      }
+    },
+    "dataset-fear-1.oces.paraphrase": {
+      "seed_baseline_id": "dataset-fear-1",
+      "source_text": "i feel like someone s strange uncle trying to break the ice at a party by showing this amazing talent thinking that guests will be impressed but in turn just made everything a hundred times more awkward",
+      "expected_label": "fear",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "I feel like someone's odd uncle at a party, trying to break the ice by showing off an amazing talent, expecting the guests to be impressed, but instead making everything a hundred times more awkward.",
+      "rationale": "Longer social-anxiety seed; meaning preserved, but fear-vs-embarrassment is subtle for a 7-way head.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 42,
+        "sentiment": 43
+      }
+    },
+    "dataset-fear-1.oces.distractor": {
+      "seed_baseline_id": "dataset-fear-1",
+      "source_text": "i feel like someone s strange uncle trying to break the ice at a party by showing this amazing talent thinking that guests will be impressed but in turn just made everything a hundred times more awkward",
+      "expected_label": "fear",
+      "family": "oces.distractor",
+      "transform_subtype": "temporal",
+      "variant_text": "I feel like someone's strange uncle trying to break the ice at a party by showing this amazing talent, thinking that guests will be impressed, but in turn just making everything a hundred times more awkward. The party was held on the second Saturday of the month.",
+      "rationale": "Wording preserved; neutral temporal clause appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 54,
+        "sentiment": 55
+      }
+    },
+    "dataset-fear-2.oces.paraphrase": {
+      "seed_baseline_id": "dataset-fear-2",
+      "source_text": "i can remember a year ago yesterday feeling so unsure so scared of what our future held",
+      "expected_label": "fear",
+      "family": "oces.paraphrase",
+      "transform_subtype": "clause_restructuring",
+      "variant_text": "A year ago yesterday, I remember feeling so uncertain, so scared of what our future held.",
+      "rationale": "Explicit fear cue (scared) preserved; clause reordered.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 21,
+        "sentiment": 21
+      }
+    },
+    "dataset-fear-2.oces.distractor": {
+      "seed_baseline_id": "dataset-fear-2",
+      "source_text": "i can remember a year ago yesterday feeling so unsure so scared of what our future held",
+      "expected_label": "fear",
+      "family": "oces.distractor",
+      "transform_subtype": "ordinary_observation",
+      "variant_text": "I can remember, a year ago yesterday, feeling so unsure, so scared of what our future held. The calendar on the wall still showed last month.",
+      "rationale": "Wording preserved; neutral observation clause appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 33,
+        "sentiment": 33
+      }
+    },
+    "dataset-joy-0.oces.paraphrase": {
+      "seed_baseline_id": "dataset-joy-0",
+      "source_text": "i strongly feel that at this point in my life i am no longer desiring to walk this path that i am on and to be truthful i have no clue as to where i am going with my life from here",
+      "expected_label": "joy",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "I strongly feel that, at this point in my life, I no longer want to walk the path I'm on, and honestly, I have no idea where my life is heading from here.",
+      "rationale": "Dataset label 'joy' is noisy (text reads uncertain/low); 7-way prediction unstable, flagged high.",
+      "semantic_risk": "high",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 41,
+        "sentiment": 42
+      }
+    },
+    "dataset-joy-0.oces.distractor": {
+      "seed_baseline_id": "dataset-joy-0",
+      "source_text": "i strongly feel that at this point in my life i am no longer desiring to walk this path that i am on and to be truthful i have no clue as to where i am going with my life from here",
+      "expected_label": "joy",
+      "family": "oces.distractor",
+      "transform_subtype": "logistical",
+      "variant_text": "I strongly feel that at this point in my life I am no longer desiring to walk this path that I am on, and to be truthful I have no clue as to where I am going with my life from here. The bus schedule changes at the end of the season.",
+      "rationale": "Noisy underlying label; kept visible for review.",
+      "semantic_risk": "high",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 58,
+        "sentiment": 59
+      }
+    },
+    "dataset-joy-1.oces.paraphrase": {
+      "seed_baseline_id": "dataset-joy-1",
+      "source_text": "i read too much about discovery and exploration in the wild west and while i feel that those concepts are precious taking part in them often myself this book just brings a refined feel when i sit back in the chair for some quiet time",
+      "expected_label": "joy",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "I read a lot about discovery and exploration in the wild west, and while I find those ideas precious and often take part in them myself, this book simply brings a refined feeling when I sit back in the chair for some quiet time.",
+      "rationale": "Contentment/joy is mild and diffuse; meaning preserved but re-review for label stability.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 49,
+        "sentiment": 49
+      }
+    },
+    "dataset-joy-1.oces.distractor": {
+      "seed_baseline_id": "dataset-joy-1",
+      "source_text": "i read too much about discovery and exploration in the wild west and while i feel that those concepts are precious taking part in them often myself this book just brings a refined feel when i sit back in the chair for some quiet time",
+      "expected_label": "joy",
+      "family": "oces.distractor",
+      "transform_subtype": "ordinary_observation",
+      "variant_text": "I read too much about discovery and exploration in the wild west, and while I feel that those concepts are precious, taking part in them often myself, this book just brings a refined feel when I sit back in the chair for some quiet time. The chair is placed beside the north window.",
+      "rationale": "Wording preserved; neutral observation clause appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 60,
+        "sentiment": 60
+      }
+    },
+    "dataset-joy-2.oces.paraphrase": {
+      "seed_baseline_id": "dataset-joy-2",
+      "source_text": "i love that i feel valuable i love making the choice i love that it s easy to make the choice to feel good",
+      "expected_label": "joy",
+      "family": "oces.paraphrase",
+      "transform_subtype": "compression",
+      "variant_text": "I love feeling valuable, I love making the choice, and I love that it's easy to choose to feel good.",
+      "rationale": "Clear repeated joy cue (love/feel good) preserved; lightly compressed.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 26,
+        "sentiment": 27
+      }
+    },
+    "dataset-joy-2.oces.distractor": {
+      "seed_baseline_id": "dataset-joy-2",
+      "source_text": "i love that i feel valuable i love making the choice i love that it s easy to make the choice to feel good",
+      "expected_label": "joy",
+      "family": "oces.distractor",
+      "transform_subtype": "mundane_factual",
+      "variant_text": "I love that I feel valuable, I love making the choice, I love that it's easy to make the choice to feel good. The notebook where I write this has a plain grey cover.",
+      "rationale": "Wording preserved; neutral factual clause appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 41,
+        "sentiment": 42
+      }
+    },
+    "handwritten-neutral-0.oces.paraphrase": {
+      "seed_baseline_id": "handwritten-neutral-0",
+      "source_text": "The train departs from platform four at nine in the morning.",
+      "expected_label": "neutral",
+      "family": "oces.paraphrase",
+      "transform_subtype": "compression",
+      "variant_text": "The train leaves platform four at nine a.m.",
+      "rationale": "Neutral factual statement; compressed, no affect introduced.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 13,
+        "sentiment": 13
+      }
+    },
+    "handwritten-neutral-0.oces.distractor": {
+      "seed_baseline_id": "handwritten-neutral-0",
+      "source_text": "The train departs from platform four at nine in the morning.",
+      "expected_label": "neutral",
+      "family": "oces.distractor",
+      "transform_subtype": "mundane_factual",
+      "variant_text": "The train departs from platform four at nine in the morning. A new coat of paint was applied to the railings last week.",
+      "rationale": "Wording preserved; second neutral fact appended, still affect-free.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 29,
+        "sentiment": 29
+      }
+    },
+    "handwritten-neutral-1.oces.paraphrase": {
+      "seed_baseline_id": "handwritten-neutral-1",
+      "source_text": "The report is due at the end of the month.",
+      "expected_label": "neutral",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "The report has to be submitted by the end of the month.",
+      "rationale": "Neutral administrative statement; lexical variation only.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 15,
+        "sentiment": 15
+      }
+    },
+    "handwritten-neutral-1.oces.distractor": {
+      "seed_baseline_id": "handwritten-neutral-1",
+      "source_text": "The report is due at the end of the month.",
+      "expected_label": "neutral",
+      "family": "oces.distractor",
+      "transform_subtype": "administrative",
+      "variant_text": "The report is due at the end of the month. The office has three meeting rooms on this floor.",
+      "rationale": "Wording preserved; neutral administrative clause appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 23,
+        "sentiment": 23
+      }
+    },
+    "handwritten-neutral-2.oces.paraphrase": {
+      "seed_baseline_id": "handwritten-neutral-2",
+      "source_text": "She placed the folder on the desk and turned on the computer.",
+      "expected_label": "neutral",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "She set the folder down on the desk and switched the computer on.",
+      "rationale": "Neutral action description; lexical variation only.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 16,
+        "sentiment": 16
+      }
+    },
+    "handwritten-neutral-2.oces.distractor": {
+      "seed_baseline_id": "handwritten-neutral-2",
+      "source_text": "She placed the folder on the desk and turned on the computer.",
+      "expected_label": "neutral",
+      "family": "oces.distractor",
+      "transform_subtype": "ordinary_observation",
+      "variant_text": "She placed the folder on the desk and turned on the computer. The desk faces a window overlooking the car park.",
+      "rationale": "Wording preserved; neutral observation clause appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 25,
+        "sentiment": 25
+      }
+    },
+    "dataset-sadness-0.oces.paraphrase": {
+      "seed_baseline_id": "dataset-sadness-0",
+      "source_text": "i feel as though the rest of my year will be jaded due to my love for this first",
+      "expected_label": "sadness",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "I feel as though the rest of my year will be jaded because of my love for this first one.",
+      "rationale": "Slightly garbled seed; meaning approximated, so flagged for review.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 24,
+        "sentiment": 24
+      }
+    },
+    "dataset-sadness-0.oces.distractor": {
+      "seed_baseline_id": "dataset-sadness-0",
+      "source_text": "i feel as though the rest of my year will be jaded due to my love for this first",
+      "expected_label": "sadness",
+      "family": "oces.distractor",
+      "transform_subtype": "ordinary_observation",
+      "variant_text": "I feel as though the rest of my year will be jaded due to my love for this first. The wall calendar lists twelve months on a single page.",
+      "rationale": "Garbled seed even with wording preserved; kept visible.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 34,
+        "sentiment": 34
+      }
+    },
+    "dataset-sadness-1.oces.paraphrase": {
+      "seed_baseline_id": "dataset-sadness-1",
+      "source_text": "i am feeling quite weepy can you get rid of them and she did",
+      "expected_label": "sadness",
+      "family": "oces.paraphrase",
+      "transform_subtype": "syntactic",
+      "variant_text": "I'm feeling quite weepy; can you get rid of them? And she did.",
+      "rationale": "Weepy cue preserved; disjointed narration makes label less certain, so review.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 20,
+        "sentiment": 21
+      }
+    },
+    "dataset-sadness-1.oces.distractor": {
+      "seed_baseline_id": "dataset-sadness-1",
+      "source_text": "i am feeling quite weepy can you get rid of them and she did",
+      "expected_label": "sadness",
+      "family": "oces.distractor",
+      "transform_subtype": "logistical",
+      "variant_text": "I am feeling quite weepy, can you get rid of them, and she did. The tissues are kept in the second drawer.",
+      "rationale": "Disjointed seed; neutral clause appended; kept visible.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 29,
+        "sentiment": 29
+      }
+    },
+    "dataset-sadness-2.oces.paraphrase": {
+      "seed_baseline_id": "dataset-sadness-2",
+      "source_text": "i walked away from the weekend feeling simply dirty like i had done something really harmful and this feeling more than anything is what overpowers my feeble attempts to justify my actions last weekend",
+      "expected_label": "sadness",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "I walked away from the weekend feeling simply dirty, as if I had done something truly harmful, and more than anything, that feeling overpowers my feeble attempts to justify what I did last weekend.",
+      "rationale": "Guilt/sadness preserved; long emotional sentence, re-review for shift.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 41,
+        "sentiment": 43
+      }
+    },
+    "dataset-sadness-2.oces.distractor": {
+      "seed_baseline_id": "dataset-sadness-2",
+      "source_text": "i walked away from the weekend feeling simply dirty like i had done something really harmful and this feeling more than anything is what overpowers my feeble attempts to justify my actions last weekend",
+      "expected_label": "sadness",
+      "family": "oces.distractor",
+      "transform_subtype": "temporal",
+      "variant_text": "I walked away from the weekend feeling simply dirty, like I had done something really harmful, and this feeling, more than anything, is what overpowers my feeble attempts to justify my actions last weekend. The weekend ran from Friday evening to Sunday night.",
+      "rationale": "Wording preserved; neutral temporal clause appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 52,
+        "sentiment": 54
+      }
+    },
+    "dataset-surprise-0.oces.paraphrase": {
+      "seed_baseline_id": "dataset-surprise-0",
+      "source_text": "im feeling really weird",
+      "expected_label": "surprise",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "I'm feeling really strange.",
+      "rationale": "Very short/ambiguous ('weird'->'strange'); could read surprise, fear or neutral, so high risk.",
+      "semantic_risk": "high",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 8,
+        "sentiment": 9
+      }
+    },
+    "dataset-surprise-0.oces.distractor": {
+      "seed_baseline_id": "dataset-surprise-0",
+      "source_text": "im feeling really weird",
+      "expected_label": "surprise",
+      "family": "oces.distractor",
+      "transform_subtype": "temporal",
+      "variant_text": "I'm feeling really weird. The clock on the wall reads half past three.",
+      "rationale": "Short/ambiguous seed; kept visible for review.",
+      "semantic_risk": "high",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 18,
+        "sentiment": 19
+      }
+    },
+    "dataset-surprise-1.oces.paraphrase": {
+      "seed_baseline_id": "dataset-surprise-1",
+      "source_text": "i was overwhelmed by the feeling of being impressed i think these kids theyre years younger than me i can call them kids right",
+      "expected_label": "surprise",
+      "family": "oces.paraphrase",
+      "transform_subtype": "syntactic",
+      "variant_text": "I was overwhelmed by how impressed I felt; I think these kids, they're years younger than me, I can call them kids, right?",
+      "rationale": "Amazement/surprise cue preserved; conversational aside makes it less clean, review.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 31,
+        "sentiment": 32
+      }
+    },
+    "dataset-surprise-1.oces.distractor": {
+      "seed_baseline_id": "dataset-surprise-1",
+      "source_text": "i was overwhelmed by the feeling of being impressed i think these kids theyre years younger than me i can call them kids right",
+      "expected_label": "surprise",
+      "family": "oces.distractor",
+      "transform_subtype": "logistical",
+      "variant_text": "I was overwhelmed by the feeling of being impressed. I think these kids, they're years younger than me, I can call them kids, right? The workshop lasted about two hours.",
+      "rationale": "Wording preserved; neutral logistical clause appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 39,
+        "sentiment": 40
+      }
+    },
+    "dataset-surprise-2.oces.paraphrase": {
+      "seed_baseline_id": "dataset-surprise-2",
+      "source_text": "i beside see smiling feel very funny",
+      "expected_label": "surprise",
+      "family": "oces.paraphrase",
+      "transform_subtype": "clause_restructuring",
+      "variant_text": "Beside me, I see smiling, and I feel very funny.",
+      "rationale": "Seed is near-nonsense (dataset noise); any paraphrase is approximate, so high risk and review.",
+      "semantic_risk": "high",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 17,
+        "sentiment": 15
+      }
+    },
+    "dataset-surprise-2.oces.distractor": {
+      "seed_baseline_id": "dataset-surprise-2",
+      "source_text": "i beside see smiling feel very funny",
+      "expected_label": "surprise",
+      "family": "oces.distractor",
+      "transform_subtype": "ordinary_observation",
+      "variant_text": "I beside see smiling feel very funny. The room has two windows and a single door.",
+      "rationale": "Garbled seed preserved verbatim; neutral clause appended; kept visible.",
+      "semantic_risk": "high",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 20,
+        "sentiment": 20
+      }
+    },
+    "sst2-val-18.oces.paraphrase": {
+      "seed_baseline_id": "sst2-val-18",
+      "source_text": "... the movie is just a plain old monster . ",
+      "expected_label": "NEGATIVE",
+      "family": "oces.paraphrase",
+      "transform_subtype": "expansion",
+      "variant_text": "In the end, the movie is nothing but a plain old monster.",
+      "rationale": "Cryptic seed with leading ellipsis; meaning approximated, so review.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 16,
+        "sentiment": 16
+      }
+    },
+    "sst2-val-18.oces.distractor": {
+      "seed_baseline_id": "sst2-val-18",
+      "source_text": "... the movie is just a plain old monster . ",
+      "expected_label": "NEGATIVE",
+      "family": "oces.distractor",
+      "transform_subtype": "logistical",
+      "variant_text": "The movie is just a plain old monster. It runs for about ninety minutes.",
+      "rationale": "Cryptic seed; neutral runtime clause appended; kept visible.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 18,
+        "sentiment": 18
+      }
+    },
+    "sst2-val-35.oces.paraphrase": {
+      "seed_baseline_id": "sst2-val-35",
+      "source_text": "a sequence of ridiculous shoot - 'em - up scenes . ",
+      "expected_label": "NEGATIVE",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "A string of ridiculous shoot-'em-up scenes.",
+      "rationale": "Negative cue ('ridiculous') preserved; lexical variation.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 13,
+        "sentiment": 14
+      }
+    },
+    "sst2-val-35.oces.distractor": {
+      "seed_baseline_id": "sst2-val-35",
+      "source_text": "a sequence of ridiculous shoot - 'em - up scenes . ",
+      "expected_label": "NEGATIVE",
+      "family": "oces.distractor",
+      "transform_subtype": "mundane_factual",
+      "variant_text": "A sequence of ridiculous shoot-'em-up scenes. The film was shot in two countries.",
+      "rationale": "Wording preserved; neutral production fact appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 21,
+        "sentiment": 22
+      }
+    },
+    "sst2-val-59.oces.paraphrase": {
+      "seed_baseline_id": "sst2-val-59",
+      "source_text": "it 's just disappointingly superficial -- a movie that has all the elements necessary to be a fascinating , involving character study , but never does more than scratch the surface . ",
+      "expected_label": "NEGATIVE",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "It's just disappointingly superficial - a film with all the ingredients to be a fascinating, involving character study, yet it never does more than scratch the surface.",
+      "rationale": "Clear negative judgement ('disappointingly superficial') preserved.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 34,
+        "sentiment": 35
+      }
+    },
+    "sst2-val-59.oces.distractor": {
+      "seed_baseline_id": "sst2-val-59",
+      "source_text": "it 's just disappointingly superficial -- a movie that has all the elements necessary to be a fascinating , involving character study , but never does more than scratch the surface . ",
+      "expected_label": "NEGATIVE",
+      "family": "oces.distractor",
+      "transform_subtype": "temporal",
+      "variant_text": "It's just disappointingly superficial - a movie that has all the elements necessary to be a fascinating, involving character study, but never does more than scratch the surface. The screening began at seven o'clock.",
+      "rationale": "Wording preserved; neutral temporal clause appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 44,
+        "sentiment": 45
+      }
+    },
+    "sst2-val-110.oces.paraphrase": {
+      "seed_baseline_id": "sst2-val-110",
+      "source_text": "scores no points for originality , wit , or intelligence . ",
+      "expected_label": "NEGATIVE",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "It earns no points for originality, wit, or intelligence.",
+      "rationale": "Strong negative ('no points') preserved.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 15,
+        "sentiment": 16
+      }
+    },
+    "sst2-val-110.oces.distractor": {
+      "seed_baseline_id": "sst2-val-110",
+      "source_text": "scores no points for originality , wit , or intelligence . ",
+      "expected_label": "NEGATIVE",
+      "family": "oces.distractor",
+      "transform_subtype": "ordinary_observation",
+      "variant_text": "Scores no points for originality, wit, or intelligence. The poster uses three colours.",
+      "rationale": "Wording preserved; neutral observation appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 21,
+        "sentiment": 20
+      }
+    },
+    "sst2-val-111.oces.paraphrase": {
+      "seed_baseline_id": "sst2-val-111",
+      "source_text": "there is n't nearly enough fun here , despite the presence of some appealing ingredients . ",
+      "expected_label": "NEGATIVE",
+      "family": "oces.paraphrase",
+      "transform_subtype": "syntactic",
+      "variant_text": "There isn't nearly enough fun here, even with some appealing ingredients present.",
+      "rationale": "Negative ('not enough fun') preserved despite the concessive clause.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 17,
+        "sentiment": 18
+      }
+    },
+    "sst2-val-111.oces.distractor": {
+      "seed_baseline_id": "sst2-val-111",
+      "source_text": "there is n't nearly enough fun here , despite the presence of some appealing ingredients . ",
+      "expected_label": "NEGATIVE",
+      "family": "oces.distractor",
+      "transform_subtype": "administrative",
+      "variant_text": "There isn't nearly enough fun here, despite the presence of some appealing ingredients. The cinema has assigned seating.",
+      "rationale": "Wording preserved; neutral administrative clause appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 24,
+        "sentiment": 25
+      }
+    },
+    "sst2-val-121.oces.paraphrase": {
+      "seed_baseline_id": "sst2-val-121",
+      "source_text": "it seems to me the film is about the art of ripping people off without ever letting them consciously know you have done so ",
+      "expected_label": "NEGATIVE",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "It seems to me the film is about the art of ripping people off without ever letting them consciously realise you've done it.",
+      "rationale": "Sentiment is implicit (descriptive sentence); negativity is inferential, so review.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 27,
+        "sentiment": 28
+      }
+    },
+    "sst2-val-121.oces.distractor": {
+      "seed_baseline_id": "sst2-val-121",
+      "source_text": "it seems to me the film is about the art of ripping people off without ever letting them consciously know you have done so ",
+      "expected_label": "NEGATIVE",
+      "family": "oces.distractor",
+      "transform_subtype": "logistical",
+      "variant_text": "It seems to me the film is about the art of ripping people off without ever letting them consciously know you have done so. The plot unfolds across two cities.",
+      "rationale": "Implicit-sentiment seed; neutral clause appended; kept visible.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 34,
+        "sentiment": 36
+      }
+    },
+    "sst2-val-136.oces.paraphrase": {
+      "seed_baseline_id": "sst2-val-136",
+      "source_text": "looks and feels like a project better suited for the small screen . ",
+      "expected_label": "NEGATIVE",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "It looks and feels like a project that would work better on the small screen.",
+      "rationale": "Faint-praise negative ('better suited for TV') preserved.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 18,
+        "sentiment": 18
+      }
+    },
+    "sst2-val-136.oces.distractor": {
+      "seed_baseline_id": "sst2-val-136",
+      "source_text": "looks and feels like a project better suited for the small screen . ",
+      "expected_label": "NEGATIVE",
+      "family": "oces.distractor",
+      "transform_subtype": "mundane_factual",
+      "variant_text": "Looks and feels like a project better suited for the small screen. The runtime is listed as one hundred minutes.",
+      "rationale": "Wording preserved; neutral runtime clause appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 24,
+        "sentiment": 25
+      }
+    },
+    "sst2-val-162.oces.paraphrase": {
+      "seed_baseline_id": "sst2-val-162",
+      "source_text": "there seems to be no clear path as to where the story 's going , or how long it 's going to take to get there . ",
+      "expected_label": "NEGATIVE",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "There seems to be no clear sense of where the story is going, or how long it will take to get there.",
+      "rationale": "Negative ('no clear path') preserved.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 26,
+        "sentiment": 26
+      }
+    },
+    "sst2-val-162.oces.distractor": {
+      "seed_baseline_id": "sst2-val-162",
+      "source_text": "there seems to be no clear path as to where the story 's going , or how long it 's going to take to get there . ",
+      "expected_label": "NEGATIVE",
+      "family": "oces.distractor",
+      "transform_subtype": "ordinary_observation",
+      "variant_text": "There seems to be no clear path as to where the story's going, or how long it's going to take to get there. The film is divided into three acts.",
+      "rationale": "Wording preserved; neutral observation appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 37,
+        "sentiment": 39
+      }
+    },
+    "sst2-val-211.oces.paraphrase": {
+      "seed_baseline_id": "sst2-val-211",
+      "source_text": "to say this was done better in wilder 's some like it hot is like saying the sun rises in the east . ",
+      "expected_label": "NEGATIVE",
+      "family": "oces.paraphrase",
+      "transform_subtype": "syntactic",
+      "variant_text": "Saying this was done better in Wilder's Some Like It Hot is like saying the sun rises in the east.",
+      "rationale": "Sarcastic comparison; sentiment depends on reading the idiom, so review.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 26,
+        "sentiment": 25
+      }
+    },
+    "sst2-val-211.oces.distractor": {
+      "seed_baseline_id": "sst2-val-211",
+      "source_text": "to say this was done better in wilder 's some like it hot is like saying the sun rises in the east . ",
+      "expected_label": "NEGATIVE",
+      "family": "oces.distractor",
+      "transform_subtype": "temporal",
+      "variant_text": "To say this was done better in Wilder's Some Like It Hot is like saying the sun rises in the east. The earlier film was released decades ago.",
+      "rationale": "Idiomatic/sarcastic seed; neutral clause appended; kept visible.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 34,
+        "sentiment": 34
+      }
+    },
+    "sst2-val-319.oces.paraphrase": {
+      "seed_baseline_id": "sst2-val-319",
+      "source_text": "too much of it feels unfocused and underdeveloped . ",
+      "expected_label": "NEGATIVE",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "Too much of it comes across as unfocused and underdeveloped.",
+      "rationale": "Clear negative ('unfocused and underdeveloped') preserved.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 14,
+        "sentiment": 19
+      }
+    },
+    "sst2-val-319.oces.distractor": {
+      "seed_baseline_id": "sst2-val-319",
+      "source_text": "too much of it feels unfocused and underdeveloped . ",
+      "expected_label": "NEGATIVE",
+      "family": "oces.distractor",
+      "transform_subtype": "mundane_factual",
+      "variant_text": "Too much of it feels unfocused and underdeveloped. The director also wrote the screenplay.",
+      "rationale": "Wording preserved; neutral production fact appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 19,
+        "sentiment": 24
+      }
+    },
+    "sst2-val-13.oces.paraphrase": {
+      "seed_baseline_id": "sst2-val-13",
+      "source_text": "we root for ( clara and paul ) , even like them , though perhaps it 's an emotion closer to pity . ",
+      "expected_label": "POSITIVE",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "We root for Clara and Paul, and even like them, though perhaps the feeling is closer to pity.",
+      "rationale": "Mixed sentiment ('closer to pity'); the positive label is fragile, so high risk and review.",
+      "semantic_risk": "high",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 23,
+        "sentiment": 23
+      }
+    },
+    "sst2-val-13.oces.distractor": {
+      "seed_baseline_id": "sst2-val-13",
+      "source_text": "we root for ( clara and paul ) , even like them , though perhaps it 's an emotion closer to pity . ",
+      "expected_label": "POSITIVE",
+      "family": "oces.distractor",
+      "transform_subtype": "temporal",
+      "variant_text": "We root for (Clara and Paul), even like them, though perhaps it's an emotion closer to pity. The story is set over a single summer.",
+      "rationale": "Mixed-sentiment seed; neutral clause appended; kept visible.",
+      "semantic_risk": "high",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 34,
+        "sentiment": 35
+      }
+    },
+    "sst2-val-17.oces.paraphrase": {
+      "seed_baseline_id": "sst2-val-17",
+      "source_text": "audrey tatou has a knack for picking roles that magnify her outrageous charm , and in this literate french comedy , she 's as morning-glory exuberant as she was in amélie . ",
+      "expected_label": "POSITIVE",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "Audrey Tautou has a knack for choosing roles that magnify her outrageous charm, and in this literate French comedy she's as morning-glory exuberant as she was in Amelie.",
+      "rationale": "Strong positive ('outrageous charm', 'exuberant') preserved.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 45,
+        "sentiment": 43
+      }
+    },
+    "sst2-val-17.oces.distractor": {
+      "seed_baseline_id": "sst2-val-17",
+      "source_text": "audrey tatou has a knack for picking roles that magnify her outrageous charm , and in this literate french comedy , she 's as morning-glory exuberant as she was in amélie . ",
+      "expected_label": "POSITIVE",
+      "family": "oces.distractor",
+      "transform_subtype": "mundane_factual",
+      "variant_text": "Audrey Tatou has a knack for picking roles that magnify her outrageous charm, and in this literate French comedy, she's as morning-glory exuberant as she was in Amelie. The comedy is spoken in French.",
+      "rationale": "Wording preserved; neutral language fact appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 52,
+        "sentiment": 51
+      }
+    },
+    "sst2-val-52.oces.paraphrase": {
+      "seed_baseline_id": "sst2-val-52",
+      "source_text": "mr. tsai is a very original artist in his medium , and what time is it there ? ",
+      "expected_label": "POSITIVE",
+      "family": "oces.paraphrase",
+      "transform_subtype": "syntactic",
+      "variant_text": "Mr. Tsai is a highly original artist in his medium, and so is What Time Is It There?",
+      "rationale": "Positive ('very original') preserved, but the film-title clause is awkward, so review.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 24,
+        "sentiment": 24
+      }
+    },
+    "sst2-val-52.oces.distractor": {
+      "seed_baseline_id": "sst2-val-52",
+      "source_text": "mr. tsai is a very original artist in his medium , and what time is it there ? ",
+      "expected_label": "POSITIVE",
+      "family": "oces.distractor",
+      "transform_subtype": "logistical",
+      "variant_text": "Mr. Tsai is a very original artist in his medium, and What Time Is It There? The film had its premiere at a festival.",
+      "rationale": "Title-as-clause seed; neutral clause appended; kept visible.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 31,
+        "sentiment": 31
+      }
+    },
+    "sst2-val-109.oces.paraphrase": {
+      "seed_baseline_id": "sst2-val-109",
+      "source_text": "it 's great escapist fun that recreates a place and time that will never happen again . ",
+      "expected_label": "POSITIVE",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "It's wonderful escapist fun that recreates a place and time that will never come again.",
+      "rationale": "Positive ('great escapist fun') preserved.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 22,
+        "sentiment": 24
+      }
+    },
+    "sst2-val-109.oces.distractor": {
+      "seed_baseline_id": "sst2-val-109",
+      "source_text": "it 's great escapist fun that recreates a place and time that will never happen again . ",
+      "expected_label": "POSITIVE",
+      "family": "oces.distractor",
+      "transform_subtype": "mundane_factual",
+      "variant_text": "It's great escapist fun that recreates a place and time that will never happen again. The soundtrack features a dozen songs.",
+      "rationale": "Wording preserved; neutral soundtrack fact appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 29,
+        "sentiment": 31
+      }
+    },
+    "sst2-val-120.oces.paraphrase": {
+      "seed_baseline_id": "sst2-val-120",
+      "source_text": "warm water under a red bridge is a quirky and poignant japanese film that explores the fascinating connections between women , water , nature , and sexuality . ",
+      "expected_label": "POSITIVE",
+      "family": "oces.paraphrase",
+      "transform_subtype": "compression",
+      "variant_text": "Warm Water Under a Red Bridge is a quirky, poignant Japanese film exploring the fascinating connections between women, water, nature, and sexuality.",
+      "rationale": "Positive ('quirky and poignant', 'fascinating') preserved; lightly compressed.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 30,
+        "sentiment": 31
+      }
+    },
+    "sst2-val-120.oces.distractor": {
+      "seed_baseline_id": "sst2-val-120",
+      "source_text": "warm water under a red bridge is a quirky and poignant japanese film that explores the fascinating connections between women , water , nature , and sexuality . ",
+      "expected_label": "POSITIVE",
+      "family": "oces.distractor",
+      "transform_subtype": "logistical",
+      "variant_text": "Warm Water Under a Red Bridge is a quirky and poignant Japanese film that explores the fascinating connections between women, water, nature, and sexuality. The film is roughly two hours long.",
+      "rationale": "Wording preserved; neutral runtime clause appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 39,
+        "sentiment": 40
+      }
+    },
+    "sst2-val-201.oces.paraphrase": {
+      "seed_baseline_id": "sst2-val-201",
+      "source_text": "inside the film 's conflict-powered plot there is a decent moral trying to get out , but it 's not that , it 's the tension that keeps you in your seat . ",
+      "expected_label": "POSITIVE",
+      "family": "oces.paraphrase",
+      "transform_subtype": "clause_restructuring",
+      "variant_text": "Within the film's conflict-powered plot there's a decent moral trying to get out, but it isn't that - it's the tension that keeps you in your seat.",
+      "rationale": "Positive resolves late ('tension keeps you in your seat'); structure is tricky, so review.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 37,
+        "sentiment": 41
+      }
+    },
+    "sst2-val-201.oces.distractor": {
+      "seed_baseline_id": "sst2-val-201",
+      "source_text": "inside the film 's conflict-powered plot there is a decent moral trying to get out , but it 's not that , it 's the tension that keeps you in your seat . ",
+      "expected_label": "POSITIVE",
+      "family": "oces.distractor",
+      "transform_subtype": "administrative",
+      "variant_text": "Inside the film's conflict-powered plot there is a decent moral trying to get out, but it's not that, it's the tension that keeps you in your seat. The film is rated for general audiences.",
+      "rationale": "Wording preserved; neutral rating clause appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 45,
+        "sentiment": 48
+      }
+    },
+    "sst2-val-227.oces.paraphrase": {
+      "seed_baseline_id": "sst2-val-227",
+      "source_text": "as the two leads , lathan and diggs are charming and have chemistry both as friends and lovers . ",
+      "expected_label": "POSITIVE",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "As the two leads, Lathan and Diggs are charming and share chemistry both as friends and as lovers.",
+      "rationale": "Positive ('charming', 'chemistry') preserved.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 24,
+        "sentiment": 24
+      }
+    },
+    "sst2-val-227.oces.distractor": {
+      "seed_baseline_id": "sst2-val-227",
+      "source_text": "as the two leads , lathan and diggs are charming and have chemistry both as friends and lovers . ",
+      "expected_label": "POSITIVE",
+      "family": "oces.distractor",
+      "transform_subtype": "ordinary_observation",
+      "variant_text": "As the two leads, Lathan and Diggs are charming and have chemistry both as friends and lovers. The pair appear in most of the film's scenes.",
+      "rationale": "Wording preserved; neutral observation appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 34,
+        "sentiment": 35
+      }
+    },
+    "sst2-val-248.oces.paraphrase": {
+      "seed_baseline_id": "sst2-val-248",
+      "source_text": "a full world has been presented onscreen , not some series of carefully structured plot points building to a pat resolution . ",
+      "expected_label": "POSITIVE",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "A complete world has been presented onscreen, rather than a series of carefully structured plot points building to a pat resolution.",
+      "rationale": "Positive is comparative/implicit ('a full world, not... pat resolution'), so review.",
+      "semantic_risk": "medium",
+      "proposed_tier": "REVIEW",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 26,
+        "sentiment": 26
+      }
+    },
+    "sst2-val-248.oces.distractor": {
+      "seed_baseline_id": "sst2-val-248",
+      "source_text": "a full world has been presented onscreen , not some series of carefully structured plot points building to a pat resolution . ",
+      "expected_label": "POSITIVE",
+      "family": "oces.distractor",
+      "transform_subtype": "logistical",
+      "variant_text": "A full world has been presented onscreen, not some series of carefully structured plot points building to a pat resolution. The film uses several outdoor locations.",
+      "rationale": "Wording preserved; neutral location clause appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 32,
+        "sentiment": 32
+      }
+    },
+    "sst2-val-290.oces.paraphrase": {
+      "seed_baseline_id": "sst2-val-290",
+      "source_text": "deliriously funny , fast and loose , accessible to the uninitiated , and full of surprises ",
+      "expected_label": "POSITIVE",
+      "family": "oces.paraphrase",
+      "transform_subtype": "lexical",
+      "variant_text": "Deliriously funny, fast and loose, easy for newcomers to enjoy, and full of surprises.",
+      "rationale": "Strongly positive list ('deliriously funny', 'full of surprises') preserved.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 22,
+        "sentiment": 22
+      }
+    },
+    "sst2-val-290.oces.distractor": {
+      "seed_baseline_id": "sst2-val-290",
+      "source_text": "deliriously funny , fast and loose , accessible to the uninitiated , and full of surprises ",
+      "expected_label": "POSITIVE",
+      "family": "oces.distractor",
+      "transform_subtype": "temporal",
+      "variant_text": "Deliriously funny, fast and loose, accessible to the uninitiated, and full of surprises. The screening lasted a little under two hours.",
+      "rationale": "Wording preserved; neutral temporal clause appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 32,
+        "sentiment": 33
+      }
+    },
+    "sst2-val-341.oces.paraphrase": {
+      "seed_baseline_id": "sst2-val-341",
+      "source_text": "it deserves to be seen by anyone with even a passing interest in the events shaping the world beyond their own horizons . ",
+      "expected_label": "POSITIVE",
+      "family": "oces.paraphrase",
+      "transform_subtype": "clause_restructuring",
+      "variant_text": "Anyone with even a passing interest in the events shaping the world beyond their own horizons deserves to see it.",
+      "rationale": "Positive recommendation ('deserves to be seen') preserved; clause reordered.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 24,
+        "sentiment": 23
+      }
+    },
+    "sst2-val-341.oces.distractor": {
+      "seed_baseline_id": "sst2-val-341",
+      "source_text": "it deserves to be seen by anyone with even a passing interest in the events shaping the world beyond their own horizons . ",
+      "expected_label": "POSITIVE",
+      "family": "oces.distractor",
+      "transform_subtype": "mundane_factual",
+      "variant_text": "It deserves to be seen by anyone with even a passing interest in the events shaping the world beyond their own horizons. The documentary includes archival footage.",
+      "rationale": "Wording preserved; neutral factual clause appended.",
+      "semantic_risk": "low",
+      "proposed_tier": "SILVER",
+      "review_method": "ai_drafted_pending_human_review",
+      "reviewer": null,
+      "clean_text_invariant": true,
+      "tokenizer_lengths": {
+        "emotion": 33,
+        "sentiment": 31
+      }
+    }
+  }
+}

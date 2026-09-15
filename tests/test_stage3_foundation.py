@@ -260,12 +260,34 @@ class TestRegistry:
         assert r.target("sentiment_v1").target_id != r.target("emotion_v1").target_id
 
     def test_module_paths_are_recorded_not_imported(self):
-        r = load_registry()
-        assert r.target("sentiment_v1").module == "endpoint.sentiment_v1"
-        assert not (ROOT / "endpoint" / "sentiment_v1.py").exists(), (
-            "this test is meaningless once Task 2 lands the module; update it then"
+        """The registry stores module paths as strings; loading it must not import them.
+
+        Task 2 landed endpoint/sentiment_v1.py, which imports transformers/torch at
+        module scope (see endpoint/loader.py -- loading a target's model happens on
+        import, same as endpoint/model.py always has for emotion). So the file
+        existing is no longer the thing to check; what actually matters is that
+        load_registry() alone -- reading targets.json, building TargetSpec objects --
+        never triggers that import as a side effect. If it did, --help, offline
+        tests, and anything else that only needs to read the registry would start
+        paying for a full model load, or fail entirely in an environment with no
+        transformers installed.
+        """
+        assert (ROOT / "endpoint" / "sentiment_v1.py").exists(), (
+            "Task 2's sentiment endpoint should exist by now"
         )
+        assert "endpoint.sentiment_v1" not in sys.modules, (
+            "endpoint.sentiment_v1 must not already be imported when this test starts, "
+            "or the assertion below proves nothing"
+        )
+
+        r = load_registry()
+
+        assert r.target("sentiment_v1").module == "endpoint.sentiment_v1"
         assert r.target("sentiment_v1").app_path == "endpoint.sentiment_v1:app"
+        assert "endpoint.sentiment_v1" not in sys.modules, (
+            "load_registry() imported endpoint.sentiment_v1 -- the registry must stay "
+            "model-free; module paths are data, not something the registry itself loads"
+        )
 
     def test_unknown_ids_raise_rather_than_returning_none(self):
         r = load_registry()

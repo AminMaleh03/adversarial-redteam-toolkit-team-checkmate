@@ -33,6 +33,7 @@ import httpx
 import pytest
 
 from contract import AttackCase, BaselineCase
+from endpoint.targets import load_registry
 from runner import run as runner_module
 from runner.run import (
     BAND_NORMAL,
@@ -257,6 +258,255 @@ def test_raw_body_given_as_str_is_encoded_without_json_wrapping(tmp_path):
     )
     writer.close()
     assert result.status_code == 400
+
+
+# --------------------------------------------------------------------------
+# request body evidence (request_body_bytes / request_body_sha256)
+# --------------------------------------------------------------------------
+
+
+def test_request_body_evidence_matches_the_actual_wire_bytes_for_json(tmp_path):
+    import hashlib
+
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/health":
+            return httpx.Response(200, json={"status": "ok"})
+        seen["content"] = request.content
+        return predict_response()
+
+    runner, writer = make_runner(tmp_path, handler)
+    result = runner.send_attack(attack(attacked_text="héllo wörld"))
+    writer.close()
+
+    assert result.request_body_bytes == len(seen["content"])
+    assert result.request_body_sha256 == hashlib.sha256(seen["content"]).hexdigest()
+
+
+def test_request_body_evidence_matches_the_actual_wire_bytes_for_raw_and_malformed(tmp_path):
+    import hashlib
+
+    payload = b'{"text": "caf\xff\xfe broken"}'
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/health":
+            return httpx.Response(200, json={"status": "ok"})
+        seen["content"] = request.content
+        return httpx.Response(400, text="bad encoding")
+
+    runner, writer = make_runner(tmp_path, handler)
+    result = runner.send_attack(
+        attack("malformed.malformed_utf8", is_raw=True, raw_body=payload, attacked_text=None)
+    )
+    writer.close()
+
+    assert seen["content"] == payload
+    assert result.request_body_bytes == len(payload)
+    assert result.request_body_sha256 == hashlib.sha256(payload).hexdigest()
+
+
+def test_request_body_evidence_is_present_even_when_transport_fails(tmp_path):
+    """A request whose bytes were prepared but never answered still has evidence.
+
+    Never substitutes a character count or response length -- the byte count comes
+    from the exact prepared body, captured before the (failing) send.
+    """
+    import hashlib
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/health":
+            return httpx.Response(200, json={"status": "ok"})
+        raise httpx.ConnectError("boom", request=request)
+
+    runner, writer = make_runner(tmp_path, handler)
+    result = runner.send_attack(attack(attacked_text="hello there"))
+    writer.close()
+
+    expected_body = json.dumps({"text": "hello there"}, separators=(",", ":")).encode()
+    # HTTPX's own json= serialization, not something we hand-roll -- confirm shape
+    # rather than byte-for-byte matching our own guess of its separators.
+    assert result.request_body_bytes is not None
+    assert result.request_body_sha256 is not None
+    assert result.error is not None and result.error.startswith("connection_error")
+
+
+def test_request_body_evidence_is_none_on_serialization_failure(tmp_path):
+    """If building the request itself fails, there were never any bytes to hash."""
+
+    class Unserializable:
+        def __repr__(self):
+            raise RuntimeError("cannot even repr this")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"status": "ok"})
+
+    runner, writer = make_runner(tmp_path, handler)
+    outcome = runner.send(None, Unserializable())
+    writer.close()
+
+    assert outcome["request_body_bytes"] is None
+    assert outcome["request_body_sha256"] is None
+    assert outcome["error"].startswith("serialization_error")
+
+
+def test_baseline_and_attack_rows_carry_target_id_and_suite_id(tmp_path):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/health":
+            return httpx.Response(200, json={"status": "ok"})
+        return predict_response()
+
+    runner, writer = make_runner(tmp_path, handler)
+    runner.target_id = "sentiment_v1"
+    runner.suite_id = "core"
+    baseline_result = runner.send_baseline(baseline())
+    attack_result = runner.send_attack(attack())
+    writer.close()
+
+    assert (baseline_result.target_id, baseline_result.suite_id) == ("sentiment_v1", "core")
+    assert (attack_result.target_id, attack_result.suite_id) == ("sentiment_v1", "core")
+
+
+# --------------------------------------------------------------------------
+# frozen case sets
+# --------------------------------------------------------------------------
+
+
+def test_apply_case_set_selects_exact_ids_in_order():
+    baselines, attacks = suite(n_baselines=3, n_standalone=2, n_derived=2)
+    case_set = {
+        "case_set_id": "mini",
+        "suite_id": "core",
+        "baseline_ids": ["b02", "b01"],
+        "standalone_attack_ids": ["s.malformed.02", "s.malformed.01"],
+        "derived_attack_ids": ["b01.encoding.01", "b02.encoding.02"],
+    }
+    sel_b, sel_a, excluded = runner_module.apply_case_set(case_set, "core", baselines, attacks)
+    assert [b.baseline_id for b in sel_b] == ["b02", "b01"]
+    assert [a.attack_id for a in sel_a] == [
+        "s.malformed.02", "s.malformed.01", "b01.encoding.01", "b02.encoding.02",
+    ]
+    excluded_baseline_keys = {key for key in excluded if key.startswith("baseline:")}
+    assert excluded_baseline_keys == {"baseline:b03"}
+
+
+def test_apply_case_set_rejects_unknown_ids():
+    baselines, attacks = suite()
+    case_set = {
+        "case_set_id": "mini", "suite_id": "core",
+        "baseline_ids": ["b01", "does-not-exist"],
+        "standalone_attack_ids": ["s.malformed.01"],
+        "derived_attack_ids": [],
+    }
+    with pytest.raises(runner_module.RunnerConfigError, match="baseline ids not present"):
+        runner_module.apply_case_set(case_set, "core", baselines, attacks)
+
+
+def test_apply_case_set_allows_standalone_only_selection_with_no_derived_attacks():
+    baselines, attacks = suite()
+    case_set = {
+        "case_set_id": "mini", "suite_id": "core",
+        "baseline_ids": ["b01"],
+        "standalone_attack_ids": ["s.malformed.01"],
+        "derived_attack_ids": [],
+    }
+    sel_b, sel_a, _ = runner_module.apply_case_set(case_set, "core", baselines, attacks)
+    assert [a.attack_id for a in sel_a] == ["s.malformed.01"]
+
+
+def test_apply_case_set_rejects_duplicates():
+    baselines, attacks = suite()
+    case_set = {
+        "case_set_id": "mini", "suite_id": "core",
+        "baseline_ids": ["b01", "b01"],
+        "standalone_attack_ids": ["s.malformed.01"],
+        "derived_attack_ids": [],
+    }
+    with pytest.raises(runner_module.RunnerConfigError, match="duplicate"):
+        runner_module.apply_case_set(case_set, "core", baselines, attacks)
+
+
+def test_apply_case_set_rejects_empty_lists():
+    baselines, attacks = suite()
+    case_set = {
+        "case_set_id": "mini", "suite_id": "core",
+        "baseline_ids": [], "standalone_attack_ids": [], "derived_attack_ids": [],
+    }
+    with pytest.raises(runner_module.RunnerConfigError, match="empty"):
+        runner_module.apply_case_set(case_set, "core", baselines, attacks)
+
+
+def test_apply_case_set_rejects_wrong_suite_id():
+    baselines, attacks = suite()
+    case_set = {
+        "case_set_id": "mini", "suite_id": "oces",
+        "baseline_ids": ["b01"], "standalone_attack_ids": ["s.malformed.01"],
+        "derived_attack_ids": [],
+    }
+    with pytest.raises(runner_module.RunnerConfigError, match="suite"):
+        runner_module.apply_case_set(case_set, "core", baselines, attacks)
+
+
+def test_apply_case_set_rejects_derived_attack_whose_baseline_is_not_selected():
+    baselines, attacks = suite(n_baselines=2)
+    case_set = {
+        "case_set_id": "mini", "suite_id": "core",
+        # b02 excluded, but a derived attack keyed off b02 is still requested.
+        "baseline_ids": ["b01"],
+        "standalone_attack_ids": ["s.malformed.01"],
+        "derived_attack_ids": ["b02.encoding.01"],
+    }
+    with pytest.raises(runner_module.RunnerConfigError, match="baseline is not itself selected"):
+        runner_module.apply_case_set(case_set, "core", baselines, attacks)
+
+
+def test_apply_case_set_rejects_id_in_both_standalone_and_derived():
+    baselines, attacks = suite()
+    case_set = {
+        "case_set_id": "mini", "suite_id": "core",
+        "baseline_ids": ["b01"],
+        "standalone_attack_ids": ["b01.encoding.01"],
+        "derived_attack_ids": ["b01.encoding.01"],
+    }
+    with pytest.raises(runner_module.RunnerConfigError, match="both standalone"):
+        runner_module.apply_case_set(case_set, "core", baselines, attacks)
+
+
+def test_load_case_set_rejects_missing_file(tmp_path):
+    with pytest.raises(runner_module.RunnerConfigError, match="not found"):
+        runner_module.load_case_set("does-not-exist", directory=tmp_path)
+
+
+def test_load_case_set_rejects_id_mismatch(tmp_path):
+    (tmp_path / "mini.json").write_text(json.dumps({"case_set_id": "wrong-id"}))
+    with pytest.raises(runner_module.RunnerConfigError, match="declares case_set_id"):
+        runner_module.load_case_set("mini", directory=tmp_path)
+
+
+def test_real_frozen_ci_core_v1_case_set_matches_the_real_emotion_suite():
+    """Full integration check against the actual committed baseline and case set.
+
+    Needs a real tokenizer to build boundary.length.* cases (approximate mode
+    cannot compute a real token boundary), so this only runs where transformers
+    is actually installed -- e.g. on a contributor's machine, not in a bare CI
+    sandbox. That is itself useful signal: if this ever fails on a real machine,
+    the frozen case set has gone stale against the current suite-building code
+    and needs a re-freeze, not a code fix here.
+    """
+    pytest.importorskip("transformers")
+    from baseline.load import load_baseline
+
+    baselines = sorted(load_baseline(), key=lambda b: b.baseline_id)
+    token_counter, max_tokens = runner_module.build_token_counter("emotion_v2")
+    attacks = runner_module.build_suite_once(baselines, token_counter, max_tokens)
+    case_set = runner_module.load_case_set("ci_core_v1")
+
+    sel_b, sel_a, excluded = runner_module.apply_case_set(case_set, "core", baselines, attacks)
+
+    counts = case_set["counts"]
+    assert len(sel_b) == counts["baselines"]
+    assert len(sel_a) == counts["standalone_attacks"] + counts["derived_attacks"]
 
 
 def test_a_raw_case_with_no_headers_adds_none_of_its_own(tmp_path):
@@ -817,17 +1067,73 @@ def test_the_manifest_hash_is_recorded_in_the_meta_file():
 
 
 def test_no_address_or_port_is_hardcoded_in_the_runner():
-    """A deployed endpoint has no port that tells us anything."""
+    """A deployed endpoint has no port that tells us anything.
+
+    The one deliberate exception is resolve_target()'s --target-id path: a
+    target-aware run is only ever allowed to talk to a trusted registry target on
+    127.0.0.1, by design (see docs/stage3/tasks/task_2_rayyan.md: "Bind test
+    services to configured loopback ports. Allow only the trusted registry
+    targets."). That function's body (comments and docstring included, since the
+    prose describes the same deliberate choice) is excluded from this scan; every
+    other line in the file is still held to "no hardcoded address or port".
+    Legacy --target still has no default and is never synthesized anywhere else.
+    """
     source = (Path(__file__).resolve().parent.parent / "runner" / "run.py").read_text(
         encoding="utf-8"
     )
+    lines = source.splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith("def resolve_target("))
+    end = next(
+        i for i in range(start + 1, len(lines))
+        if lines[i].startswith("def ") or lines[i].startswith("class ")
+    )
+    resolve_target_body = "\n".join(lines[start:end])
+    assert 'f"http://127.0.0.1:{spec.port}"' in resolve_target_body, (
+        "expected the one deliberate loopback derivation inside resolve_target(); "
+        "if it moved, update this test's excluded range to match"
+    )
+
     code = "\n".join(
         line
-        for line in source.splitlines()
-        if not line.lstrip().startswith("#") and "python -m runner.run" not in line
+        for i, line in enumerate(lines)
+        if not (start <= i < end)
+        and not line.lstrip().startswith("#")
+        and "python -m runner.run" not in line
     )
     for forbidden in ("localhost", "127.0.0.1", "0.0.0.0", ":8000", ":8001"):
         assert forbidden not in code, f"{forbidden!r} is hardcoded in runner/run.py"
+
+
+def test_target_id_derives_url_from_the_trusted_registry_loopback_port():
+    registry = load_registry()
+    target_url, version, target_id = runner_module.resolve_target(
+        None, None, "sentiment_v1", registry
+    )
+    spec = registry.target("sentiment_v1")
+    assert target_url == f"http://127.0.0.1:{spec.port}"
+    assert (version, target_id) == (spec.version, "sentiment_v1")
+
+
+def test_legacy_target_and_version_still_work_without_target_id():
+    registry = load_registry()
+    target_url, version, target_id = runner_module.resolve_target(
+        "http://caller-supplied.example", "v1", None, registry
+    )
+    assert (target_url, version, target_id) == ("http://caller-supplied.example", "v1", "emotion_v1")
+
+
+def test_target_id_conflicting_with_target_or_version_is_rejected():
+    registry = load_registry()
+    with pytest.raises(runner_module.RunnerConfigError):
+        runner_module.resolve_target("http://x", None, "sentiment_v1", registry)
+    with pytest.raises(runner_module.RunnerConfigError):
+        runner_module.resolve_target(None, "v1", "sentiment_v1", registry)
+
+
+def test_neither_target_id_nor_target_and_version_is_rejected():
+    registry = load_registry()
+    with pytest.raises(runner_module.RunnerConfigError):
+        runner_module.resolve_target(None, None, None, registry)
 
 
 # CLI regressions: exercise main() so artifact and settings bugs cannot be
@@ -838,7 +1144,7 @@ def cli_run(monkeypatch, tmp_path):
     attacks = [attack(aid) for aid in ("a1", "a2", "a3")]
     state = {"posts": 0, "health": 0, "dead_after": None, "interrupt_after": None,
              "manifest_writes": 0, "manifest_path": None, "settings": None}
-    monkeypatch.setattr(runner_module, "load_baseline", lambda: baselines)
+    monkeypatch.setattr(runner_module, "load_baseline", lambda path=None: baselines)
     monkeypatch.setattr(runner_module, "build_suite_once", lambda *args: attacks)
 
     def manifest(path):
@@ -926,7 +1232,7 @@ def test_cli_metadata_records_effective_settings(cli_run):
 ])
 def test_cli_rejects_invalid_settings_before_build_or_network(cli_run, monkeypatch, flags):
     invoke, _, state, _ = cli_run
-    def unexpected_load():
+    def unexpected_load(path=None):
         pytest.fail("invalid arguments must be rejected before loading/building the suite")
     monkeypatch.setattr(runner_module, "load_baseline", unexpected_load)
     with pytest.raises(SystemExit) as exited:

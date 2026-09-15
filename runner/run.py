@@ -45,7 +45,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from attacks import library  # noqa: E402
 from baseline.load import load_baseline  # noqa: E402
-from contract import AttackCase, BaselineCase, RunResult  # noqa: E402
+from contract import AttackCase, BaselineCase, ContractError, RunResult  # noqa: E402
+from endpoint.targets import TargetConfigError, load_registry  # noqa: E402
+
+# Model-free: endpoint.targets never imports transformers/torch, so this import is
+# free even for --help and offline tests. Loaded once, lazily, the first time a CLI
+# invocation actually needs it -- see resolve_target() and _find_evaluation_for().
+_REGISTRY = None
+
+
+def _registry():
+    global _REGISTRY
+    if _REGISTRY is None:
+        _REGISTRY = load_registry()
+    return _REGISTRY
+
+
+CASE_SETS_DIR = Path(__file__).resolve().parent.parent / "analysis" / "case_sets"
 
 DEFAULT_OUT = "results"
 MANIFEST_NAME = "manifest.json"        # pinned by Ahsan. Lamei's integration
@@ -60,10 +76,13 @@ BAND_SLOW = "slow"
 BAND_TIMEOUT = "timeout"
 
 # Structured prefixes on RunResult.error, so the analysis can separate the
-# three failure kinds without guessing from free text.
+# failure kinds without guessing from free text.
 ERR_CONNECTION = "connection_error"
 ERR_TIMEOUT = "timeout"
 ERR_TRANSPORT = "transport_error"
+# Building the request itself failed, before any bytes existed to hash -- distinct
+# from a transport failure, which happens AFTER a real prepared body exists.
+ERR_SERIALIZATION = "serialization_error"
 
 TERM_COMPLETED = "completed"
 TERM_LIMIT = "stopped_on_limit"
@@ -76,6 +95,98 @@ TERM_INTERRUPTED = "interrupted"
 # manifest would record them as exact, which is silently wrong.
 MIN_PLAUSIBLE_MAX_TOKENS = 16
 MAX_PLAUSIBLE_MAX_TOKENS = 100_000
+
+# Legacy --version -> registry target_id, the "explicit emotion default" that keeps
+# every old `--target URL --version v1|v2` invocation working unchanged.
+LEGACY_VERSION_TARGET_ID = {"v1": "emotion_v1", "v2": "emotion_v2"}
+
+
+# --------------------------------------------------------------------------
+# target/suite resolution (Stage 3: target-aware runs)
+# --------------------------------------------------------------------------
+
+
+class RunnerConfigError(ValueError):
+    """Raised for a target/suite/case-set configuration the CLI must reject."""
+
+
+def resolve_target(
+    target: str | None,
+    version: str | None,
+    target_id: str | None,
+    registry,
+) -> tuple[str, str, str]:
+    """Resolve (target_url, version, target_id) from the CLI flags actually given.
+
+    Two, and only two, supported shapes:
+
+      * legacy:     --target URL --version v1|v2, no --target-id.
+                    target_id is derived as the "explicit emotion default"
+                    (emotion_v1 / emotion_v2) -- never inferred from the URL.
+      * target-aware: --target-id TARGET_ID, no --target and no --version.
+                    The URL is derived from the registry's own loopback port --
+                    never taken from the CLI. This is the only way an
+                    arbitrary/public target could sneak in, so it is refused
+                    entirely: a target-aware run only ever talks to a trusted
+                    registry target on 127.0.0.1.
+
+    Mixing the two (e.g. --target-id together with --target or --version) is a
+    configuration error, not a "which one wins" situation.
+    """
+    if target_id is not None:
+        if target is not None or version is not None:
+            raise RunnerConfigError(
+                "--target-id cannot be combined with --target or --version; "
+                "--target-id derives both from the trusted registry."
+            )
+        spec = registry.target(target_id)
+        resolved_url = f"http://127.0.0.1:{spec.port}"
+        return resolved_url, spec.version, target_id
+
+    if target is None or version is None:
+        raise RunnerConfigError(
+            "either pass --target-id, or pass both --target and --version."
+        )
+    return target, version, LEGACY_VERSION_TARGET_ID[version]
+
+
+def _find_evaluation_for(registry, target_id: str, suite_id: str):
+    """The one EvaluationSpec that runs `suite_id` against `target_id`.
+
+    Used only to resolve the baseline file this run must use -- never to change
+    which suite is executed or to introduce a third suite name. A bounded CI
+    selection is still `suite_id == "core"`; there is no separate "ci" suite here.
+    """
+    task_id = registry.target(target_id).task_id
+    matches = [
+        spec
+        for spec in registry.evaluations.values()
+        if spec.task_id == task_id
+        and spec.suite_id == suite_id
+        and target_id in spec.target_ids
+    ]
+    if not matches:
+        raise RunnerConfigError(
+            f"no evaluation is configured for target {target_id!r} suite {suite_id!r}"
+        )
+    if len(matches) > 1:
+        raise RunnerConfigError(
+            f"ambiguous evaluation configuration for target {target_id!r} suite "
+            f"{suite_id!r}: {[m.evaluation_id for m in matches]}"
+        )
+    return matches[0]
+
+
+def resolve_baseline_path(registry, target_id: str, suite_id: str) -> Path:
+    """The baseline file this (target, suite) run must load, per the registry.
+
+    Core uses the task's default baseline file. OCES uses the evaluation-level
+    override (a frozen seed file), never the task's core baseline -- resolving
+    this correctly is what lets the recorded baseline hash mean something.
+    """
+    evaluation = _find_evaluation_for(registry, target_id, suite_id)
+    relative = registry.baseline_file_for(evaluation.evaluation_id)
+    return (Path(__file__).resolve().parent.parent / relative)
 
 
 # --------------------------------------------------------------------------
@@ -180,24 +291,40 @@ def sha256_file(path: Path) -> str:
 # --------------------------------------------------------------------------
 
 
-def build_token_counter() -> tuple[Callable[[str], int], int]:
-    """The real tokenizer, so boundary cases land on the true token limit.
+def build_token_counter(target_id: str = "emotion_v2") -> tuple[Callable[[str], int], int]:
+    """The real tokenizer for `target_id`, so boundary cases land on the true token limit.
 
-    Imported inside the function rather than at module scope: endpoint.model
-    loads the whole model at import time, and the tests must not pay for that.
+    Imported inside the function rather than at module scope: loading a tokenizer
+    (and, for the legacy emotion path, a whole model) is not free, and callers that
+    only need --help or offline tests must not pay for it.
+
+    Emotion targets keep using the existing, unchanged `endpoint.model` import --
+    zero behavior change to a path this task must leave untouched. Every other
+    target (sentiment_v1, and any future registry target) loads its tokenizer
+    through the registry via `endpoint.loader.load_tokenizer_for_target`, which
+    loads ONLY the tokenizer, never the full model -- counting tokens for a
+    sentiment run must not accidentally load sentiment weights here, any more than
+    it may accidentally load the emotion model's.
 
     truncation=False is required. Silent truncation would neutralise two whole
     attack categories, and this is the only place outside the endpoint folder
     that calls the tokenizer directly.
     """
-    from endpoint.model import MAX_SEQUENCE_LENGTH, tokenizer
+    if target_id in LEGACY_VERSION_TARGET_ID.values():
+        from endpoint.model import MAX_SEQUENCE_LENGTH, tokenizer
 
-    max_tokens = int(MAX_SEQUENCE_LENGTH)
+        max_tokens = int(MAX_SEQUENCE_LENGTH)
+    else:
+        from endpoint.loader import load_tokenizer_for_target
+
+        tokenizer, max_tokens = load_tokenizer_for_target(target_id)
+        max_tokens = int(max_tokens)
+
     if not MIN_PLAUSIBLE_MAX_TOKENS <= max_tokens <= MAX_PLAUSIBLE_MAX_TOKENS:
         raise RuntimeError(
-            f"endpoint.model.MAX_SEQUENCE_LENGTH is {max_tokens}, which is not a "
-            "plausible token limit. Hugging Face reports a huge sentinel when a "
-            "tokenizer config omits model_max_length. Boundary cases built around "
+            f"target {target_id!r}'s max_sequence_length is {max_tokens}, which is "
+            "not a plausible token limit. Hugging Face reports a huge sentinel when "
+            "a tokenizer config omits model_max_length. Boundary cases built around "
             "that would be meaningless and the manifest would record them as exact."
         )
 
@@ -232,6 +359,133 @@ def partition_attacks(
     standalone = [case for case in attacks if case.baseline_id is None]
     derived = [case for case in attacks if case.baseline_id is not None]
     return standalone, derived
+
+
+# --------------------------------------------------------------------------
+# frozen case sets (e.g. CI's ci_core_v1)
+# --------------------------------------------------------------------------
+
+
+def load_case_set(case_set_id: str, directory: Path = CASE_SETS_DIR) -> dict:
+    """Read a frozen selection like analysis/case_sets/ci_core_v1.json.
+
+    Only reads and returns the raw dict -- ownership of the file's content is
+    Khalid's (analysis/case_sets/**); this module only ever consumes it.
+    """
+    path = directory / f"{case_set_id}.json"
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        raise RunnerConfigError(f"case set {case_set_id!r} not found at {path}") from None
+    except json.JSONDecodeError as exc:
+        raise RunnerConfigError(f"case set {case_set_id!r} at {path} is not valid JSON: {exc}") from None
+    if raw.get("case_set_id") != case_set_id:
+        raise RunnerConfigError(
+            f"case set file {path} declares case_set_id "
+            f"{raw.get('case_set_id')!r}, expected {case_set_id!r}"
+        )
+    return raw
+
+
+def _reject_bad_id_list(ids: object, where: str, allow_empty: bool = False) -> list[str]:
+    if not isinstance(ids, list) or not all(isinstance(x, str) for x in ids):
+        raise RunnerConfigError(f"case set {where} must be a list of strings")
+    if not ids and not allow_empty:
+        raise RunnerConfigError(f"case set {where} must not be empty")
+    seen: set[str] = set()
+    duplicates: list[str] = []
+    for value in ids:
+        if value in seen:
+            duplicates.append(value)
+        seen.add(value)
+    if duplicates:
+        raise RunnerConfigError(f"case set {where} has duplicate ids: {sorted(set(duplicates))}")
+    return ids
+
+
+def apply_case_set(
+    case_set: dict,
+    suite_id: str,
+    baselines: Sequence[BaselineCase],
+    attacks: Sequence[AttackCase],
+) -> tuple[list[BaselineCase], list[AttackCase], list[str]]:
+    """Restrict the built suite to exactly a frozen selection, in its exact order.
+
+    Reject unknown, duplicate, empty, incomplete or conflicting selections outright
+    rather than silently dropping anything -- a case set naming an id the built suite
+    doesn't have is a configuration bug (stale freeze, wrong baseline file, wrong
+    suite), not something to skip quietly.
+
+    Returns (selected_baselines, selected_attacks, excluded_keys). excluded_keys
+    covers every planned case NOT in the selection, in planned order -- this is what
+    main() folds into limit_excluded-style bookkeeping for a bounded run.
+    """
+    declared_suite = case_set.get("suite_id")
+    if declared_suite != suite_id:
+        raise RunnerConfigError(
+            f"case set {case_set.get('case_set_id')!r} is for suite "
+            f"{declared_suite!r}, not the requested suite {suite_id!r}"
+        )
+
+    baseline_ids = _reject_bad_id_list(case_set.get("baseline_ids"), "baseline_ids")
+    standalone_ids = _reject_bad_id_list(
+        case_set.get("standalone_attack_ids"), "standalone_attack_ids", allow_empty=True
+    )
+    derived_ids = _reject_bad_id_list(
+        case_set.get("derived_attack_ids"), "derived_attack_ids", allow_empty=True
+    )
+    if not standalone_ids and not derived_ids:
+        raise RunnerConfigError(
+            "case set selects no attacks at all (standalone_attack_ids and "
+            "derived_attack_ids are both empty)"
+        )
+
+    attack_ids = standalone_ids + derived_ids
+    overlap = set(standalone_ids) & set(derived_ids)
+    if overlap:
+        raise RunnerConfigError(
+            f"case set lists {sorted(overlap)} in both standalone_attack_ids and "
+            "derived_attack_ids"
+        )
+
+    baseline_by_id = {b.baseline_id: b for b in baselines}
+    attack_by_id = {a.attack_id: a for a in attacks}
+
+    missing_baselines = [bid for bid in baseline_ids if bid not in baseline_by_id]
+    if missing_baselines:
+        raise RunnerConfigError(
+            f"case set references baseline ids not present in the built suite: "
+            f"{missing_baselines}"
+        )
+    missing_attacks = [aid for aid in attack_ids if aid not in attack_by_id]
+    if missing_attacks:
+        raise RunnerConfigError(
+            f"case set references attack ids not present in the built suite: "
+            f"{missing_attacks}"
+        )
+
+    selected_baselines = [baseline_by_id[bid] for bid in baseline_ids]
+    selected_attacks = [attack_by_id[aid] for aid in attack_ids]
+
+    selected_baseline_id_set = set(baseline_ids)
+    orphaned = [
+        case.attack_id
+        for case in selected_attacks
+        if case.baseline_id is not None and case.baseline_id not in selected_baseline_id_set
+    ]
+    if orphaned:
+        raise RunnerConfigError(
+            f"case set selects derived attacks whose baseline is not itself "
+            f"selected: {orphaned}"
+        )
+
+    selected_attack_id_set = set(attack_ids)
+    excluded_keys = [
+        baseline_key(b.baseline_id) for b in baselines if b.baseline_id not in selected_baseline_id_set
+    ] + [
+        attack_key(a.attack_id) for a in attacks if a.attack_id not in selected_attack_id_set
+    ]
+    return selected_baselines, selected_attacks, excluded_keys
 
 
 # --------------------------------------------------------------------------
@@ -349,6 +603,8 @@ class Runner:
         clock: Callable[[], float] = time.perf_counter,
         skip: Sequence[str] = (),
         on_record: Callable[[RunResult], None] | None = None,
+        target_id: str = "",
+        suite_id: str = "",
     ) -> None:
         if timeout != REQUEST_TIMEOUT:
             raise ValueError(f"request timeout must be {REQUEST_TIMEOUT} seconds")
@@ -356,6 +612,13 @@ class Runner:
             raise ValueError("health timeout must be finite and greater than zero")
         self.base = target.rstrip("/")
         self.version = version
+        # New Stage 3 identity, stamped on every row. Blank stays supported (an
+        # existing direct `Runner(...)` construction, e.g. in older tests, still
+        # works and produces historical-style blank fields) -- a real CLI run
+        # always sets both explicitly. See RunResult.target_id/suite_id in
+        # contract.py: blank means historical, never an inferred emotion default.
+        self.target_id = target_id
+        self.suite_id = suite_id
         self.writer = writer
         self.predict_url = self.base + predict_path
         self.health_url = self.base + health_path
@@ -414,7 +677,46 @@ class Runner:
         async with asyncio.timeout(timeout):
             return await self.client.request(method, url, timeout=timeout, **kwargs)
 
+    async def _send_prepared(self, request: httpx.Request, timeout: float) -> httpx.Response:
+        """Send an already-built request. Same outer-deadline reasoning as _request.
+
+        HTTPX's per-request timeout lives on the request itself (set at build time,
+        via extensions), not as a `send()` keyword -- `AsyncClient.send()` takes no
+        `timeout` argument. `asyncio.timeout` is still the real outer deadline here;
+        this just has to match HTTPX's own expectations for where timeout is set.
+        """
+        async with asyncio.timeout(timeout):
+            return await self.client.send(request)
+
     # -- sending ------------------------------------------------------------
+
+    def _build_request(self, case: AttackCase | None, text: str | None) -> httpx.Request:
+        """Build the exact request HTTPX will send, without sending it.
+
+        For a raw case, the body is used verbatim -- these bytes may be
+        deliberately invalid UTF-8, and the headers are part of the test. Using
+        json= here, or adding a header, would repair the very thing being tested.
+        For an ordinary case, HTTPX's own json= serialization produces the body;
+        this is intentionally not hand-rolled with json.dumps, so the bytes we
+        hash are the exact bytes HTTPX itself would put on the wire.
+
+        No network I/O happens here -- building a request is synchronous and
+        local. A failure in this method means serialization itself failed,
+        before any prepared body existed to capture.
+        """
+        if case is not None and case.is_raw:
+            body = case.raw_body
+            if isinstance(body, str):
+                body = body.encode("utf-8")
+            elif body is None:
+                body = b""
+            return self.client.build_request(
+                "POST", self.predict_url, content=body, headers=dict(case.raw_headers or {}),
+                timeout=self.timeout,
+            )
+        return self.client.build_request(
+            "POST", self.predict_url, json={"text": text}, timeout=self.timeout
+        )
 
     def send(self, case: AttackCase | None, text: str | None) -> dict:
         """One request. No retry: a connection failure is recorded as one.
@@ -423,27 +725,36 @@ class Runner:
         is one of the three outcomes the analysis counts separately, and a
         retry would hide it. The health ping does retry once, for a reason
         specific to the ping -- see health_ok.
+
+        Body evidence (request_body_bytes / request_body_sha256) is captured
+        from the ACTUAL prepared request -- never recomputed independently, and
+        never substituted with a character count. It is present in every
+        returned outcome that reaches the try block below, including ones where
+        the transport subsequently fails: a request that got no response still
+        has a known attempted body. Only a serialization failure (caught before
+        the try block) leaves both fields None, because no bytes ever existed.
         """
         started = self.clock()
         try:
-            if case is not None and case.is_raw:
-                body = case.raw_body
-                if isinstance(body, str):
-                    body = body.encode("utf-8")
-                elif body is None:
-                    body = b""
-                # Verbatim. These bytes may be deliberately invalid UTF-8, and
-                # the headers are part of the test. Using json= here, or adding
-                # a header, would repair the very thing being tested.
-                response = self._async_runner.run(self._request(
-                    "POST", self.predict_url, self.timeout,
-                    content=body,
-                    headers=dict(case.raw_headers or {}),
-                ))
-            else:
-                response = self._async_runner.run(self._request(
-                    "POST", self.predict_url, self.timeout, json={"text": text}
-                ))
+            request = self._build_request(case, text)
+        except Exception as exc:                      # noqa: BLE001
+            latency_ms = (self.clock() - started) * 1000.0
+            return {
+                "status_code": None,
+                "response_body": "",
+                "error": f"{ERR_SERIALIZATION}: {type(exc).__name__}: {exc}",
+                "latency_ms": round(latency_ms, 2),
+                "latency_band": band_latency(latency_ms, timed_out=False),
+                "request_body_bytes": None,
+                "request_body_sha256": None,
+            }
+
+        prepared_body = request.content
+        request_body_bytes = len(prepared_body)
+        request_body_sha256 = hashlib.sha256(prepared_body).hexdigest()
+
+        try:
+            response = self._async_runner.run(self._send_prepared(request, self.timeout))
 
             latency_ms = (self.clock() - started) * 1000.0
             if response.status_code >= 500:
@@ -454,6 +765,8 @@ class Runner:
                 "error": None,
                 "latency_ms": round(latency_ms, 2),
                 "latency_band": band_latency(latency_ms, timed_out=False),
+                "request_body_bytes": request_body_bytes,
+                "request_body_sha256": request_body_sha256,
             }
 
         except (TimeoutError, httpx.TimeoutException) as exc:
@@ -465,6 +778,8 @@ class Runner:
                 "error": f"{ERR_TIMEOUT}: no response within {self.timeout}s ({type(exc).__name__})",
                 "latency_ms": round(latency_ms, 2),
                 "latency_band": BAND_TIMEOUT,
+                "request_body_bytes": request_body_bytes,
+                "request_body_sha256": request_body_sha256,
             }
 
         except httpx.TransportError as exc:
@@ -476,6 +791,8 @@ class Runner:
                 "error": f"{ERR_CONNECTION}: {type(exc).__name__}: {exc}",
                 "latency_ms": round(latency_ms, 2),
                 "latency_band": band_latency(latency_ms, timed_out=False),
+                "request_body_bytes": request_body_bytes,
+                "request_body_sha256": request_body_sha256,
             }
 
         except httpx.HTTPError as exc:
@@ -486,6 +803,8 @@ class Runner:
                 "error": f"{ERR_TRANSPORT}: {type(exc).__name__}: {exc}",
                 "latency_ms": round(latency_ms, 2),
                 "latency_band": band_latency(latency_ms, timed_out=False),
+                "request_body_bytes": request_body_bytes,
+                "request_body_sha256": request_body_sha256,
             }
 
     def health_ok(self) -> bool:
@@ -554,6 +873,10 @@ class Runner:
             latency_ms=outcome["latency_ms"],
             latency_band=outcome["latency_band"],
             endpoint_alive_after=alive,
+            target_id=self.target_id,
+            suite_id=self.suite_id,
+            request_body_bytes=outcome.get("request_body_bytes"),
+            request_body_sha256=outcome.get("request_body_sha256"),
         )
         if self.writer is None:
             raise RuntimeError("a result writer is required before sending cases")
@@ -655,6 +978,11 @@ def build_meta(
     suite_sizes: dict,
     request_timeout: float = REQUEST_TIMEOUT,
     health_timeout: float = HEALTH_TIMEOUT,
+    target_id: str = "",
+    suite_id: str = "",
+    case_set_id: str | None = None,
+    baseline_file: str = "",
+    baseline_file_sha256: str | None = None,
 ) -> dict:
     """The meta file.
 
@@ -674,6 +1002,9 @@ def build_meta(
     return {
         "run_id": run_id,
         "version": version,
+        "target_id": target_id,
+        "suite_id": suite_id,
+        "case_set_id": case_set_id,
         "target": target,
         "started_at": started_at,
         "ended_at": ended_at,
@@ -684,6 +1015,8 @@ def build_meta(
             "planned_suite_sha256": planned_fingerprint,
             "manifest_sha256": manifest_sha256,
             "manifest_path": manifest_path,
+            "baseline_file": baseline_file,
+            "baseline_file_sha256": baseline_file_sha256,
         },
         "suite": suite_sizes,
         "coverage": {
@@ -744,8 +1077,32 @@ def build_parser() -> argparse.ArgumentParser:
     # No default target and no default version: the same runner has to work
     # against a deployed endpoint later with no code change, and a deployed
     # endpoint has no port that tells us which version it is.
-    parser.add_argument("--target", required=True, help="base URL of the endpoint")
-    parser.add_argument("--version", required=True, choices=("v1", "v2"))
+    #
+    # --target/--version stay optional at the argparse level (not required=True
+    # any more) because they are now one of two valid shapes, the other being
+    # --target-id alone -- see resolve_target(). Which shape was actually given
+    # is validated after parsing, in main(), so the error message can name the
+    # real problem (missing one of a pair, or a conflicting combination)
+    # instead of argparse's generic "required" message.
+    parser.add_argument("--target", default=None, help="base URL of the endpoint (legacy mode)")
+    parser.add_argument("--version", default=None, choices=("v1", "v2"), help="(legacy mode)")
+    parser.add_argument(
+        "--target-id",
+        default=None,
+        choices=sorted(_registry().targets),
+        help="a trusted registry target; derives --target and --version. "
+        "Cannot be combined with --target or --version.",
+    )
+    parser.add_argument(
+        "--suite", choices=("core", "oces"), default="core",
+        help="which suite to run (default core). oces is not runnable until its "
+        "case/rule freeze lands.",
+    )
+    parser.add_argument(
+        "--case-set", default=None, metavar="CASE_SET_ID",
+        help="restrict the run to a frozen selection from analysis/case_sets/. "
+        "Cannot be combined with --limit.",
+    )
     parser.add_argument(
         "--out",
         default=DEFAULT_OUT,
@@ -771,27 +1128,62 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    registry = _registry()
+
+    # --- resolve which target/version/suite this invocation actually means,
+    # and reject any invalid or conflicting combination -- all before any file
+    # or network access, same as the existing type-level CLI validation above.
+    try:
+        target, version, target_id = resolve_target(args.target, args.version, args.target_id, registry)
+    except (RunnerConfigError, ContractError) as exc:
+        parser.error(str(exc))
+
+    if args.suite == "oces":
+        parser.error(
+            "--suite oces is not runnable yet: OCES case/rule generation has not "
+            "landed. See docs/stage3/tasks/task_2_rayyan.md."
+        )
+    if args.case_set is not None and args.limit is not None:
+        parser.error("--case-set cannot be combined with --limit; the case set is the selection.")
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
-    results_path = out_dir / f"results_{args.version}.jsonl"
-    meta_path = out_dir / f"run_meta_{args.version}.json"
+    results_path = out_dir / f"results_{version}.jsonl"
+    meta_path = out_dir / f"run_meta_{version}.json"
     manifest_path = out_dir / MANIFEST_NAME
 
     run_id = uuid.uuid4().hex[:12]
     started_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
-    # File order from the loader, then sorted by id. Sorting means the
-    # fingerprint changes only when the content changes, not when
-    # baseline.json happens to be written in a different order.
-    baselines = sorted(load_baseline(), key=lambda b: b.baseline_id)
+    # Baseline file resolved through the registry for every target, including the
+    # legacy emotion ones -- it resolves to the exact same file they always used,
+    # so this is not a behavior change, just a single code path for both.
+    try:
+        baseline_path = resolve_baseline_path(registry, target_id, args.suite)
+    except (RunnerConfigError, ContractError) as exc:
+        parser.error(str(exc))
+    try:
+        # File order from the loader, then sorted by id. Sorting means the
+        # fingerprint changes only when the content changes, not when the
+        # baseline file happens to be written in a different order.
+        baselines = sorted(load_baseline(baseline_path), key=lambda b: b.baseline_id)
+    except FileNotFoundError:
+        print(
+            f"cannot run target {target_id!r} suite {args.suite!r}: baseline file "
+            f"not found at {baseline_path}. This evaluation's baseline has not been "
+            "produced yet.",
+            file=sys.stderr,
+        )
+        return 2
+    baseline_file_sha256 = sha256_file(baseline_path)
 
     if args.no_tokenizer:
         token_counter, max_tokens = None, None
         print("WARNING: approximate length boundaries, for testing only")
     else:
-        token_counter, max_tokens = build_token_counter()
+        token_counter, max_tokens = build_token_counter(target_id)
 
     attacks = build_suite_once(baselines, token_counter, max_tokens)
 
@@ -801,12 +1193,24 @@ def main(argv: Sequence[str] | None = None) -> int:
     planned_keys = [baseline_key(b.baseline_id) for b in baselines] + [
         attack_key(a.attack_id) for a in attacks
     ]
-    kept_attacks, limit_excluded = select_attacks(attacks, args.limit)
+
+    if args.case_set is not None:
+        case_set = load_case_set(args.case_set)
+        try:
+            run_baselines, kept_attacks, limit_excluded = apply_case_set(
+                case_set, args.suite, baselines, attacks
+            )
+        except RunnerConfigError as exc:
+            parser.error(str(exc))
+    else:
+        run_baselines = baselines
+        kept_attacks, limit_excluded = select_attacks(attacks, args.limit)
+
     skip_set = set(args.skip)
-    # Limit takes precedence: an attack outside the limited prefix is only
+    # Limit/case-set takes precedence: a case outside the selected set is only
     # limit-excluded, even when its ID also appears in --skip.
     skipped_keys = [attack_key(a.attack_id) for a in kept_attacks if a.attack_id in skip_set]
-    selected_keys = [baseline_key(b.baseline_id) for b in baselines] + [
+    selected_keys = [baseline_key(b.baseline_id) for b in run_baselines] + [
         attack_key(a.attack_id) for a in kept_attacks if a.attack_id not in skip_set
     ]
 
@@ -820,8 +1224,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         "max_tokens": max_tokens,
     }
 
-    print(f"run       {run_id}  ({args.version})")
-    print(f"target    {args.target}")
+    print(f"run       {run_id}  ({version})  target_id={target_id}  suite={args.suite}"
+          + (f"  case_set={args.case_set}" if args.case_set else ""))
+    print(f"target    {target}")
     print(f"suite     {suite_sizes['baselines']} baselines + {suite_sizes['attacks']} attacks "
           f"= {suite_sizes['total_cases']} planned")
     print(f"sending   {len(selected_keys)} cases"
@@ -842,8 +1247,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     writer = None
     manifest_sha = None
     runner = Runner(
-        target=args.target,
-        version=args.version,
+        target=target,
+        version=version,
         writer=writer,
         predict_path=args.predict_path,
         health_path=args.health_path,
@@ -851,6 +1256,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         health_timeout=args.health_timeout,
         skip=args.skip,
         on_record=progress,
+        target_id=target_id,
+        suite_id=args.suite,
     )
     runner.skipped = skipped_keys
 
@@ -864,7 +1271,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             library.write_manifest(str(staged_manifest))
             manifest_sha = sha256_file(staged_manifest)
             if not runner.preflight():
-                print(f"the endpoint at {args.target} is not answering {args.health_path}.")
+                print(f"the endpoint at {target} is not answering {args.health_path}.")
                 print("No cases were sent; previous run artifacts were preserved.")
                 print("Start it, or check --target and --health-path.")
                 return 2
@@ -874,7 +1281,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         runner.writer = writer
         print(f"manifest  {manifest_path}  sha256 {manifest_sha[:16]}")
         try:
-            runner.run(baselines, kept_attacks)
+            runner.run(run_baselines, kept_attacks)
             termination = TERM_LIMIT if args.limit is not None else TERM_COMPLETED
         except EndpointDied as died:
             termination = TERM_HEALTH
@@ -913,7 +1320,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 writer.close()
                 meta = build_meta(
                     run_id=run_id,
-                    version=args.version,
+                    version=version,
                     started_at=started_at,
                     ended_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
                     is_smoke=args.limit is not None,
@@ -921,7 +1328,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     planned_fingerprint=planned_fingerprint,
                     manifest_sha256=manifest_sha,
                     manifest_path=str(manifest_path),
-                    target=args.target,
+                    target=target,
                     planned=planned_keys,
                     selected=selected_keys,
                     completed=runner.completed,
@@ -932,6 +1339,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                     suite_sizes=suite_sizes,
                     request_timeout=runner.timeout,
                     health_timeout=runner.health_timeout,
+                    target_id=target_id,
+                    suite_id=args.suite,
+                    case_set_id=args.case_set,
+                    baseline_file=str(baseline_path),
+                    baseline_file_sha256=baseline_file_sha256,
                 )
                 write_meta(meta_path, meta)
                 coverage = meta["coverage"]

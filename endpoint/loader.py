@@ -108,6 +108,27 @@ def _resolve_usable_max_length(model_spec: ModelSpec, tokenizer) -> int:
     return reported
 
 
+def load_tokenizer_for_target(target_id: str, registry: Optional[Registry] = None):
+    """Load ONLY the tokenizer for `target_id` -- no model weights.
+
+    For callers (the runner's token counting) that need to know how many tokens a
+    piece of text is, not run inference. Loading the full model just to count tokens
+    would be wasteful and, worse, is exactly the kind of accidental extra load this
+    task's fixtures warn about ("token counting must not accidentally ... load its
+    weights"). Runs the same identity check as :func:`load_target_model` on the
+    tokenizer side, so a mismatched max_sequence_length is still caught here.
+
+    Returns (tokenizer, max_sequence_length).
+    """
+    registry = registry if registry is not None else load_registry()
+    model_spec = registry.model_for(target_id)
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_spec.tokenizer_id, revision=model_spec.tokenizer_revision
+    )
+    max_sequence_length = _resolve_usable_max_length(model_spec, tokenizer)
+    return tokenizer, max_sequence_length
+
+
 def load_target_model(target_id: str, registry: Optional[Registry] = None) -> LoadedTarget:
     """Load the real model/tokenizer for `target_id` and validate its identity.
 

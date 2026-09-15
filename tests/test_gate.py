@@ -16,6 +16,7 @@ evidence comes from a real integrated run and is reported separately.
 from __future__ import annotations
 
 import json
+import hashlib
 import subprocess
 import sys
 import types
@@ -95,6 +96,13 @@ def write_run(tmp_path: Path, *, rows: list[dict] | None = None,
     (target_dir / "results.jsonl").write_text(
         "".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8"
     )
+    meta_path = target_dir / "run_meta.json"
+    meta_doc = json.loads(meta_path.read_text(encoding="utf-8"))
+    meta_doc.setdefault("suite_id", "core")
+    meta_doc.setdefault("version", "v2")
+    meta_doc.setdefault("fingerprints", {})["results_sha256"] = hashlib.sha256(
+        (target_dir / "results.jsonl").read_bytes()).hexdigest()
+    meta_path.write_text(json.dumps(meta_doc), encoding="utf-8")
     return target_dir
 
 
@@ -130,6 +138,12 @@ def install_doubles(monkeypatch, tmp_path, *, outcome=None, policy_error=None,
             ],
         }
 
+    report_dir = tmp_path / "report"
+    report_dir.mkdir(exist_ok=True)
+    (report_dir / "analysis.json").write_text(
+        json.dumps(analysis if analysis is not None else {"schema_version": 3}), encoding="utf-8"
+    )
+    (report_dir / "report.html").write_text("synthetic report", encoding="utf-8")
     fake_run_all = types.ModuleType("run_all")
     fake_run_all.run_experiment = experiment or default_experiment
     monkeypatch.setitem(sys.modules, "run_all", fake_run_all)
@@ -242,7 +256,7 @@ def test_the_gate_supplies_the_artifact_paths_the_policy_cannot_know(monkeypatch
     # The measured path, not the one the policy document happened to carry: the
     # fixture's authored "results/ci/emotion_v2/results.jsonl" must not survive
     # into a result that claims to name where this run actually wrote.
-    assert artifacts["raw_results"]["emotion_v2"].endswith("emotion_v2/results.jsonl")
+    assert Path(artifacts["raw_results"]["emotion_v2"]).parts[-2:] == ("emotion_v2", "results.jsonl")
     assert str(tmp_path) in artifacts["raw_results"]["emotion_v2"]
     # An absent optional PDF is null, never a path that was not produced.
     assert artifacts["report_pdf"] is None
@@ -492,3 +506,41 @@ def test_a_policy_that_cannot_even_be_read_names_no_policy_identity(monkeypatch,
     _, document = invoke(tmp_path, policy=tmp_path / "absent.json")
     assert document["policy_id"] == ""
     assert document["policy_sha256"] == ""
+
+
+@pytest.mark.parametrize("corruption", ["mixed_target", "duplicate", "hash", "analysis_missing", "analysis_changed"])
+def test_untrustworthy_artifacts_cannot_reach_a_passing_policy(monkeypatch, tmp_path, corruption):
+    calls = install_doubles(monkeypatch, tmp_path, outcome=outcome_from_fixture("gate_pass"))
+    path = tmp_path / "run/emotion_v2/results.jsonl"
+    rows = path.read_text(encoding="utf-8")
+    row = json.loads(rows)
+    if corruption == "mixed_target":
+        row["target_id"] = "sentiment_v1"
+        path.write_text(json.dumps(row), encoding="utf-8")
+    elif corruption == "duplicate":
+        path.write_text(rows + rows, encoding="utf-8")
+    elif corruption == "hash":
+        path.write_text(rows + "\n", encoding="utf-8")
+    elif corruption == "analysis_missing":
+        (tmp_path / "report/analysis.json").unlink()
+    else:
+        (tmp_path / "report/analysis.json").write_text('{"changed": true}', encoding="utf-8")
+    code, document = invoke(tmp_path)
+    assert code == 2
+    assert "policy" not in calls
+    assert document["policy_sha256"] == hashlib.sha256((tmp_path / "policy.json").read_bytes()).hexdigest()
+
+
+def test_policy_gets_the_measured_file_hash(monkeypatch, tmp_path):
+    calls = install_doubles(monkeypatch, tmp_path, outcome=outcome_from_fixture("gate_pass"))
+    code, document = invoke(tmp_path)
+    assert code == 0
+    actual = hashlib.sha256((tmp_path / "policy.json").read_bytes()).hexdigest()
+    assert calls["policy"]["policy"]["policy_sha256"] == actual
+    assert document["policy_sha256"] == actual
+
+
+def test_gate_rejects_a_non_ci_evaluation_before_execution(monkeypatch, tmp_path):
+    calls = install_doubles(monkeypatch, tmp_path, outcome=outcome_from_fixture("gate_pass"))
+    assert invoke(tmp_path, "--evaluation", "sentiment.core")[0] == 2
+    assert "experiment" not in calls

@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import hashlib
 import json
 import sys
 import traceback
@@ -276,6 +277,12 @@ def collect_evidence(result: dict, evaluation_id: str) -> dict:
             )
         )
 
+    if sum(isinstance(item, dict) and item.get("evaluation_id") == evaluation_id
+           for item in evaluations) != 1:
+        raise GateExecutionError(CheckResult(
+            check_id=CHECK_ORCHESTRATION, status=CHECK_ERROR,
+            reason=f"expected exactly one evaluation {evaluation_id!r}",
+        ))
     entry = next(
         (item for item in evaluations
          if isinstance(item, dict) and item.get("evaluation_id") == evaluation_id),
@@ -335,7 +342,29 @@ def collect_evidence(result: dict, evaluation_id: str) -> dict:
                     evidence_refs=[str(meta_path)],
                 )
             ) from exc
-        results_by_target[target_id] = parse_results(results_path)
+        meta = run_metas[target_id]
+        if not isinstance(meta, dict) or meta.get("target_id") != target_id:
+            raise GateExecutionError(CheckResult(
+                check_id=CHECK_EVIDENCE, status=CHECK_ERROR,
+                reason=f"{target_id}: metadata identity is missing or inconsistent",
+            ))
+        rows = parse_results(results_path)
+        identities = {(row.target_id, row.suite_id, row.version) for row in rows}
+        expected_identity = (target_id, meta.get("suite_id"), meta.get("version"))
+        keys = [(row.case_type, row.baseline_id if row.case_type == "baseline" else row.attack_id)
+                for row in rows]
+        if identities - {expected_identity} or len(set(keys)) != len(keys):
+            raise GateExecutionError(CheckResult(
+                check_id=CHECK_EVIDENCE, status=CHECK_ERROR,
+                reason=f"{target_id}: mixed result identities or duplicate case rows",
+            ))
+        recorded_sha = (meta.get("fingerprints") or {}).get("results_sha256")
+        if recorded_sha != hashlib.sha256(results_path.read_bytes()).hexdigest():
+            raise GateExecutionError(CheckResult(
+                check_id=CHECK_EVIDENCE, status=CHECK_ERROR,
+                reason=f"{target_id}: results file hash is missing or does not match metadata",
+            ))
+        results_by_target[target_id] = rows
         raw_paths[target_id] = str(results_path)
 
     analysis = result.get("analysis")
@@ -352,12 +381,34 @@ def collect_evidence(result: dict, evaluation_id: str) -> dict:
         )
 
     report_dir = result.get("report_dir")
+    analysis_path = result.get("analysis_json") or (
+        Path(report_dir) / "analysis.json" if report_dir else None
+    )
+    if analysis_path is None or not Path(analysis_path).is_file():
+        raise GateExecutionError(CheckResult(
+            check_id=CHECK_EVIDENCE, status=CHECK_ERROR,
+            reason="the analysis artifact is missing",
+        ))
+    try:
+        saved_analysis = json.loads(Path(analysis_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise GateExecutionError(CheckResult(
+            check_id=CHECK_EVIDENCE, status=CHECK_ERROR,
+            reason=f"cannot read analysis artifact: {exc}",
+        )) from exc
+    if saved_analysis != analysis:
+        raise GateExecutionError(CheckResult(
+            check_id=CHECK_EVIDENCE, status=CHECK_ERROR,
+            reason="saved analysis differs from the orchestrator result",
+        ))
+    def existing_file(value):
+        return str(value) if value and Path(value).is_file() else None
     artifacts = {
-        "analysis_json": str(Path(report_dir) / "analysis.json") if report_dir else None,
-        "report_html": str(result.get("report_html")) if result.get("report_html") else None,
+        "analysis_json": str(analysis_path),
+        "report_html": existing_file(result.get("report_html")),
         # None, not a path, when the optional PDF did not render. html_only stays
         # supported; a missing PDF is not missing gate evidence.
-        "report_pdf": str(result["report_pdf"]) if result.get("report_pdf") else None,
+        "report_pdf": existing_file(result.get("report_pdf")),
         "raw_results": raw_paths,
         "run_dir": str(result.get("run_dir", "")) or None,
     }
@@ -378,6 +429,7 @@ def run_gate(args: argparse.Namespace) -> GateOutcome:
     """Execute the evaluation and evaluate the policy against what it produced."""
     policy_path = Path(args.policy)
     policy, policy_sha256 = load_policy(policy_path)
+    policy = {**policy, "policy_sha256": policy_sha256}
     policy_id = str(policy.get("policy_id", ""))
     policy_version = str(policy.get("policy_version", ""))
     suite_id = str(policy.get("suite_id", ""))
@@ -396,6 +448,12 @@ def run_gate(args: argparse.Namespace) -> GateOutcome:
 
     def fail(check: CheckResult) -> GateExecutionError:
         return GateExecutionError(check, identity)
+
+    if args.evaluation != DEFAULT_EVALUATION:
+        raise fail(CheckResult(
+            check_id=CHECK_ORCHESTRATION, status=CHECK_ERROR,
+            reason=f"the internal CI gate requires evaluation {DEFAULT_EVALUATION!r}",
+        ))
 
     # Deferred: importing run_all pulls in the orchestrator, the analysis and the
     # report stack. --help and every offline test must not pay for that, and the
@@ -474,7 +532,11 @@ def run_gate(args: argparse.Namespace) -> GateOutcome:
             )
         ) from exc
 
-    evidence = collect_evidence(result, args.evaluation)
+    try:
+        evidence = collect_evidence(result, args.evaluation)
+    except GateExecutionError as exc:
+        exc.context.update(identity)
+        raise
 
     try:
         outcome = evaluate_policy(
@@ -515,8 +577,7 @@ def run_gate(args: argparse.Namespace) -> GateOutcome:
     merged = dict(outcome.artifacts or {})
     merged.update(evidence["artifacts"])
     outcome.artifacts = merged
-    if not outcome.policy_sha256:
-        outcome.policy_sha256 = policy_sha256
+    outcome.policy_sha256 = policy_sha256
     if not outcome.policy_id:
         outcome.policy_id = policy_id
     if not outcome.policy_version:

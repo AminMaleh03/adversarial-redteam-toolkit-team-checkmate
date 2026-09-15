@@ -937,3 +937,91 @@ class TestFixturePack:
             if p.is_file() and "__pycache__" not in p.parts
         }
         assert before == after
+
+    def test_manifest_files_key_order_is_the_canonical_posix_sort(self):
+        """MANIFEST.json's ``files`` object must be ordered platform-independently.
+
+        Its key order previously came from ``sorted()`` over ``Path`` objects, which
+        compares paths under the host OS's own semantics -- case-insensitive on
+        Windows, case-sensitive on POSIX (see ``sorted_paths`` in build_fixtures.py
+        for the full mechanism and the Rayyan-reported failure it fixes). This does
+        not run the builder; it just pins the *committed* file's key order to the
+        one true canonical ordering, so a regression shows up as a normal diff on
+        whichever OS is used to review it, not only as a fixture-determinism
+        failure on a different OS.
+        """
+        manifest = load_json(FIXTURES / "MANIFEST.json")
+        keys = list(manifest["files"].keys())
+        assert keys == sorted(keys), (
+            "MANIFEST.json's files object is not in canonical (plain Python string) "
+            "sorted order -- it was likely regenerated with a Path-native sort"
+        )
+
+    def test_sorted_paths_helper_is_platform_independent(self, tmp_path):
+        """The canonical-ordering helper, exercised directly against a case-mix.
+
+        Builds a small tree with a deliberately adversarial mix -- upper/lowercase
+        siblings, and a nested path whose name would sort on the opposite side of a
+        top-level file under case-insensitive (Windows-native) comparison versus
+        case-sensitive (POSIX-native) comparison. ``sorted_paths`` must return the
+        same order regardless of which OS is running the test.
+        """
+        sys.path.insert(0, str(FIXTURES))
+        import build_fixtures
+
+        names = [
+            "README.md", "readme_notes.txt", "api", "api/status.json",
+            "Zeta.json", "alpha/nested.json", "alpha/Nested2.json", "negative",
+            "negative/truncated.jsonl",
+        ]
+        for rel in names:
+            p = tmp_path / rel
+            if rel.endswith((".md", ".txt", ".json", ".jsonl")):
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text("x", encoding="utf-8")
+            else:
+                p.mkdir(parents=True, exist_ok=True)
+
+        ordered = build_fixtures.sorted_paths(tmp_path.rglob("*"), tmp_path)
+        keys = [p.relative_to(tmp_path).as_posix() for p in ordered]
+
+        # The canonical order is exactly plain Python string sort over the posix
+        # keys -- independent of Path.__lt__, independent of the host OS, and
+        # independent of filesystem enumeration order (rglob order is not relied
+        # on; sorted_paths re-sorts whatever it is given).
+        assert keys == sorted(keys)
+        # And it is genuinely case-sensitive (the explicit, documented case policy):
+        # "README.md" sorts before "Zeta.json" (both uppercase-leading, 'R' < 'Z'),
+        # and every uppercase-leading name sorts before every lowercase-leading one.
+        assert keys.index("README.md") < keys.index("Zeta.json")
+        assert keys.index("Zeta.json") < keys.index("alpha")
+        assert keys.index("Zeta.json") < keys.index("api")
+
+    def test_sorted_paths_detects_a_future_return_to_implicit_path_ordering(self, tmp_path):
+        """Guards the guard: a naive ``sorted(paths)`` must disagree with the helper
+        on this adversarial case, or this whole regression class stops being tested.
+        """
+        sys.path.insert(0, str(FIXTURES))
+        import build_fixtures
+
+        for rel in ("README.md", "negative", "negative/truncated.jsonl"):
+            p = tmp_path / rel
+            if "." in p.name:
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text("x", encoding="utf-8")
+            else:
+                p.mkdir(parents=True, exist_ok=True)
+
+        canonical = [p.relative_to(tmp_path).as_posix()
+                     for p in build_fixtures.sorted_paths(tmp_path.rglob("*"), tmp_path)]
+        naive = [p.relative_to(tmp_path).as_posix() for p in sorted(tmp_path.rglob("*"))]
+
+        assert canonical == sorted(canonical), "the helper itself must be canonical"
+        if naive == canonical:
+            pytest.skip(
+                "this host's native Path ordering happens to agree with the "
+                "canonical order for this case mix; the two orderings are still "
+                "provably different in general (Windows case-insensitive vs "
+                "POSIX case-sensitive), so this is a property of this OS's "
+                "Path.__lt__, not evidence the helper is unnecessary"
+            )

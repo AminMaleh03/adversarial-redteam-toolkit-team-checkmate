@@ -357,7 +357,21 @@ def scoped_registry():
         _FINGERPRINTS.update(fingerprint_snapshot)
 
 def write_manifest(path: str) -> None:
-    """Dump the manifest to JSON for the report and for analysis to join against."""
+    """Dump the manifest to JSON for the report and for analysis to join against.
+
+    ``newline="\\n"`` disables Python's universal-newline translation on write, so a
+    manifest generated on Windows and one generated on Linux/macOS hash to the same
+    bytes. Without it, text mode substitutes the platform line separator (CRLF on
+    Windows) for every ``\\n`` ``json.dump`` writes. The manifest lives under
+    ``results/`` (gitignored, generated per run), so ``.gitattributes`` cannot fix
+    this the way it fixes a checked-in file -- the bytes depend on whichever platform
+    produced them, not on how the repository is checked out. A policy that asserts
+    ``manifest_sha256`` against a Windows-generated value would then fail on every
+    other platform, and vice versa. Found during PR #10 integration review (Rayyan's
+    handover, section 9.2): a manifest generated here hashed to the CRLF-translated
+    value recorded as ``analysis/case_sets/ci_core_v1.json``'s
+    ``frozen_from.manifest_sha256``, not the canonical LF value.
+    """
     payload = {aid: asdict(meta) for aid, meta in sorted(_MANIFEST.items())}
-    with open(path, "w", encoding="utf-8") as handle:
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
         json.dump(payload, handle, indent=2, ensure_ascii=False)

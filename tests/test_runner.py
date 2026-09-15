@@ -2045,32 +2045,62 @@ def test_sentiment_core_dependencies_are_now_actually_present(cli):
     assert missing_requirements(load_registry(), "sentiment.core") == []
 
 
-def test_a_suite_the_attack_library_cannot_build_yet_is_refused(cli):
-    """Until CONTRACTS.md 4.2 lands, a non-legacy suite must fail, not mislabel.
+def test_suite_and_task_id_forward_to_the_now_task_aware_attack_library(cli):
+    """CONTRACTS.md 4.2 has landed: build_suite_once really is task/suite-aware now.
 
-    Building the emotion core suite and recording it as a sentiment or OCES suite
-    would put the wrong cases behind the right name -- an analysis would then score
-    real results against an oracle set for different cases and report nothing wrong.
+    This used to guard the transition -- before Lamei's Task 4, ``suite``/``task_id``
+    were accepted syntactically but not implemented, and the risk was a silent
+    mislabel: building the emotion core suite and recording it as a sentiment or OCES
+    suite, so an analysis would score real results against an oracle set for
+    different cases and report nothing wrong. That risk is retired now that
+    ``attacks.library.build_suite`` genuinely builds per suite/task_id rather than
+    raising "does not yet accept" -- found stale during PR #10 integration review (a
+    test that could now only ever skip, verifying nothing on every run).
+
+    What actually matters going forward is the contract this parameter pair now
+    keeps: a known task_id is accepted and really is used (not silently ignored), an
+    unknown suite or task_id is refused with the documented ContractError rather than
+    building the wrong thing anyway, and ``suite="oces"`` is refused with its own
+    specific message -- OCES is frozen authored data, never synthesised here. All of
+    it runs inside ``scoped_registry()``, and registration is checked empty again on
+    exit, so this test cannot leak state into whatever the process builds next.
     """
-    import inspect as _inspect
-    from attacks import library as attack_library
+    from attacks.metadata import scoped_registry, manifest
+    from contract import SUITE_CORE
 
-    if "task_id" in _inspect.signature(attack_library.build_suite).parameters:
-        pytest.skip(
-            "attacks.library.build_suite now accepts suite/task_id, so this guard "
-            "is spent; the forwarding path is exercised by a real OCES run instead"
-        )
-    from attacks.metadata import scoped_registry
-
-    # Inside the isolating scope: this really builds cases, and they must not be
-    # left registered for whatever builds next in this process.
     with scoped_registry():
-        # The legacy combination is unaffected and still builds.
+        # The legacy combination is unaffected: suite/task_id default to core/emotion_7.
         assert build_suite_once([baseline()], None, None) != []
-        with pytest.raises(ContractError, match="does not yet accept suite/task_id"):
-            build_suite_once([baseline()], None, None, suite="core", task_id="sentiment_2")
-        with pytest.raises(ContractError, match="does not yet accept suite/task_id"):
+    assert manifest() == {}, "registry must be empty again after the legacy build's scope exits"
+
+    with scoped_registry():
+        # A second, real task_id: accepted, and it is genuinely used to build cases
+        # (not silently defaulted back to emotion_7) -- confirmed by every registered
+        # case's own suite_id, resolved from the manifest the scope just built.
+        cases = build_suite_once([baseline()], None, None, suite="core", task_id="sentiment_2")
+        assert cases != []
+        man = manifest()
+        assert man, "sentiment_2 build registered no cases"
+        assert {meta.suite_id for meta in man.values()} == {SUITE_CORE}
+    assert manifest() == {}, "registry must be empty again after the sentiment_2 build's scope exits"
+
+    # Unknown suite / unknown task_id / a suite build_suite still refuses to
+    # synthesise: each is checked in its own scope, and each must leave the
+    # registry exactly as empty as an error path found it.
+    with scoped_registry():
+        with pytest.raises(ContractError, match="unknown suite"):
+            build_suite_once([baseline()], None, None, suite="not_a_real_suite", task_id="emotion_7")
+    assert manifest() == {}, "a rejected suite must not leave partial registrations behind"
+
+    with scoped_registry():
+        with pytest.raises(ContractError, match="unknown task_id"):
+            build_suite_once([baseline()], None, None, suite="core", task_id="not_a_real_task")
+    assert manifest() == {}, "a rejected task_id must not leave partial registrations behind"
+
+    with scoped_registry():
+        with pytest.raises(ContractError, match="'oces' variants are authored"):
             build_suite_once([baseline()], None, None, suite="oces", task_id="emotion_7")
+    assert manifest() == {}, "a refused suite='oces' build must not leave partial registrations behind"
 
 
 def test_code_provenance_is_a_commit_or_an_honest_null():

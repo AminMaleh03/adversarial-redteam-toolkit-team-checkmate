@@ -74,6 +74,32 @@ APP_COMMIT = "9386d75a535ed26007379c3e2af5b930d6698015"
 # --------------------------------------------------------------------------------------
 
 
+def sorted_paths(paths, root: Path):
+    """Sort paths by a canonical repo-relative POSIX key, not by Path.__lt__.
+
+    ``sorted(some_dir.rglob("*"))`` looks deterministic and is not: comparing ``Path``
+    objects directly compares them under the host OS's path semantics, and those
+    disagree on case. ``PureWindowsPath`` compares case-insensitively (Windows
+    filesystems normally are), ``PurePosixPath`` compares case-sensitively (POSIX
+    filesystems normally are). ``README.md`` and a ``negative/`` entry land on opposite
+    sides of that comparison depending only on which OS built the fixture pack, which
+    silently reorders ``MANIFEST.json``'s ``files`` object between platforms and makes
+    ``TestFixturePack::test_builder_is_deterministic`` fail on whichever OS did not
+    originally produce the checked-in fixtures (found during PR #10 integration
+    review, Rayyan's handover section 9.3, reproduced on Windows here by inspection
+    rather than by an actual cross-platform run).
+
+    The fix sorts by an explicit string key instead of letting ``Path`` compare
+    itself: ``PurePosixPath(relative_to(root)).as_posix()``, a forward-slashed,
+    repo-relative string. Comparing that key is plain Python string comparison --
+    byte/codepoint order, the same on every platform, with no implicit
+    case-folding anywhere. Two different paths always produce two different keys
+    (there are no case-only collisions in this fixture pack), so no further
+    tie-breaker is needed; ``sorted`` is stable regardless.
+    """
+    return sorted(paths, key=lambda p: p.relative_to(root).as_posix())
+
+
 def jdump(obj) -> str:
     return json.dumps(obj, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
 
@@ -1800,7 +1826,7 @@ def validate(out: Path, expected: dict, run_index: dict) -> list[str]:
         problems.append(msg)
 
     text_blob = ""
-    for path in sorted(out.rglob("*")):
+    for path in sorted_paths(out.rglob("*"), out):
         if path.is_file() and path.suffix in (".json", ".jsonl"):
             text_blob += path.read_text(encoding="utf-8")
     for forbidden in ("...", "PLACEHOLDER", "TODO", "XXXX", "0xdeadbeef"):
@@ -1951,7 +1977,7 @@ def validate(out: Path, expected: dict, run_index: dict) -> list[str]:
 
 def main() -> int:
     out = HERE
-    for child in sorted(out.iterdir()):
+    for child in sorted_paths(out.iterdir(), out):
         if child.name in ("build_fixtures.py", "README.md", "__pycache__"):
             continue
         shutil.rmtree(child) if child.is_dir() else child.unlink()
@@ -1979,9 +2005,9 @@ def main() -> int:
         "clean_reference_sha256": CLEAN_REFERENCE_SHA,
         "selection_sha256": SELECTION_SHA,
         "files": {
-            str(p.relative_to(out)).replace("\\", "/"):
+            p.relative_to(out).as_posix():
                 hashlib.sha256(p.read_bytes()).hexdigest()
-            for p in sorted(out.rglob("*"))
+            for p in sorted_paths(out.rglob("*"), out)
             if p.is_file() and p.name not in ("build_fixtures.py", "MANIFEST.json")
             and "__pycache__" not in p.parts
         },

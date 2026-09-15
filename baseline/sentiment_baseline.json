@@ -1,0 +1,254 @@
+[
+  {
+    "baseline_id": "sst2-val-18",
+    "text": "... the movie is just a plain old monster . ",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-35",
+    "text": "a sequence of ridiculous shoot - 'em - up scenes . ",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-59",
+    "text": "it 's just disappointingly superficial -- a movie that has all the elements necessary to be a fascinating , involving character study , but never does more than scratch the surface . ",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-110",
+    "text": "scores no points for originality , wit , or intelligence . ",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-111",
+    "text": "there is n't nearly enough fun here , despite the presence of some appealing ingredients . ",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-121",
+    "text": "it seems to me the film is about the art of ripping people off without ever letting them consciously know you have done so ",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-136",
+    "text": "looks and feels like a project better suited for the small screen . ",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-162",
+    "text": "there seems to be no clear path as to where the story 's going , or how long it 's going to take to get there . ",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-211",
+    "text": "to say this was done better in wilder 's some like it hot is like saying the sun rises in the east . ",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-319",
+    "text": "too much of it feels unfocused and underdeveloped . ",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-361",
+    "text": "a very long movie , dull in stretches , with entirely too much focus on meal preparation and igloo construction . ",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-432",
+    "text": "coughs and sputters on its own postmodern conceit . ",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-489",
+    "text": "it 's dumb , but more importantly , it 's just not scary . ",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-590",
+    "text": "this movie is something of an impostor itself , stretching and padding its material in a blur of dead ends and distracting camera work . ",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-601",
+    "text": "fancy a real downer ? ",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-672",
+    "text": "in all , this is a watchable movie that 's not quite the memorable experience it might have been . ",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-730",
+    "text": "suffocated by its fussy script and uptight characters , this musty adaptation is all the more annoying since it 's been packaged and sold back to us by hollywood . ",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-743",
+    "text": "you really have to wonder how on earth anyone , anywhere could have thought they 'd make audiences guffaw with a script as utterly diabolical as this . ",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-748",
+    "text": "and when you 're talking about a slapstick comedy , that 's a pretty big problem . ",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-761",
+    "text": "the result is a gaudy bag of stale candy , something from a halloween that died . ",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-805",
+    "text": "irwin is a man with enough charisma and audacity to carry a dozen films , but this particular result is ultimately held back from being something greater . ",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-13",
+    "text": "we root for ( clara and paul ) , even like them , though perhaps it 's an emotion closer to pity . ",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-17",
+    "text": "audrey tatou has a knack for picking roles that magnify her outrageous charm , and in this literate french comedy , she 's as morning-glory exuberant as she was in amélie . ",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-52",
+    "text": "mr. tsai is a very original artist in his medium , and what time is it there ? ",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-109",
+    "text": "it 's great escapist fun that recreates a place and time that will never happen again . ",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-120",
+    "text": "warm water under a red bridge is a quirky and poignant japanese film that explores the fascinating connections between women , water , nature , and sexuality . ",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-201",
+    "text": "inside the film 's conflict-powered plot there is a decent moral trying to get out , but it 's not that , it 's the tension that keeps you in your seat . ",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-227",
+    "text": "as the two leads , lathan and diggs are charming and have chemistry both as friends and lovers . ",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-248",
+    "text": "a full world has been presented onscreen , not some series of carefully structured plot points building to a pat resolution . ",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-290",
+    "text": "deliriously funny , fast and loose , accessible to the uninitiated , and full of surprises ",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-341",
+    "text": "it deserves to be seen by anyone with even a passing interest in the events shaping the world beyond their own horizons . ",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-427",
+    "text": "an exhilarating futuristic thriller-noir , minority report twists the best of technology around a gripping story , delivering a riveting , pulse intensifying escapist adventure of the first order ",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-480",
+    "text": "while undisputed is n't exactly a high , it is a gripping , tidy little movie that takes mr. hill higher than he 's been in a while . ",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-561",
+    "text": "another one of those estrogen overdose movies like `` divine secrets of the ya ya sisterhood , '' except that the writing , acting and character development are a lot better . ",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-588",
+    "text": "... a story we have n't seen on the big screen before , and it 's a story that we as americans , and human beings , should know . ",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-609",
+    "text": "nine queens is not only than a frighteningly capable debut and genre piece , but also a snapshot of a dangerous political situation on the verge of coming to a head . ",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-656",
+    "text": "so much facile technique , such cute ideas , so little movie . ",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-671",
+    "text": "two hours fly by -- opera 's a pleasure when you do n't have to endure intermissions -- and even a novice to the form comes away exhilarated . ",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-674",
+    "text": "atom egoyan has conjured up a multilayered work that tackles any number of fascinating issues ",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-686",
+    "text": "more romantic , more emotional and ultimately more satisfying than the teary-eyed original . ",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-778",
+    "text": "one of the most significant moviegoing pleasures of the year . ",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-785",
+    "text": "aside from minor tinkering , this is the same movie you probably loved in 1994 , except that it looks even better . ",
+    "label": "POSITIVE",
+    "source": "dataset"
+  }
+]

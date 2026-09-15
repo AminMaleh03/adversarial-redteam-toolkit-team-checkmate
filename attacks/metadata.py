@@ -35,7 +35,22 @@ import json
 from dataclasses import asdict, dataclass, field
 from typing import Optional
 
-from contract import AttackCase
+from contract import (
+    AttackCase,
+    COVERAGE_CLASSES,
+    OCES_FAMILIES,
+    SUITES,
+    SUITE_CORE,
+)
+
+# The three declared application-layer input controls V2 adds. `controls_targeted` is a
+# subset of these; the scoped exception handler (C3) is deliberately NOT here because it is
+# cross-cutting and must never be attributed as causal coverage. Frozen values match the
+# CONTRACTS wording ("length, strict_type_schema, normalization").
+CONTROL_LENGTH = "length"
+CONTROL_STRICT_TYPE_SCHEMA = "strict_type_schema"
+CONTROL_NORMALIZATION = "normalization"
+CONTROLS = frozenset({CONTROL_LENGTH, CONTROL_STRICT_TYPE_SCHEMA, CONTROL_NORMALIZATION})
 
 # --------------------------------------------------------------------------------------
 # Controlled vocabularies (module constants so a typo is an ImportError, not a silent join
@@ -146,6 +161,17 @@ class AttackMetadata:
     expected_sanitizer_behavior: str = SAN_NOT_APPLICABLE
     expected_http_behavior: str = HTTP_MEASURE
     notes: str = ""
+    # --- Stage 3 coverage + suite/OCES fields (CONTRACTS.md 4.4, frozen names) ---
+    # suite the case belongs to; `coverage_*` are the outcome-INDEPENDENT declaration of
+    # which declared control (if any) governs this case, resolved from attacks/coverage_map.json
+    # by attacks.coverage. `exposure`/`declared_family` are populated for OCES cases (Phase 2+).
+    suite_id: str = SUITE_CORE
+    coverage_class: Optional[str] = None          # one of COVERAGE_CLASSES once resolved
+    controls_targeted: list[str] = field(default_factory=list)  # subset of CONTROLS
+    coverage_rationale: str = ""
+    coverage_map_version: Optional[str] = None
+    exposure: str = ""
+    declared_family: Optional[str] = None         # oces.paraphrase | oces.distractor
 
     def __post_init__(self) -> None:
         if self.relation not in RELATIONS:
@@ -162,6 +188,21 @@ class AttackMetadata:
             raise ValueError(
                 f"unknown boundary_source {self.boundary_source!r} for {self.attack_id}"
             )
+        if self.suite_id not in SUITES:
+            raise ValueError(f"unknown suite_id {self.suite_id!r} for {self.attack_id}")
+        if self.coverage_class is not None and self.coverage_class not in COVERAGE_CLASSES:
+            raise ValueError(
+                f"unknown coverage_class {self.coverage_class!r} for {self.attack_id}"
+            )
+        for control in self.controls_targeted:
+            if control not in CONTROLS:
+                raise ValueError(
+                    f"unknown control {control!r} in controls_targeted for {self.attack_id}"
+                )
+        if self.declared_family is not None and self.declared_family not in OCES_FAMILIES:
+            raise ValueError(
+                f"unknown declared_family {self.declared_family!r} for {self.attack_id}"
+            )
 
 
 # --------------------------------------------------------------------------------------
@@ -170,6 +211,30 @@ class AttackMetadata:
 
 _MANIFEST: dict[str, AttackMetadata] = {}
 _FINGERPRINTS: dict[str, str] = {}
+
+# Coverage fields are STAMPED ONTO a case after it is registered (by
+# attacks.coverage.stamp_manifest, called at the end of library.build_suite), never supplied
+# at registration. They are derived annotations, not part of a case's identity, so
+# re-registering the same case (e.g. a second build_suite pass in a shared, non-cleared
+# registry -- as run_all does across a Demo/Full run and then a Lab job) must not trip the
+# "different metadata" guard just because the earlier pass has since been stamped. The
+# subsequent build re-stamps them, so the end state stays correct. The guard still fires on
+# any genuine identity difference (relation, oracle, source, tier, dose, suite_id, ...).
+#
+# suite_id is deliberately NOT here: it is supplied at registration (the sub-builders default
+# it to SUITE_CORE; an OCES author would set it explicitly) and is part of a case's identity,
+# so the same attack_id/payload registered under two different suites must be rejected.
+_POST_REGISTRATION_FIELDS = frozenset({
+    "coverage_class",
+    "controls_targeted",
+    "coverage_rationale",
+    "coverage_map_version",
+})
+
+
+def _registration_identity(meta: "AttackMetadata") -> dict:
+    """The metadata as supplied at registration, minus post-registration stamped fields."""
+    return {k: v for k, v in asdict(meta).items() if k not in _POST_REGISTRATION_FIELDS}
 
 
 def _fingerprint(case: AttackCase) -> str:
@@ -224,7 +289,9 @@ def register(case: AttackCase, meta: AttackMetadata) -> AttackCase:
     if existing_fp is not None and existing_fp != fp:
         raise ValueError(f"attack_id {case.attack_id!r} reused for a DIFFERENT payload")
     existing_meta = _MANIFEST.get(case.attack_id)
-    if existing_meta is not None and existing_meta != meta:
+    if existing_meta is not None and (
+        _registration_identity(existing_meta) != _registration_identity(meta)
+    ):
         raise ValueError(f"attack_id {case.attack_id!r} reused with DIFFERENT metadata")
 
     _MANIFEST[case.attack_id] = meta

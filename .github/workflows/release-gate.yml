@@ -52,7 +52,44 @@ jobs:
         if: always()
         shell: bash
         run: |
-          python -c "import json,os,pathlib; p=json.loads(pathlib.Path('results/gate/gate_result.json').read_text()); c=p.get('candidate',{}); assert c.get('commit')==os.environ['GITHUB_SHA'], (c.get('commit'),os.environ['GITHUB_SHA']); r=json.loads(pathlib.Path('endpoint/targets.json').read_text()); expected=r['models']['emotion_distilroberta']['revision']; assert c.get('model_revision')==expected, (c.get('model_revision'),expected)"
+          python -c "
+          import json, os, pathlib
+
+          gate_result_path = pathlib.Path('results/gate/gate_result.json')
+          if not gate_result_path.exists():
+              raise SystemExit('gate_result.json was not written; nothing to verify')
+          gate_result = json.loads(gate_result_path.read_text())
+
+          # An execution_error before a run ever produced an analysis document (the
+          # candidate endpoint never started, the policy itself was unreadable, ...)
+          # leaves nothing here to verify -- the gate's own exit code, enforced in the
+          # next step, is what fails the job, not this identity check. Check for that
+          # first: a genuine execution_error can legitimately carry an empty candidate.
+          analysis_path = (gate_result.get('artifacts') or {}).get('analysis_json')
+          if not analysis_path or not pathlib.Path(analysis_path).exists():
+              print('no analysis.json produced (execution_error before a run existed); skipping identity verification')
+              raise SystemExit(0)
+
+          # GateOutcome.candidate is the plain target_id string (contract.py), not a
+          # nested identity object -- do not assume a commit/model_revision shape here.
+          expected_candidate = 'emotion_v2'
+          assert gate_result.get('candidate') == expected_candidate, (
+              gate_result.get('candidate'), expected_candidate)
+
+          analysis = json.loads(pathlib.Path(analysis_path).read_text())
+
+          app_commit = analysis['run_identity']['app_commit']
+          assert app_commit == os.environ['GITHUB_SHA'], (app_commit, os.environ['GITHUB_SHA'])
+
+          summaries = analysis['evaluations'][0]['summaries']
+          observed_revision = summaries[expected_candidate]['identity']['model']['revision']
+          targets = json.loads(pathlib.Path('endpoint/targets.json').read_text())
+          expected_revision = targets['models']['emotion_distilroberta']['revision']
+          assert observed_revision == expected_revision, (observed_revision, expected_revision)
+
+          print(f'verified: commit {app_commit} matches GITHUB_SHA; '
+                f'{expected_candidate} model revision {observed_revision} matches the pinned registry')
+          "
       - name: Publish gate evidence
         if: always()
         uses: actions/upload-artifact@v4

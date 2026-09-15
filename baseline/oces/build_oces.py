@@ -65,11 +65,18 @@ from attacks import coverage
 from attacks import metadata as md
 
 # --- frozen knobs ---------------------------------------------------------------------
-GENERATOR_VERSION = "1.1.0"
+GENERATOR_VERSION = "1.2.0"
 AUTHORED_UTC = "2026-09-15"
 TRANSFORM_VERSION = "oces-v1"
 SOURCE = "oces-authored-v1"
 AUTHOR = "AI draft (Claude Code); Task 4 owner: Lamei"
+
+# Human review is complete (Phase 5): the Task 4 owner reviewed all 82 candidates with a
+# ChatGPT-assisted semantic audit and accepted the current set (0 deleted, 0 rewrites, no
+# GOLD promotion). Author stays the AI-draft attribution; reviewer/method are recorded
+# honestly. REVIEW cases stay REVIEW.
+REVIEWER = "Lamei (Task 4 owner)"
+REVIEW_METHOD = "human semantic review by Lamei, assisted by ChatGPT"
 
 EMOTION_PER_LABEL = 3
 SENTIMENT_PER_LABEL = 10
@@ -80,7 +87,12 @@ EXPOSURE_STATEMENT = (
     "additional evaluation authored after the evaluated defenses were frozen; the authors "
     "were aware of the defenses; not a blind holdout and not design-independent"
 )
-REVIEW_METHOD = "ai_drafted_pending_human_review"
+
+# Defense identity being frozen against (verified Phase 0; endpoint/v2.py is unchanged).
+FOUNDATION_COMMIT = "257e15f3432aa29a3942d52b2cf3befb12ba3354"
+V2_GIT_BLOB = "b71787e3bf39e4062f883c9e34fae78d5b7c6263"          # cross-platform content id
+V2_LF_SHA256 = "b71193bef639410c828ec78e9aacc172e5da6a1c3b9fd8e5f7041ee6afc78baf"
+V2_CRLF_SHA256 = "cf364b70c80c25081a5cb5a0ff83c844fe9199d7cbc65a517b59177ccf434a9e"
 
 # Outcome-independent coverage for every OCES case: by construction they are ordinary clean
 # English that triggers none of V2's declared input controls, so they are `not_targeted`.
@@ -259,7 +271,7 @@ def _build_task(seeds, task, emo_count, sent_count, map_version):
             "variant_text": variant_text,
             "rationale": rationale,
             "author": AUTHOR,
-            "reviewer": None,
+            "reviewer": REVIEWER,
             "review_method": REVIEW_METHOD,
             "semantic_risk": risk,
             "proposed_tier": tier,
@@ -273,7 +285,9 @@ def _build_task(seeds, task, emo_count, sent_count, map_version):
             "case_id": attack_id, "task": task, "expected_label": seed.label,
             "clean_request": req, "raw_source_text": seed.text, "family": declared_family,
             "variant_text": variant_text, "rationale": rationale, "author": AUTHOR,
-            "semantic_risk": risk, "proposed_tier": tier, "Lamei_decision": "",
+            "reviewer": REVIEWER, "semantic_risk": risk, "proposed_tier": tier,
+            # accepted decisions: SILVER -> APPROVE, REVIEW -> KEEP_REVIEW (no GOLD promotion)
+            "Lamei_decision": "APPROVE" if tier == "SILVER" else "KEEP_REVIEW",
         })
     return seed_records, cases, provenance, review_rows
 
@@ -283,6 +297,66 @@ def _write_json(path: Path, obj) -> None:
     with path.open("w", encoding="utf-8") as handle:
         json.dump(obj, handle, ensure_ascii=False, indent=2)
         handle.write("\n")
+
+
+def _sha256_file(path: Path) -> str:
+    import hashlib
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _len_stats(values):
+    """min / median / max of an integer list, integer-valued."""
+    s = sorted(values)
+    n = len(s)
+    mid = s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) // 2
+    return {"min": s[0], "median": mid, "max": s[-1], "n": n}
+
+
+def _pre_freeze_summary(emo_seeds, sent_seeds, all_prov, tier_dist, risk_dist,
+                        coverage_dist, subtype_dist, map_version):
+    from collections import Counter
+    seeds_by_label = Counter()
+    for s in emo_seeds + sent_seeds:
+        seeds_by_label[s.label] += 1
+    fam = Counter(v["family"] for v in all_prov.values())
+    # tokenizer length stats: clean requests (unique per seed) and variants
+    req_seen, req_emo, req_sent, var_emo, var_sent = set(), [], [], [], []
+    for v in all_prov.values():
+        tl = v["tokenizer_lengths"]
+        if v["seed_baseline_id"] not in req_seen:
+            req_seen.add(v["seed_baseline_id"])
+            req_emo.append(tl["clean_request"]["emotion"])
+            req_sent.append(tl["clean_request"]["sentiment"])
+        var_emo.append(tl["variant"]["emotion"])
+        var_sent.append(tl["variant"]["sentiment"])
+    all_lengths = req_emo + req_sent + var_emo + var_sent
+    return {
+        "seeds_by_label": dict(sorted(seeds_by_label.items())),
+        "clean_requests": len(emo_seeds) + len(sent_seeds),
+        "variants": len(all_prov),
+        "total_additional_requests": (len(emo_seeds) + len(sent_seeds)) + len(all_prov),
+        "family_counts": dict(sorted(fam.items())),
+        "transform_subtype_distribution": dict(sorted(subtype_dist.items())),
+        "tier_distribution": dict(sorted(tier_dist.items())),
+        "semantic_risk_distribution": dict(sorted(risk_dist.items())),
+        "coverage_distribution": dict(sorted(coverage_dist.items())),
+        "coverage_map_version": map_version,
+        "tokenizer_length": {
+            "clean_request_emotion_tok": _len_stats(req_emo),
+            "clean_request_sentiment_tok": _len_stats(req_sent),
+            "variant_emotion_tok": _len_stats(var_emo),
+            "variant_sentiment_tok": _len_stats(var_sent),
+        },
+        "token_limit": TOKEN_LIMIT,
+        "all_comfortably_below_limit": max(all_lengths) < TOKEN_LIMIT,
+        "defense_identity": {
+            "foundation_commit": FOUNDATION_COMMIT,
+            "endpoint_v2_git_blob": V2_GIT_BLOB,
+            "endpoint_v2_lf_sha256": V2_LF_SHA256,
+            "endpoint_v2_crlf_sha256": V2_CRLF_SHA256,
+        },
+        "model_prediction_queries_before_freeze": 0,
+    }
 
 
 def build():
@@ -303,6 +377,9 @@ def build():
     tier_dist = Counter(v["proposed_tier"] for v in all_prov.values())
     risk_dist = Counter(v["semantic_risk"] for v in all_prov.values())
     coverage_dist = Counter(v["coverage_class"] for v in all_prov.values())
+    subtype_dist = Counter(v["transform_subtype"] for v in all_prov.values())
+    summary = _pre_freeze_summary(emo_seeds, sent_seeds, all_prov, tier_dist, risk_dist,
+                                  coverage_dist, subtype_dist, map_version)
 
     provenance = {
         "artifact": "oces",
@@ -334,9 +411,13 @@ def build():
             "coverage_map_version": map_version,
             "distribution": dict(sorted(coverage_dist.items())),
         },
-        "review": {"method": REVIEW_METHOD, "reviewer": None, "author": AUTHOR,
-                   "note": "AI-drafted candidates; human semantic review pending; "
-                           "proposed_tier is not a claim of human review"},
+        "review": {"method": REVIEW_METHOD, "reviewer": REVIEWER, "author": AUTHOR,
+                   "status": "accepted; 0 deleted, 0 rewrites, no GOLD promotion",
+                   "decisions": {"SILVER": "APPROVE", "REVIEW": "KEEP_REVIEW"},
+                   "note": "AI-drafted candidates accepted after human semantic review by the "
+                           "Task 4 owner (ChatGPT-assisted); human review does not auto-promote "
+                           "to GOLD; REVIEW cases stay REVIEW and out of automatic rates"},
+        "pre_freeze_summary": summary,
         "seed_selection": {
             "emotion": {
                 "rule": "within each of the 7 labels, sort baselines by baseline_id and take "
@@ -379,12 +460,31 @@ def build():
 
     review_path = CASES_DIR / "oces_review_sheet.csv"
     fields = ["case_id", "task", "expected_label", "clean_request", "raw_source_text",
-              "family", "variant_text", "rationale", "author", "semantic_risk",
+              "family", "variant_text", "rationale", "author", "reviewer", "semantic_risk",
               "proposed_tier", "Lamei_decision"]
     with review_path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
         writer.writerows(emo_rows + sent_rows)
+
+    # ---- deterministic content-hash artifact (hashes the finalized freeze files; NOT itself) ----
+    hashed = {
+        "baseline/oces/emotion_seeds.json": _sha256_file(SEEDS_DIR / "emotion_seeds.json"),
+        "baseline/oces/sentiment_seeds.json": _sha256_file(SEEDS_DIR / "sentiment_seeds.json"),
+        "attacks/data/oces/emotion_cases.json": _sha256_file(CASES_DIR / "emotion_cases.json"),
+        "attacks/data/oces/sentiment_cases.json": _sha256_file(CASES_DIR / "sentiment_cases.json"),
+        "attacks/data/oces/provenance.json": _sha256_file(CASES_DIR / "provenance.json"),
+        "baseline/oces/oces_content.py": _sha256_file(Path(oces_content.__file__)),
+        "baseline/oces/build_oces.py": _sha256_file(Path(__file__)),
+    }
+    _write_json(CASES_DIR / "freeze_content_hashes.json", {
+        "artifact": "oces_freeze_content_hashes",
+        "generator_version": GENERATOR_VERSION,
+        "coverage_map_version": map_version,
+        "note": "SHA-256 of each finalized OCES freeze file (content identity for "
+                "reproducibility). This file does not hash itself.",
+        "files": hashed,
+    })
 
     return provenance
 

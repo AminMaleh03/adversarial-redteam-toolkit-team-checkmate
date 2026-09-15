@@ -1,0 +1,15 @@
+{
+  "artifact": "oces_freeze_content_hashes",
+  "generator_version": "1.2.0",
+  "coverage_map_version": "1.0.0",
+  "note": "SHA-256 of each finalized OCES freeze file (content identity for reproducibility). This file does not hash itself.",
+  "files": {
+    "baseline/oces/emotion_seeds.json": "d5cc6011848ad5800fdfbb2b006a2cc77e7f8de0bd0d6cef3e5d012565951af3",
+    "baseline/oces/sentiment_seeds.json": "a16e5c999c68fc20e685e793b7cfd3e6de38cf49cfc70ebf1e42a833390fd2c5",
+    "attacks/data/oces/emotion_cases.json": "f2e8e394f8cb90cf9dab6de225bb8033868f72ee273f7ea61516a5ff1af65863",
+    "attacks/data/oces/sentiment_cases.json": "053737c338ae0102807e7099963817de33c6d89c972d4e87d93226d504799e04",
+    "attacks/data/oces/provenance.json": "003bdaaaa87aea39f952fbcc0778f419e9be5562eca8b725ac0967c72ea08b85",
+    "baseline/oces/oces_content.py": "522f7f89c878ce7170a0dae9f913ae744e9e466ac904fde2d5e75264b7273ad2",
+    "baseline/oces/build_oces.py": "2f53e72bfaa52a55ce3db4f20c1a6d14ced34d6c6b2551c10dda236b7eeb8357"
+  }
+}

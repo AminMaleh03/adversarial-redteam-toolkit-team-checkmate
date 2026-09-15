@@ -197,26 +197,67 @@ def test_clean_text_mirror_matches_frozen_sanitizer():
 
 
 # ------------------------------------------------------------------------- honesty / discipline
-def test_no_case_is_marked_human_reviewed_and_author_is_honest():
+def test_review_attribution_is_honest_after_review():
+    """Human review is complete; attribution must stay honest (author = AI draft, reviewer =
+    the human), and no case is promoted to GOLD just because review happened."""
     prov = _load(PROVENANCE)
-    assert prov["review"]["reviewer"] is None
     assert prov["no_model_inference"] is True
     assert "not a blind" in prov["exposure_statement"].lower()
-    assert "AI draft" in prov["author"]                        # honest authorship, not hand-written
+    assert "AI draft" in prov["author"]                        # author is the AI draft, not hand-written
+    assert prov["review"]["reviewer"] == "Lamei (Task 4 owner)"
+    assert "ChatGPT" in prov["review"]["method"] and "human" in prov["review"]["method"].lower()
     for v in prov["variants"].values():
-        assert v["reviewer"] is None
-        assert v["review_method"] == "ai_drafted_pending_human_review"
         assert "AI draft" in v["author"]
+        assert v["reviewer"] == "Lamei (Task 4 owner)"
+        assert "ChatGPT" in v["review_method"]
+    tiers = {v["proposed_tier"] for v in prov["variants"].values()}
+    assert tiers == {"SILVER", "REVIEW"}                       # NO GOLD promotion
     # ambiguous/high-risk candidates stay visible as REVIEW, never silently scored
     for v in prov["variants"].values():
         if v["semantic_risk"] == "high":
             assert v["proposed_tier"] == "REVIEW"
 
 
-def test_provenance_carries_no_freeze_commit_yet():
-    """Phase 4 stops before the freeze commit; provenance must not fabricate one."""
+def test_review_sheet_decisions_match_tiers():
+    import csv
+    from collections import Counter
+    with (CASES_DIR / "oces_review_sheet.csv").open(encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    assert len(rows) == 82
+    for r in rows:
+        assert r["reviewer"] == "Lamei (Task 4 owner)"
+        expected = "APPROVE" if r["proposed_tier"] == "SILVER" else "KEEP_REVIEW"
+        assert r["Lamei_decision"] == expected
+    assert Counter(r["Lamei_decision"] for r in rows) == {"APPROVE": 50, "KEEP_REVIEW": 32}
+
+
+def test_provenance_does_not_embed_a_freeze_commit():
+    """The authoring provenance must never embed the freeze commit (a commit can't contain its
+    own SHA). The freeze SHA lives only in the separate Phase-5 freeze_provenance record."""
     prov = _load(PROVENANCE)
     assert "freeze_commit" not in prov and "freeze_sha" not in prov
+
+
+def test_pre_freeze_summary_is_consistent():
+    s = _load(PROVENANCE)["pre_freeze_summary"]
+    assert s["clean_requests"] == 41 and s["variants"] == 82
+    assert s["total_additional_requests"] == 123
+    assert s["family_counts"] == {"oces.distractor": 41, "oces.paraphrase": 41}
+    assert s["tier_distribution"] == {"REVIEW": 32, "SILVER": 50}
+    assert s["coverage_distribution"] == {"not_targeted": 82}
+    assert s["all_comfortably_below_limit"] is True
+    assert s["model_prediction_queries_before_freeze"] == 0
+    assert s["defense_identity"]["endpoint_v2_git_blob"] == "b71787e3bf39e4062f883c9e34fae78d5b7c6263"
+    assert s["defense_identity"]["foundation_commit"] == "257e15f3432aa29a3942d52b2cf3befb12ba3354"
+
+
+def test_freeze_content_hashes_match_actual_files():
+    import hashlib
+    doc = _load(CASES_DIR / "freeze_content_hashes.json")
+    assert "freeze_content_hashes.json" not in json.dumps(doc["files"])   # never hashes itself
+    for rel, sha in doc["files"].items():
+        actual = hashlib.sha256((REPO / rel).read_bytes()).hexdigest()
+        assert actual == sha, f"{rel}: hash drift ({actual} != {sha})"
 
 
 # ------------------------------------------------------------------------- isolation

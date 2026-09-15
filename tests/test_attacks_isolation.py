@@ -76,13 +76,23 @@ def test_unknown_suite_and_task_fail_loud():
             library.build_suite(_emotion_baselines(), task_id="not-a-task")
 
 
-def test_oces_suite_is_not_generated_in_code():
-    """OCES is authored as frozen data (Phase 4); build_suite must refuse to synthesise it."""
+def test_oces_suite_loads_frozen_data_not_code_synthesis():
+    """OCES is authored as frozen data (Phase 4); build_suite loads it -- it never
+    synthesises OCES content itself. Calling it with the wrong (core) baseline set for
+    an OCES build still fails loudly, because none of the frozen cases' baseline_ids
+    would legitimately need to resolve against a set that was never their real seed file
+    -- see tests/test_oces_runtime.py for the dedicated loader coverage (hash
+    verification, tamper/missing/version detection, real counts and determinism)."""
+    oces_emotion_seeds = sorted(
+        load_baseline(REPO / "baseline" / "oces" / "emotion_seeds.json"),
+        key=lambda b: b.baseline_id,
+    )
     with md.scoped_registry():
-        with pytest.raises(ContractError):
-            library.build_suite(
-                _emotion_baselines(), task_id="emotion_7", suite=SUITE_OCES
-            )
+        cases = library.build_suite(
+            oces_emotion_seeds, task_id="emotion_7", suite=SUITE_OCES
+        )
+        assert len(cases) == 42
+        assert {meta.suite_id for meta in md.manifest().values()} == {SUITE_OCES}
 
 
 # ------------------------------------------------------------------ cross-task isolation

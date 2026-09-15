@@ -13,7 +13,7 @@ import math
 import re
 from dataclasses import dataclass
 
-from contract import CORE_FAMILIES, SUITES, RunResult
+from contract import CORE_FAMILIES, OCES_FAMILIES, SUITE_OCES, SUITES, RunResult
 
 CATEGORIES = CORE_FAMILIES
 
@@ -140,7 +140,13 @@ def validate_manifest(manifest: dict) -> None:
             raise ValueError(f"invalid manifest entry {aid!r}")
         if meta.get("attack_id") != aid:
             raise ValueError(f"manifest key {aid!r} disagrees with attack_id")
-        for name, values in (("family", CATEGORIES), ("oracle", oracles), ("validity_tier", tiers)):
+        # Family is validated against the vocabulary for THIS entry's own declared suite
+        # (CONTRACTS.md 4.4: `suite_id` is `core` or `oces`, recorded per case). An OCES
+        # entry's family (`oces.paraphrase`/`oces.distractor`) is never a core category
+        # and vice versa; checking every entry against a single hardcoded core-only list
+        # would make an OCES manifest fail validation unconditionally.
+        allowed_families = OCES_FAMILIES if meta.get("suite_id") == SUITE_OCES else CATEGORIES
+        for name, values in (("family", allowed_families), ("oracle", oracles), ("validity_tier", tiers)):
             value = meta.get(name)
             if not isinstance(value, str) or value not in values:
                 raise ValueError(f"manifest {aid!r}: unknown or missing {name}: {value!r}")
@@ -287,23 +293,36 @@ def validate_run(
     if not isinstance(ids, dict) or not isinstance(coverage, dict):
         raise ValueError(f"{version}: missing case_ids or coverage")
     sets = {}
-    for name in ("planned", "selected", "completed", "missing", "skipped", "limit_excluded"):
-        keys = ids.get(name)
+    # "deselected" is the case-set-driven CI path's exclusion reason (runner/run.py): a
+    # planned case that is neither skipped (data-level exclusion) nor limit-excluded (a
+    # demo-size cap), but simply not part of a frozen selection file. Every current run
+    # writes it, but it postdates artifacts that do not (this repo's own committed
+    # fixtures among them), so an absent key is treated as an empty list -- present but
+    # empty is validated the same as any other exclusion reason once it does appear.
+    for name in ("planned", "selected", "completed", "missing", "skipped", "limit_excluded",
+                 "deselected"):
+        default = [] if name == "deselected" else None
+        keys = ids.get(name, default)
         if not isinstance(keys, list) or any(not isinstance(k, str) or not re.fullmatch(r"(?:baseline|attack):.+", k) for k in keys):
             raise ValueError(f"{version}: invalid case_ids.{name}")
         if len(keys) != len(set(keys)):
             raise ValueError(f"{version}: duplicate case_ids.{name}")
         sets[name] = set(keys)
-        if type(coverage.get(name)) is not int or coverage[name] != len(keys):
+        count_default = 0 if name == "deselected" else None
+        if type(coverage.get(name, count_default)) is not int or coverage.get(name, count_default) != len(keys):
             raise ValueError(f"{version}: coverage.{name} disagrees with case IDs")
     if [case_key(r) for r in rows] != ids["completed"]:
         raise ValueError(f"{version}: actual result rows disagree with completed case IDs/order")
     if sets["completed"] & sets["missing"] or sets["completed"] | sets["missing"] != sets["selected"]:
         raise ValueError(f"{version}: completed/missing must partition selected cases")
-    if (sets["selected"] & sets["skipped"] or sets["selected"] & sets["limit_excluded"]
-            or sets["skipped"] & sets["limit_excluded"]
-            or sets["selected"] | sets["skipped"] | sets["limit_excluded"] != sets["planned"]):
-        raise ValueError(f"{version}: selected/skipped/limit_excluded must partition planned cases")
+    exclusion_sets = ("skipped", "limit_excluded", "deselected")
+    if (any(sets["selected"] & sets[name] for name in exclusion_sets)
+            or any(sets[a] & sets[b] for i, a in enumerate(exclusion_sets)
+                   for b in exclusion_sets[i + 1:])
+            or sets["selected"].union(*(sets[name] for name in exclusion_sets)) != sets["planned"]):
+        raise ValueError(
+            f"{version}: selected/skipped/limit_excluded/deselected must partition planned cases"
+        )
     rate = len(rows) / len(sets["planned"]) if sets["planned"] else 0.0
     if coverage.get("coverage_rate") != round(rate, 6):
         raise ValueError(f"{version}: coverage_rate disagrees with actual rows")

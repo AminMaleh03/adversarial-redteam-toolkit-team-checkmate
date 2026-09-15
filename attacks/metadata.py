@@ -212,16 +212,19 @@ class AttackMetadata:
 _MANIFEST: dict[str, AttackMetadata] = {}
 _FINGERPRINTS: dict[str, str] = {}
 
-# Fields that are STAMPED ONTO a case after it is registered (by library.build_suite ->
-# _stamp_suite_id and attacks.coverage.stamp_manifest), never supplied at registration.
-# They are derived annotations, not part of a case's identity, so re-registering the same
-# case (e.g. a second build_suite pass in a shared, non-cleared registry -- as run_all does
-# across a Demo/Full run and then a Lab job) must not trip the "different metadata" guard
-# just because the earlier pass has since been stamped. The subsequent build re-stamps them,
-# so the end state stays correct. The guard still fires on any genuine identity difference
-# (relation, oracle, source, tier, dose, ...).
+# Coverage fields are STAMPED ONTO a case after it is registered (by
+# attacks.coverage.stamp_manifest, called at the end of library.build_suite), never supplied
+# at registration. They are derived annotations, not part of a case's identity, so
+# re-registering the same case (e.g. a second build_suite pass in a shared, non-cleared
+# registry -- as run_all does across a Demo/Full run and then a Lab job) must not trip the
+# "different metadata" guard just because the earlier pass has since been stamped. The
+# subsequent build re-stamps them, so the end state stays correct. The guard still fires on
+# any genuine identity difference (relation, oracle, source, tier, dose, suite_id, ...).
+#
+# suite_id is deliberately NOT here: it is supplied at registration (the sub-builders default
+# it to SUITE_CORE; an OCES author would set it explicitly) and is part of a case's identity,
+# so the same attack_id/payload registered under two different suites must be rejected.
 _POST_REGISTRATION_FIELDS = frozenset({
-    "suite_id",
     "coverage_class",
     "controls_targeted",
     "coverage_rationale",

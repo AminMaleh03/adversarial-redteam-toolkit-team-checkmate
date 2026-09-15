@@ -114,6 +114,63 @@ def test_emotion_sentiment_emotion_cycle_no_contamination():
     assert all(cov is not None for _, _, cov in emo_man_1.values())
 
 
+def test_same_id_and_payload_under_different_suite_is_rejected():
+    """suite_id is part of a case's identity: the same attack_id/payload must not be
+    accepted once as core and once as oces. Guards the cross-suite identity weakness."""
+    from contract import AttackCase
+    md.reset()
+    case = AttackCase("dup.suite", None, "encoding", None, "same payload")
+    core_meta = md.AttackMetadata(
+        "dup.suite", "encoding", "sf", md.REL_AVAILABILITY, md.ORACLE_STAY_AVAILABLE,
+        "s", md.TIER_GOLD, suite_id=SUITE_CORE,
+    )
+    oces_meta = md.AttackMetadata(
+        "dup.suite", "encoding", "sf", md.REL_AVAILABILITY, md.ORACLE_STAY_AVAILABLE,
+        "s", md.TIER_GOLD, suite_id=SUITE_OCES,
+    )
+    md.register(case, core_meta)
+    with pytest.raises(ValueError):
+        md.register(case, oces_meta)            # identical payload, different suite -> rejected
+    md.reset()
+
+
+def test_write_manifest_in_scope_contains_only_that_task(tmp_path):
+    """Task 4: build AND write the manifest inside one scope; the written file describes
+    only that isolated build, with suite + coverage metadata, and no cross-task leakage."""
+    md.reset()
+    emo, sent = _emotion_baselines(), _sentiment_baselines()
+    emo_path = tmp_path / "emotion_manifest.json"
+    sent_path = tmp_path / "sentiment_manifest.json"
+
+    with md.scoped_registry():
+        library.build_suite(emo, token_counter=_fake_counter, max_tokens=64,
+                            suite=SUITE_CORE, task_id="emotion_7")
+        library.write_manifest(str(emo_path))       # written from the SAME isolated scope
+    with md.scoped_registry():
+        library.build_suite(sent, token_counter=_fake_counter, max_tokens=64,
+                            suite=SUITE_CORE, task_id="sentiment_2")
+        library.write_manifest(str(sent_path))
+
+    emo_man = json.loads(emo_path.read_text(encoding="utf-8"))
+    sent_man = json.loads(sent_path.read_text(encoding="utf-8"))
+
+    # each written manifest carries the suite id and a resolved coverage class for every case
+    assert emo_man and sent_man
+    assert all(m["suite_id"] == SUITE_CORE for m in emo_man.values())
+    assert all(m["coverage_class"] is not None for m in emo_man.values())
+    assert all(m["suite_id"] == SUITE_CORE for m in sent_man.values())
+    assert all(m["coverage_class"] is not None for m in sent_man.values())
+
+    # neither written file contains the other task's derived ids
+    emo_prefixes = {b.baseline_id for b in emo}
+    sent_prefixes = {b.baseline_id for b in sent}
+    assert {a.split(".")[0] for a in sent_man if "." in a} & emo_prefixes == set()
+    assert {a.split(".")[0] for a in emo_man if "." in a} & sent_prefixes == set()
+
+    assert md.manifest() == {}                       # registry restored after both scopes
+    md.reset()
+
+
 def test_manifest_is_empty_after_each_scope_exits():
     """No suite state survives the scope: the process manifest returns to its prior state."""
     md.reset()
@@ -213,14 +270,19 @@ def test_tasks_produce_different_but_deterministic_counts():
 
 
 def test_sentiment_count_reproduces_with_real_pinned_tokenizer():
-    """Uses the REAL pinned sentiment tokenizer (no weights, no inference). Skips offline."""
+    """Uses the REAL pinned sentiment tokenizer (no weights, no inference).
+
+    Only genuine unavailability of the tokenizer asset (offline / no cache) may skip -- that
+    is the guarded probe. Once it loads, the suite build runs UNGUARDED, so a real generation
+    regression fails the test rather than being masked as an offline skip.
+    """
     try:
         from transformers import AutoTokenizer
         tok = AutoTokenizer.from_pretrained(
             "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
             revision="714eb0fa89d2f80546fda750413ed43d93601a13",
         )
-    except Exception as exc:                 # noqa: BLE001 - offline / asset unavailable
+    except Exception as exc:                 # noqa: BLE001 - tokenizer asset genuinely unavailable
         pytest.skip(f"pinned sentiment tokenizer unavailable offline: {exc}")
 
     def count(text):

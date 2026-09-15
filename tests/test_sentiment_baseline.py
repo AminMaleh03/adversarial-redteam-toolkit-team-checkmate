@@ -129,11 +129,20 @@ def test_builder_constants_are_frozen():
 
 
 def test_rebuild_reproduces_committed_files(tmp_path):
-    """Network-guarded: rebuild from the pinned revision and diff against committed files."""
+    """Rebuild from the pinned revision and diff against the committed files.
+
+    Only genuine unavailability of the external dataset (offline / no cache) may skip: we
+    probe that first. Once the dataset is reachable, build() runs UNGUARDED, so a real
+    builder or validation regression (wrong row count, wrong labels, selection/provenance
+    mismatch, ...) fails the test instead of being masked as an "offline" skip.
+    """
     try:
-        cases, excluded, provenance = bsb.build()
-    except Exception as exc:                        # noqa: BLE001 - offline / dataset missing
+        from datasets import load_dataset
+        load_dataset(bsb.DATASET_NAME, revision=bsb.DATASET_REVISION, split=bsb.DATASET_SPLIT)
+    except Exception as exc:                        # noqa: BLE001 - dataset genuinely unavailable
         pytest.skip(f"pinned SST-2 dataset unavailable offline: {exc}")
+
+    cases, excluded, provenance = bsb.build()       # unguarded: any failure here is a real bug
 
     # Re-serialise exactly as main() writes the files, and assert byte-for-byte parity with
     # the committed artifacts (this also normalises int-vs-string JSON key coercion).

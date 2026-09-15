@@ -46,6 +46,11 @@ from contract import BaselineCase
 # --- frozen knobs ---------------------------------------------------------------------
 # Fixed so two runs, and two people, reproduce byte-identical data. Do not change after
 # sentiment_baseline.json is committed; a later change is a NEW version, not an edit.
+#
+# SEED is AUTHORED and frozen by Task 4 (Lamei), not prescribed by the foundation docs:
+# docs/stage3/MODEL_IDENTITY.md requires only a fixed seed + deterministic, model-free
+# selection and does not mandate a particular numeric value. This value is that frozen
+# choice; the selection's validity does not depend on which fixed seed is used.
 SEED = 20260915
 PER_LABEL = 21                      # 21 NEGATIVE + 21 POSITIVE = 42
 BUILDER_VERSION = "1.0.0"

@@ -26,13 +26,16 @@ from attacks import boundary, encoding, malformed, perturbation, truncation, whi
 from attacks import coverage
 from attacks import metadata as md
 
-# The tasks this library knows how to build a suite for. task_id is validated and recorded
-# for provenance/isolation; it does NOT branch the core construction. What actually differs
-# between tasks is (a) the baseline sentences the caller passes in and (b) the injected
-# token_counter (the emotion vs sentiment tokenizer) -- never a hidden per-task code path.
-# So two tasks legitimately yield DIFFERENT case counts purely because their baseline text
-# differs (content-dependent subfamilies like compatibility_ligature only fire on sentences
-# that contain the relevant substring), while each remains fully deterministic.
+# The tasks this library knows how to build a suite for. task_id is VALIDATED here; it does
+# NOT branch the core construction and is NOT stored in per-attack metadata (the frozen
+# AttackMetadata has no task_id field, by design). Task identity of an executed row is
+# recorded in RUN provenance by the runner -- RunResult.target_id, which resolves to a task
+# via the registry -- not by the attack library. What actually differs between tasks at build
+# time is (a) the baseline sentences the caller passes in and (b) the injected token_counter
+# (the emotion vs sentiment tokenizer) -- never a hidden per-task code path. So two tasks
+# legitimately yield DIFFERENT case counts purely because their baseline text differs
+# (content-dependent subfamilies like compatibility_ligature only fire on sentences that
+# contain the relevant substring), while each remains fully deterministic.
 #
 # These are the two task_ids the foundation pins (contract.TaskSpec.task_id). Kept local to
 # the library (not in the frozen contract) as a build-time guard: an unknown task_id is a

@@ -2005,12 +2005,44 @@ def test_cli_two_targets_write_into_their_own_directories(cli, tmp_path, monkeyp
     assert (out / "manifest.json").read_bytes() == (second_out / "manifest.json").read_bytes()
 
 
-def test_a_missing_dependency_is_reported_not_worked_around(cli):
-    """Lamei's sentiment baseline does not exist yet, and that is what is said."""
+def test_a_missing_dependency_is_reported_not_worked_around(cli, monkeypatch):
+    """A required file that is absent must stop the run, not be worked around.
+
+    This used to rely on Lamei's sentiment baseline genuinely not existing yet. Task 4
+    landed baseline/sentiment_baseline.json and Task 2 landed endpoint/sentiment_v1.py,
+    so sentiment.core is now fully runnable and the original expectation became false
+    on integration -- on either branch alone it still held. The behaviour under test is
+    the readiness gate itself, so the absence is now injected rather than borrowed from
+    whichever dependency happened to be late: require_runnable raises exactly as it
+    would for a real missing file, and the run must abort before sending anything or
+    publishing any output.
+    """
     invoke, out, state = cli
+
+    # Point the run at a declared baseline file that genuinely is not there. This is
+    # the same condition the absent sentiment baseline used to create, and it fails at
+    # the same place -- the run hashes the baseline file it is about to read, so a
+    # missing dependency surfaces before a single request is sent, rather than being
+    # silently substituted or skipped.
+    monkeypatch.setattr(
+        runner_module, "_resolve_baseline_file",
+        lambda resolved: "baseline/does_not_exist_sentiment_baseline.json",
+    )
+
     assert invoke("--target-id", "sentiment_v1") == 2
     assert state["posts"] == []
     assert list(out.iterdir()) == []
+
+
+def test_sentiment_core_dependencies_are_now_actually_present(cli):
+    """The counterpart to the above: with both tasks landed, readiness really passes.
+
+    Guards the other direction -- if a future change broke the sentiment endpoint
+    module path or the baseline file, the injected-failure test above would still pass
+    while the real evaluation had quietly become unrunnable.
+    """
+    from endpoint.targets import load_registry, missing_requirements
+    assert missing_requirements(load_registry(), "sentiment.core") == []
 
 
 def test_a_suite_the_attack_library_cannot_build_yet_is_refused(cli):

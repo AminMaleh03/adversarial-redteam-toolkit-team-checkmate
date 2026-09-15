@@ -186,7 +186,8 @@ class TestRegistry:
             "from endpoint.targets import load_registry;"
             "r = load_registry();"
             "assert r.registry_version;"
-            "bad = [m for m in ('torch','transformers','endpoint.model') if m in sys.modules];"
+            "bad = [m for m in ('torch','transformers','endpoint.model',"
+            "'endpoint.sentiment_v1','endpoint.loader') if m in sys.modules];"
             "print('LOADED:' + ','.join(bad))" % ROOT
         )
         out = subprocess.run(
@@ -275,19 +276,18 @@ class TestRegistry:
         assert (ROOT / "endpoint" / "sentiment_v1.py").exists(), (
             "Task 2's sentiment endpoint should exist by now"
         )
-        assert "endpoint.sentiment_v1" not in sys.modules, (
-            "endpoint.sentiment_v1 must not already be imported when this test starts, "
-            "or the assertion below proves nothing"
-        )
 
         r = load_registry()
 
         assert r.target("sentiment_v1").module == "endpoint.sentiment_v1"
         assert r.target("sentiment_v1").app_path == "endpoint.sentiment_v1:app"
-        assert "endpoint.sentiment_v1" not in sys.modules, (
-            "load_registry() imported endpoint.sentiment_v1 -- the registry must stay "
-            "model-free; module paths are data, not something the registry itself loads"
-        )
+
+        # The "did loading import it?" half cannot be asserted here: pytest runs the
+        # whole suite in one interpreter, and tests/test_endpoint.py legitimately
+        # imports endpoint.sentiment_v1 for real, so sys.modules is already populated
+        # by the time this runs and an in-process check proves nothing either way.
+        # That half lives in test_loads_without_importing_any_model above, which asks
+        # a clean subprocess -- the only place the question is actually answerable.
 
     def test_unknown_ids_raise_rather_than_returning_none(self):
         r = load_registry()
@@ -308,12 +308,31 @@ class TestRegistry:
         require_runnable(r, "emotion.core")
 
     def test_future_task_files_are_missing_but_do_not_break_loading(self):
+        """Deferred existence checks: the registry loads either way, and says which.
+
+        This asserted the other direction at foundation time -- sentiment.core's files
+        were deliberately absent, and the point was that load_registry() still worked.
+        Task 2 landed endpoint/sentiment_v1.py and Task 4 landed
+        baseline/sentiment_baseline.json, so there is nothing left missing and the
+        original assertion became false on integration rather than on either branch
+        alone. The deferred-check mechanism is what this test is really about, so it
+        is asserted against a target that genuinely is absent instead, and the now-
+        satisfied evaluation is required to be runnable.
+        """
         r = load_registry()
-        assert missing_requirements(r, "sentiment.core"), (
-            "Task 2/4 files should still be absent at foundation time"
+
+        assert missing_requirements(r, "sentiment.core") == [], (
+            "Task 2's endpoint and Task 4's baseline have both landed, so nothing "
+            "should be reported missing for sentiment.core"
         )
+        require_runnable(r, "sentiment.core")        # must not raise
+
+        # The mechanism still has to report a genuinely absent file, or it would be
+        # reporting success by no longer looking.
+        missing = missing_requirements(r, "sentiment.core", root=ROOT / "tests" / "fixtures")
+        assert missing, "requirement checking must still detect absent files"
         with pytest.raises(TargetConfigError):
-            require_runnable(r, "sentiment.core")
+            require_runnable(r, "sentiment.core", root=ROOT / "tests" / "fixtures")
 
     @pytest.mark.parametrize(
         "mutate,expected",

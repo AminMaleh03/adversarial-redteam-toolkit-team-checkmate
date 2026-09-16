@@ -64,14 +64,14 @@ def test_index_returns_branded_welcome_page(client):
 
 def test_home_shows_red_lab_version_label(client):
     body = client.get("/").text
-    assert "Red Lab v6.1" in body
+    assert "Red Lab v6.2" in body
 
 
 def test_active_pages_use_centralized_version_source_not_a_hardcoded_string(client):
     # v6.1: home, lab and generated report pages must all read the same PRODUCT_VERSION_LABEL
     # constant rather than each carrying its own copy of the string.
     from report.generate import PRODUCT_VERSION_LABEL
-    assert PRODUCT_VERSION_LABEL == "Red Lab v6.1"
+    assert PRODUCT_VERSION_LABEL == "Red Lab v6.2"
     home_body = client.get("/").text
     lab_body = client.get("/lab").text
     assert PRODUCT_VERSION_LABEL in home_body

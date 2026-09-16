@@ -26,7 +26,8 @@
     <div class="panel v3-identity">
       <p><strong>Run</strong> {{ data.run_identity.get('run_name') or data.run_identity.get('run_id') or 'Not recorded' }}</p>
       <p><strong>Run ID</strong> <code>{{ data.run_identity.get('run_id') or 'Not recorded' }}</code></p>
-      <p><strong>Application commit</strong> <code>{{ data.run_identity.get('app_commit') or data.run_identity.get('code_provenance', {}).get('app_commit') or 'Not recorded' }}</code></p>
+      {% set app_commit = data.run_identity.get('app_commit') or data.run_identity.get('code_provenance', {}).get('app_commit') %}
+      <p><strong>Application commit</strong> <code>{{ app_commit or 'Not recorded' }}</code>{% if not app_commit %} &mdash; {{ data.run_identity.get('app_commit_unavailable_reason') or 'no provenance reason was recorded for this run' }}{% endif %}</p>
       <p><strong>Contracts</strong> {{ data.contracts_version }}</p>
     </div>
   </section>
@@ -40,7 +41,7 @@
     </div>
 
     {% if evaluation.kind == 'single' %}
-    <div class="notice v3-single-note"><strong>Single-target evaluation.</strong> There is no V1/V2 hardening comparison for this model, so no improvement percentage is reported.</div>
+    <div class="notice v3-single-note"><strong>Single-target evaluation.</strong> This is a single-target evaluation of {{ evaluation.targets|join(', ') }}; results below are observations for the pinned target only. No hardening comparison is available or implied, no V1/V2 pair exists for this evaluation, and no improvement percentage is reported. Any remediation must be based only on this single-target evidence.</div>
     {% else %}
     <div class="panel v3-comparison">
       <h3>Paired comparison</h3>
@@ -90,6 +91,10 @@
     <article class="panel endpoint-card v3-target" id="target-{{ loop.index }}-{{ target_id }}">
       <p class="eyebrow">{{ target_id }} &middot; {{ summary.version|upper }}</p>
       <h3>{{ target_id|replace('_', ' ')|title }}</h3>
+      {% set ident = (summary.get('identity', {}).get('declared') or summary.get('identity', {}).get('inferred')) %}
+      {% if ident %}
+      <p class="v3-model-identity">Model <code>{{ ident.model_id }}</code>@<code>{{ ident.model_revision }}</code> &middot; Tokenizer <code>{{ ident.tokenizer_id }}</code>@<code>{{ ident.tokenizer_revision }}</code> <span class="caption">({{ summary.identity.get('provenance', 'provenance not recorded') }})</span></p>
+      {% endif %}
       <p>{{ summary.coverage.completed }}/{{ summary.coverage.planned }} requests completed ({{ summary.coverage.coverage_rate|percent }}).</p>
       <div class="v3-card-grid">
       {% for family, stats in summary.category_stats.items() %}

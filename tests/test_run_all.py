@@ -211,6 +211,103 @@ def test_registry_experiment_accepts_relative_results_root(monkeypatch, tmp_path
     assert (run_dir / Path(target_dirs["emotion_v2"]).parent).is_dir()
 
 
+# ------------------------------------------------------------------------------------------
+# v6.2: application-commit provenance is obtained once, reused, and honestly explained
+# ------------------------------------------------------------------------------------------
+
+
+def test_run_json_records_the_real_forty_char_application_commit(monkeypatch, tmp_path):
+    class PlannedStop(RuntimeError):
+        pass
+
+    synthetic_sha = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+    assert len(synthetic_sha) == 40
+    monkeypatch.setattr(
+        run_all.runner_mod, "code_provenance",
+        lambda root: {"app_commit": synthetic_sha, "dirty": False},
+    )
+    monkeypatch.setattr(
+        run_all, "_plan_evaluation",
+        lambda *args, **kwargs: (_ for _ in ()).throw(PlannedStop("planned stop")),
+    )
+    with pytest.raises(PlannedStop):
+        run_all.run_experiment(
+            mode="ci", run_name="commit_check", results_root=tmp_path,
+            evaluation_ids=["ci.emotion"], html_only=True,
+        )
+    run_dir = next((tmp_path).iterdir())
+    document = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+    assert document["app_commit"] == synthetic_sha
+    assert len(document["app_commit"]) == 40
+
+
+def test_app_commit_unavailable_reason_is_none_when_commit_present():
+    assert run_all._app_commit_unavailable_reason({"app_commit": "a" * 40, "dirty": False}) is None
+
+
+def test_app_commit_unavailable_reason_explains_missing_provenance_explicitly():
+    reason = run_all._app_commit_unavailable_reason({"app_commit": None, "dirty": None})
+    assert reason
+    assert "git" in reason.lower()
+    # Must never look like a silent "unknown", a branch name, or a remote head standing in.
+    assert reason not in ("unknown", "main", "HEAD", "origin/main")
+
+
+def test_app_commit_unavailable_reason_never_invents_a_commit_from_empty_string():
+    # An empty string is falsy, same as None -- must still produce an explicit reason,
+    # never render as if a (blank) commit were recorded.
+    reason = run_all._app_commit_unavailable_reason({"app_commit": "", "dirty": None})
+    assert reason
+
+
+# ------------------------------------------------------------------------------------------
+# v6.2: report limitations must not leak paired-only (V1/V2 hardening) wording into a
+# sentiment-only (single-target) run.
+# ------------------------------------------------------------------------------------------
+
+_PAIRED_ONLY_NOTE = "V2's defenses are application-layer only; no retraining was done."
+
+
+def test_applicable_limitations_excludes_paired_only_note_for_sentiment_only_run():
+    assert any(_PAIRED_ONLY_NOTE in note for note in run_all.analysis_mod.LIMITATION_NOTES)
+    blocks = [{
+        "kind": "single",
+        "targets": ["sentiment_v1"],
+        "summaries": {"sentiment_v1": {"limitations": list(run_all.analysis_mod.LIMITATION_NOTES)}},
+    }]
+    notes = run_all._applicable_limitations(blocks)
+    assert not any("V2's defenses are application-layer only" in note for note in notes)
+    assert not any("hardening" in note.lower() for note in notes)
+    assert len(notes) == len(run_all.analysis_mod.LIMITATION_NOTES) - 1
+
+
+def test_applicable_limitations_keeps_paired_only_note_when_a_paired_evaluation_exists():
+    blocks = [
+        {"kind": "paired", "targets": ["emotion_v1", "emotion_v2"],
+         "summaries": {
+             "emotion_v1": {"limitations": list(run_all.analysis_mod.LIMITATION_NOTES)},
+             "emotion_v2": {"limitations": list(run_all.analysis_mod.LIMITATION_NOTES)},
+         }},
+        {"kind": "single", "targets": ["sentiment_v1"],
+         "summaries": {"sentiment_v1": {"limitations": list(run_all.analysis_mod.LIMITATION_NOTES)}}},
+    ]
+    notes = run_all._applicable_limitations(blocks)
+    assert any("V2's defenses are application-layer only" in note for note in notes)
+    # Deduplicated across both evaluations, not doubled.
+    assert len(notes) == len(run_all.analysis_mod.LIMITATION_NOTES)
+
+
+def test_applicable_limitations_preserves_order_and_dedupes():
+    blocks = [{
+        "kind": "paired", "targets": ["emotion_v1", "emotion_v2"],
+        "summaries": {
+            "emotion_v1": {"limitations": ["a", "b"]},
+            "emotion_v2": {"limitations": ["b", "c"]},
+        },
+    }]
+    assert run_all._applicable_limitations(blocks) == ["a", "b", "c"]
+
+
 def test_release_workflow_prepares_results_and_preserves_gate_exit_code():
     workflow = (ROOT / ".github" / "workflows" / "release-gate.yml").read_text(
         encoding="utf-8"

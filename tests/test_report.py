@@ -583,7 +583,7 @@ def test_demo_hero_uses_functional_identity_not_marketing_copy(demo_data):
     assert "in one minute" not in result
     assert "V1" in result and "Unhardened Endpoint" in result
     assert "V2" in result and "Hardened Endpoint" in result
-    assert "Red Lab v6.1" in result and "Team Checkmate" in result
+    assert "Red Lab v6.2" in result and "Team Checkmate" in result
 
 
 def test_demo_crash_note_is_a_small_caption_not_a_warning_box(demo_data):
@@ -648,7 +648,7 @@ def test_reports_credit_team_checkmate_and_show_red_lab_version(demo_data):
     for mode in ("demo", "full"):
         result = html(demo_data, mode=mode)
         assert "Team Checkmate" in result
-        assert "Red Lab v6.1" in result
+        assert "Red Lab v6.2" in result
 
 
 # ----------------------------------------------------------------------------------------
@@ -722,7 +722,7 @@ def test_reports_masthead_brand_shows_version_label(demo_data):
         header = result[result.index("<header"):result.index("</header>")]
         assert "Team Checkmate" in header
         assert 'class="brand-creator"' in header
-        assert "Red Lab v6.1" in header
+        assert "Red Lab v6.2" in header
 
 
 def test_reports_masthead_brand_uses_shared_class_names_with_web_app(demo_data):
@@ -1030,7 +1030,7 @@ def test_full_report_analysis_schema_not_a_hero_badge(data):
     assert "Analysis schema" not in hero  # moved out of the hero entirely
     provenance = result[result.index('id="provenance"'):result.index("</section>", result.index('id="provenance"'))]
     assert "Analysis schema v2" in provenance
-    assert "Red Lab v6.1" in provenance  # product version, a distinct concept, still present
+    assert "Red Lab v6.2" in provenance  # product version, a distinct concept, still present
 
 
 def test_full_report_remediation_architecture_preserved(data):
@@ -1133,7 +1133,7 @@ def _stage3_document():
 def test_v3_report_renders_targets_single_explanation_and_structured_remediation():
     result = report.render_html(_stage3_document(), source_sha256="b" * 64, include_pdf=False)
     assert "emotion_v1" in result and "sentiment_v1" in result
-    assert "There is no V1/V2 hardening comparison for this model" in result
+    assert "No hardening comparison is available or implied" in result
     assert "Observed evidence" in result
     assert "Why it matters" in result
     assert "Verification" in result
@@ -1200,3 +1200,155 @@ def test_v3_demo_report_pdf_omitted_regardless_of_evaluation_kind():
     assert {"paired", "single"} <= kinds  # sanity: fixture actually covers both kinds
     demo_html = report.render_html(payload, source_sha256="c" * 64, include_pdf=True, mode="demo")
     assert "Download PDF" not in demo_html
+
+
+# ------------------------------------------------------------------------------------------
+# v6.2: application commit is real, consistent, and honestly explained when missing
+# ------------------------------------------------------------------------------------------
+
+_SYNTHETIC_SHA = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+
+
+def _application_commit_paragraph(html):
+    match = re.search(r"<p><strong>Application commit</strong>.*?</p>", html, re.S)
+    assert match, "expected an Application commit paragraph in the v3 report"
+    return match.group(0)
+
+
+def test_v3_report_shows_the_real_forty_char_application_commit():
+    assert len(_SYNTHETIC_SHA) == 40
+    payload = _stage3_document()
+    payload["run_identity"]["app_commit"] = _SYNTHETIC_SHA
+    html = report.render_html(payload, source_sha256="1" * 64, include_pdf=False)
+    paragraph = _application_commit_paragraph(html)
+    assert _SYNTHETIC_SHA in paragraph
+    assert "Not recorded" not in paragraph
+
+
+def test_v3_report_explains_missing_application_commit_not_bare_not_recorded():
+    payload = _stage3_document()
+    payload["run_identity"]["app_commit"] = None
+    payload["run_identity"].pop("code_provenance", None)
+    payload["run_identity"]["app_commit_unavailable_reason"] = (
+        "Git metadata was unavailable in this environment when the run started."
+    )
+    html = report.render_html(payload, source_sha256="2" * 64, include_pdf=False)
+    paragraph = _application_commit_paragraph(html)
+    assert "Not recorded" in paragraph
+    assert "Git metadata was unavailable" in paragraph
+
+
+def test_v3_report_never_substitutes_model_revision_or_branch_name_for_app_commit():
+    payload = _stage3_document()
+    model_revision = (
+        payload["evaluations"][0]["summaries"]["emotion_v1"]["identity"]["declared"]["model_revision"]
+    )
+    payload["run_identity"]["app_commit"] = None
+    payload["run_identity"].pop("code_provenance", None)
+    for branch_like in ("main", "stage3/ahsan", "HEAD", "origin/main"):
+        assert branch_like != model_revision  # sanity: fixture data really is distinct
+    html = report.render_html(payload, source_sha256="3" * 64, include_pdf=False)
+    paragraph = _application_commit_paragraph(html)
+    assert model_revision not in paragraph
+    assert "main" not in paragraph.lower()
+
+
+def test_v3_render_html_module_never_imports_subprocess_or_shells_out_to_git():
+    # The report renderer must remain pure -- provenance is threaded through existing run
+    # evidence, never (re-)derived by asking the template layer to run Git (v6.2).
+    source = (ROOT / "report" / "generate.py").read_text(encoding="utf-8")
+    assert "import subprocess" not in source
+    assert "git rev-parse" not in source
+    assert "GIT_" not in source
+
+
+# ------------------------------------------------------------------------------------------
+# v6.2: paired common-eligible-denominator and single-target "not applicable" wording
+# ------------------------------------------------------------------------------------------
+
+
+def test_v3_paired_denominator_is_the_matched_intersection_not_either_side_alone():
+    payload = _stage3_document()
+    paired = next(e for e in payload["evaluations"] if e["kind"] == "paired")
+    comparison = paired["comparison"]
+    v1_denominator = paired["summaries"][paired["targets"][0]]["drift"]["eligible_comparisons"]
+    v2_denominator = paired["summaries"][paired["targets"][1]]["drift"]["eligible_comparisons"]
+    # Sanity: the fixture's per-target denominators actually differ from the common one, so
+    # this test cannot pass by accident if the template were showing either side alone.
+    assert comparison["common_denominator"] not in (0,)
+    html = report.render_html(payload, source_sha256="4" * 64, include_pdf=False)
+    assert f"Common eligible denominator: <strong>{comparison['common_denominator']}</strong>" in html
+    # The two per-target denominators, if different from the common one, must not appear
+    # mislabeled as *the* common eligible denominator.
+    if v1_denominator != comparison["common_denominator"]:
+        assert f"Common eligible denominator: <strong>{v1_denominator}</strong>" not in html
+    if v2_denominator != comparison["common_denominator"]:
+        assert f"Common eligible denominator: <strong>{v2_denominator}</strong>" not in html
+
+
+def test_v3_paired_comparison_withheld_shows_explicit_reason_not_bare_not_recorded():
+    payload = _stage3_document()
+    paired = next(e for e in payload["evaluations"] if e["kind"] == "paired")
+    paired["comparison"] = {"comparison_withheld_reason": "manifests differed between targets"}
+    html = report.render_html(payload, source_sha256="5" * 64, include_pdf=False)
+    section = html[html.index(paired["evaluation_id"]):]
+    section = section[:section.index("</section>")]
+    assert "manifests differed between targets" in section
+    assert "Common eligible denominator: <strong>Not recorded" not in section
+
+
+def test_v3_single_target_sentiment_shows_not_applicable_language_not_bare_not_recorded():
+    payload = _stage3_document()
+    single = next(e for e in payload["evaluations"] if e["kind"] == "single")
+    assert single["comparison"] is None
+    html = report.render_html(payload, source_sha256="6" * 64, include_pdf=False)
+    section = html[html.index(f'id="evaluation-{payload["evaluations"].index(single) + 1}"'):]
+    section = section[:section.index("</section>")]
+    assert "Single-target evaluation" in section
+    assert "No hardening comparison is available or implied" in section
+    assert "Common eligible denominator" not in section
+    assert "Not recorded" not in section
+
+
+def test_v3_single_target_sentiment_contains_no_v2_or_hardening_claims():
+    # v6.2 requirement 4: a sentiment (single-target) evaluation block must never *affirm* a
+    # V2/hardened counterpart exists, was tested, or that mitigation was measured. (A negated
+    # mention -- "no V1/V2 pair exists for this evaluation" -- is the correct, honest wording
+    # and is deliberately not in this forbidden list.)
+    payload = _stage3_document()
+    single = next(e for e in payload["evaluations"] if e["kind"] == "single")
+    idx = payload["evaluations"].index(single) + 1
+    html = report.render_html(payload, source_sha256="7" * 64, include_pdf=False)
+    section = html[html.index(f'id="evaluation-{idx}"'):]
+    section = section[:section.index("</section>")]
+    for forbidden in (
+        "sentiment_v2", "hardened endpoint", "Mitigated by V2",
+        "Persisting after hardening", "V2 — Hardened Endpoint", "Two endpoint configurations",
+    ):
+        assert forbidden.lower() not in section.lower()
+    # "mitigation"/"improvement" may appear only inside the honest negation already asserted
+    # by test_v3_single_target_sentiment_shows_not_applicable_language_not_bare_not_recorded;
+    # here, confirm no *positive* mitigation percentage or rate is rendered for this target.
+    assert "flip_rate_on_common" not in section
+    assert "Common eligible denominator" not in section
+
+
+def test_v3_report_never_shows_v2_hardening_limitation_when_run_has_no_paired_evaluation():
+    # v6.2 requirement 4 at the run-wide "Limitations" section: analysis.analyze.
+    # LIMITATION_NOTES' V2-hardening note is emitted unconditionally per target by the
+    # (frozen) analysis layer -- a sentiment-only run's report must not surface it.
+    payload = _stage3_document()
+    sentiment_only = {
+        "schema_version": 3, "contracts_version": "3.0.0",
+        "run_identity": dict(payload["run_identity"]),
+        "evaluations": [next(e for e in payload["evaluations"] if e["kind"] == "single")],
+        "limitations": [
+            note for note in
+            payload["evaluations"][0]["summaries"][payload["evaluations"][0]["targets"][0]].get("limitations", [])
+            if "V2" not in note
+        ] or ["Single-target observations only."],
+    }
+    html = report.render_html(sentiment_only, source_sha256="8" * 64, include_pdf=False)
+    limitations_section = html[html.index('id="limitations"'):]
+    assert "V2" not in limitations_section
+    assert "hardening" not in limitations_section.lower()

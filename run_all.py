@@ -1215,6 +1215,41 @@ def _analyze_evaluation(registry, evaluation, evaluation_dir: Path) -> dict:
     return block
 
 
+# analysis.analyze.LIMITATION_NOTES is emitted unconditionally onto every target's summary
+# (per-target, regardless of whether that target has a paired counterpart) -- this one note
+# is written in V1/V2 hardening terms and is not applicable to a run that never touches a
+# paired evaluation (v6.2: a sentiment-only report must never say "V2" or "hardening").
+# Matched by content, not by tuple index, so a reordering of the frozen tuple upstream can't
+# silently break the filter.
+_PAIRED_ONLY_LIMITATION_MARKER = "V2's defenses are application-layer only"
+
+
+def _applicable_limitations(analysis_blocks: list) -> list:
+    """The run-wide, deduplicated limitations list, minus any paired-only (V1/V2 hardening)
+    note when this run contains no paired evaluation at all. Never rewrites or reorders the
+    notes that do apply -- only omits ones that describe a comparison this run cannot have."""
+    has_paired = any(block["kind"] == "paired" for block in analysis_blocks)
+    notes = (
+        note for block in analysis_blocks
+        for target_id in block["targets"]
+        for note in block["summaries"][target_id].get("limitations", [])
+        if has_paired or _PAIRED_ONLY_LIMITATION_MARKER not in note
+    )
+    return list(dict.fromkeys(notes))
+
+
+def _app_commit_unavailable_reason(provenance: dict) -> Optional[str]:
+    """An explicit reason for a missing application commit (v6.2) -- never a silent
+    "unknown", a branch name, or the remote head standing in for the real commit."""
+    if provenance.get("app_commit"):
+        return None
+    return (
+        "Git metadata was unavailable in this environment when the run started "
+        "(no .git directory, git not on PATH, or the git command failed); no application "
+        "commit could be recorded for this run."
+    )
+
+
 def _registry_snapshot(registry) -> dict:
     return {
         "registry_version": registry.registry_version,
@@ -1270,7 +1305,11 @@ def _run_registry_experiment(mode: str, run_name: Optional[str], results_root: O
         raise RuntimeError("target registry changed while the run was being created")
     (run_dir / "registry.json").write_bytes(registry_bytes)
 
+    # Obtained once, here, and reused for every evaluation in this orchestration call (never
+    # re-derived per evaluation or asked of the report renderer) so multiple evaluations in one
+    # run always agree on the same application commit (v6.2 requirement).
     provenance = runner_mod.code_provenance(ROOT)
+    app_commit_unavailable_reason = _app_commit_unavailable_reason(provenance)
     created = datetime.now(timezone.utc).isoformat(timespec="seconds")
     index_entries = []
     for evaluation in evaluations:
@@ -1364,14 +1403,11 @@ def _run_registry_experiment(mode: str, run_name: Optional[str], results_root: O
             "run_identity": {
                 "run_id": run_id, "run_name": display_name,
                 "created_at_utc": created, "app_commit": provenance["app_commit"],
+                "app_commit_unavailable_reason": app_commit_unavailable_reason,
                 "dirty": provenance["dirty"], "registry_sha256": registry.source_sha256,
             },
             "evaluations": analysis_blocks,
-            "limitations": list(dict.fromkeys(
-                note for block in analysis_blocks
-                for target_id in block["targets"]
-                for note in block["summaries"][target_id].get("limitations", [])
-            )),
+            "limitations": _applicable_limitations(analysis_blocks),
         }
         raw = (json.dumps(analysis_document, indent=2, ensure_ascii=False, allow_nan=False) + "\n").encode("utf-8")
         _emit_progress(progress_callback, "generating_results", "Generating the report")

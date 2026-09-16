@@ -15,6 +15,7 @@ protect its own internal V1/V2 ports (:8000/:8001) from two visitors racing each
 from __future__ import annotations
 
 import base64
+import hashlib
 import logging
 import secrets
 import sys
@@ -295,6 +296,37 @@ app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
 templates = Jinja2Templates(directory=str(HERE / "templates"))
 
 
+def _asset_fingerprints() -> dict[str, str]:
+    """Map each static filename to a short hash of its current bytes.
+
+    The templates linked ``/static/app.css`` with no version, and the platform serves it with
+    an ETag but no ``Cache-Control``, so a browser is free to reuse its stored copy without
+    revalidating. That is not hypothetical: after the v7 deploy, a visitor who had loaded the
+    site earlier kept the previous stylesheet and saw v7's markup painted in the superseded
+    V5.5 light palette, while the generated reports -- which carry their CSS inline -- came
+    out correctly dark. The mismatch reads as a broken deployment rather than a stale cache.
+
+    Appending a content hash gives each release a distinct URL, so a changed asset can never
+    be answered from a cache entry for the previous one. The hash is of the bytes, not of the
+    commit, so an unchanged asset keeps its URL and stays cached across deploys.
+    """
+    fingerprints = {}
+    for path in sorted((HERE / "static").glob("*")):
+        if path.is_file():
+            fingerprints[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()[:12]
+    return fingerprints
+
+
+# Computed once at import: the static files are baked into the image and never change at runtime.
+ASSET_FINGERPRINTS = _asset_fingerprints()
+
+
+def asset_url(name: str) -> str:
+    """``/static/<name>`` carrying its content hash, or unversioned if the file is absent."""
+    digest = ASSET_FINGERPRINTS.get(name)
+    return f"/static/{name}?v={digest}" if digest else f"/static/{name}"
+
+
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request) -> HTMLResponse:
     # Always the welcome page -- never redirects a fresh visitor into a previous result
@@ -312,6 +344,7 @@ def index(request: Request) -> HTMLResponse:
         "technical_report_available": run_all.TECHNICAL_REPORT_DIR.exists(),
         "technical_report_href": f"{TECHNICAL_REPORT_MOUNT}/",
         "demo_descriptors": _all_demo_descriptors(),
+        "asset": asset_url,
     }
     return templates.TemplateResponse(request, "index.html", context)
 
@@ -331,6 +364,7 @@ def lab_page(request: Request) -> HTMLResponse:
         "technical_report_href": f"{TECHNICAL_REPORT_MOUNT}/",
         "lab_descriptors": lab_module.all_lab_descriptors(),
         "lab_max_chars": lab_module.MAX_INPUT_CHARS,
+        "asset": asset_url,
     }
     return templates.TemplateResponse(request, "lab.html", context)
 

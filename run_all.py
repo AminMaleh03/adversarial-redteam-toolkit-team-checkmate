@@ -55,6 +55,10 @@ RESULTS_ROOT = ROOT / "results"
 # (provenance recorded in HANDOFF.md). Demo reports link to a copy of this, never to a
 # transient results/<run>/ path or an absolute filesystem path.
 VERIFIED_FULL_REPORT_DIR = ROOT / "artifacts" / "verified_full_report"
+# V6.3: stable, project-relative location for the generated multi-target master technical
+# report (see report/master_report.py). Pre-generated and committed, the same pattern as
+# VERIFIED_FULL_REPORT_DIR above -- never regenerated on request, never a transient path.
+TECHNICAL_REPORT_DIR = ROOT / "artifacts" / "technical_report"
 
 ENDPOINT_SPECS = {
     "v1": {"app": "endpoint.v1:app", "port": 8000},

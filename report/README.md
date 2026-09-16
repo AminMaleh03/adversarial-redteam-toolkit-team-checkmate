@@ -100,6 +100,32 @@ Validation and PDF rendering finish before the output directory is created. A fi
 failure during publication can leave a partial new directory; the command reports failure.
 Keep that directory for diagnosis and use a fresh destination after resolving the error.
 
+## Master technical report (V6.3+)
+
+`report/master_report.py` renders the multi-target master technical report served at
+`/technical-report/`, combining the historical emotion.core benchmark with real
+sentiment.core, emotion.oces, sentiment.oces and ci.emotion evidence into one navigable
+document. It never re-scores or re-runs an evaluation -- it only reads already-recorded
+evidence, listed with its SHA-256 in `report/master_evidence/manifest.json`.
+
+```powershell
+.\.venv\Scripts\python.exe -m report.master_report
+```
+
+This re-hashes every file the manifest lists and refuses to render (exit 1) if any is
+missing or its bytes no longer match -- evidence integrity fails closed, not silently.
+Output is committed at `artifacts/technical_report/` (the same pattern as
+`artifacts/verified_full_report/`): pre-generated, never regenerated on request by the
+web app. `web/app.py` mounts it at `/technical-report/` alongside the archived
+`/verified-full/` route, which the master report links to as historical evidence and
+never overwrites.
+
+To add a new evidence source: run it for real, commit the resulting bundle under
+`artifacts/<name>/` with its own `PROVENANCE.md`, add its path and SHA-256 to
+`report/master_evidence/manifest.json`, then extend `master_report.build_context` and
+`master_template.html` to read it. Never hand-edit a bundle's bytes after generation, and
+never point the manifest at a path under gitignored `results/`.
+
 ## Validate
 
 ```powershell

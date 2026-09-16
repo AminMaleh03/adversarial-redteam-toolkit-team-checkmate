@@ -64,14 +64,14 @@ def test_index_returns_branded_welcome_page(client):
 
 def test_home_shows_red_lab_version_label(client):
     body = client.get("/").text
-    assert "Red Lab v6.2" in body
+    assert "Red Lab v6.3" in body
 
 
 def test_active_pages_use_centralized_version_source_not_a_hardcoded_string(client):
     # v6.1: home, lab and generated report pages must all read the same PRODUCT_VERSION_LABEL
     # constant rather than each carrying its own copy of the string.
     from report.generate import PRODUCT_VERSION_LABEL
-    assert PRODUCT_VERSION_LABEL == "Red Lab v6.2"
+    assert PRODUCT_VERSION_LABEL == "Red Lab v6.3"
     home_body = client.get("/").text
     lab_body = client.get("/lab").text
     assert PRODUCT_VERSION_LABEL in home_body
@@ -93,11 +93,13 @@ def test_home_navigation_has_required_links(client):
 def test_home_technical_report_link_preserves_page_history(client):
     body = client.get("/").text
     if "Technical Report" not in body:
-        pytest.skip("verified_full_report artifact not present in this checkout")
+        pytest.skip("technical_report artifact not present in this checkout")
     idx = body.index("Technical Report")
     tag = body[body.rindex("<a", 0, idx):idx]
     assert 'target="_blank"' not in tag
-    assert 'href="/verified-full/report.html"' in tag
+    # V6.3: the "Technical Report" nav link now points at the new master report route,
+    # not the archived /verified-full/ historical benchmark (still linked from within it).
+    assert 'href="/technical-report/"' in tag
 
 
 def test_home_has_mobile_menu_toggle_markup(client):
@@ -699,3 +701,38 @@ def test_verified_full_served_bytes_match_recorded_evidence_hashes(client):
         resp = client.get(f"/verified-full/{name}")
         assert resp.status_code == 200
         assert hashlib.sha256(resp.content).hexdigest() == recorded[name], name
+
+
+# ------------------------------------------------------------------------------------------
+# V6.3: the /technical-report/ master report route.
+# ------------------------------------------------------------------------------------------
+
+def test_technical_report_route_serves_master_report(client):
+    if not run_all.TECHNICAL_REPORT_DIR.exists():
+        pytest.skip("technical_report artifact not present in this checkout")
+    resp = client.get("/technical-report/")
+    assert resp.status_code == 200
+    assert "Red Lab v6.3" in resp.text
+    assert "MASTER TECHNICAL REPORT" in resp.text
+
+
+def test_technical_report_route_has_no_pdf_button(client):
+    if not run_all.TECHNICAL_REPORT_DIR.exists():
+        pytest.skip("technical_report artifact not present in this checkout")
+    body = client.get("/technical-report/").text
+    assert "Download PDF" not in body
+    assert "report.pdf" not in body
+
+
+def test_technical_report_verified_full_bytes_unmodified(client):
+    """Adding the master report route must never touch the archived V5 artifact."""
+    meta_path = run_all.VERIFIED_FULL_REPORT_DIR / "export_meta.json"
+    if not meta_path.exists() or not run_all.TECHNICAL_REPORT_DIR.exists():
+        pytest.skip("required artifacts not present in this checkout")
+    recorded = json.loads(meta_path.read_text(encoding="utf-8"))["files"]
+    for name in ("analysis.json", "report.html", "report.pdf"):
+        resp = client.get(f"/verified-full/{name}")
+        assert resp.status_code == 200
+        assert hashlib.sha256(resp.content).hexdigest() == recorded[name], name
+    verified_body = client.get("/verified-full/report.html").text
+    assert "Red Lab v5.0" in verified_body

@@ -47,6 +47,7 @@ RED_LAB_LOGO_PATH = ROOT / "Red Lab Adversarial Testing Redefined.png"
 
 RESULTS_MOUNT = "/results"
 VERIFIED_MOUNT = "/verified-full"
+TECHNICAL_REPORT_MOUNT = "/technical-report"
 
 # Real orchestration transitions only -- see run_all.py's _emit_progress call sites for
 # what each stage actually means. Order here must match the order run_experiment() emits.
@@ -285,6 +286,10 @@ app.mount(RESULTS_MOUNT, StaticFiles(directory=str(run_all.RESULTS_ROOT)), name=
 if run_all.VERIFIED_FULL_REPORT_DIR.exists():
     app.mount(VERIFIED_MOUNT, StaticFiles(directory=str(run_all.VERIFIED_FULL_REPORT_DIR)), name="verified_full")
 
+if run_all.TECHNICAL_REPORT_DIR.exists():
+    app.mount(TECHNICAL_REPORT_MOUNT, StaticFiles(directory=str(run_all.TECHNICAL_REPORT_DIR), html=True),
+              name="technical_report")
+
 app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
 
 templates = Jinja2Templates(directory=str(HERE / "templates"))
@@ -304,6 +309,8 @@ def index(request: Request) -> HTMLResponse:
         "product_version_label": PRODUCT_VERSION_LABEL,
         "verified_full_available": run_all.VERIFIED_FULL_REPORT_DIR.exists(),
         "verified_full_href": f"{VERIFIED_MOUNT}/report.html",
+        "technical_report_available": run_all.TECHNICAL_REPORT_DIR.exists(),
+        "technical_report_href": f"{TECHNICAL_REPORT_MOUNT}/",
         "demo_descriptors": _all_demo_descriptors(),
     }
     return templates.TemplateResponse(request, "index.html", context)
@@ -320,6 +327,8 @@ def lab_page(request: Request) -> HTMLResponse:
         "product_version_label": PRODUCT_VERSION_LABEL,
         "verified_full_available": run_all.VERIFIED_FULL_REPORT_DIR.exists(),
         "verified_full_href": f"{VERIFIED_MOUNT}/report.html",
+        "technical_report_available": run_all.TECHNICAL_REPORT_DIR.exists(),
+        "technical_report_href": f"{TECHNICAL_REPORT_MOUNT}/",
         "lab_descriptors": lab_module.all_lab_descriptors(),
         "lab_max_chars": lab_module.MAX_INPUT_CHARS,
     }

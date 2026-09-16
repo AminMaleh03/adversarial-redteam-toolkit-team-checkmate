@@ -26,8 +26,8 @@
         <a href="/" id="nav-home" aria-current="page">Home</a>
         <a href="#run" id="nav-live-demo">Live Demo</a>
         <a href="/lab" id="nav-try-lab">Try Your Own Input</a>
-        {% if verified_full_available %}
-        <a href="{{ verified_full_href }}">Technical Report</a>
+        {% if technical_report_available %}
+        <a href="{{ technical_report_href }}">Technical Report</a>
         {% endif %}
       </nav>
     </div>
@@ -64,8 +64,8 @@
           <div class="hero-path"><button id="run-btn" class="button primary" type="button">Run Live Demo</button><p class="caption">Explore a curated attack suite</p></div>
           <div class="hero-path"><a class="button secondary" href="/lab">Try Your Own Input</a><p class="caption">Put your own sentence to the test</p></div>
         </div>
-        {% if verified_full_available %}
-        <a class="button tertiary hero-report" href="{{ verified_full_href }}">View Technical Report</a>
+        {% if technical_report_available %}
+        <a class="button tertiary hero-report" href="{{ technical_report_href }}">View Technical Report</a>
         {% endif %}
         <p id="cta-note" class="caption">Real requests. Recorded outcomes. Evidence you can inspect.</p>
         <p class="model" id="model-identity">Model: j-hartmann/emotion-english-distilroberta-base &middot; 7 emotion labels</p>

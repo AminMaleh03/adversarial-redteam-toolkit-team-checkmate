@@ -1,0 +1,3340 @@
+{
+  "schema_version": 3,
+  "contracts_version": "3.0.0",
+  "run_identity": {
+    "run_id": "bf0c268072bf48dd",
+    "run_name": "v63_real_sentiment_core",
+    "created_at_utc": "2026-09-16T08:19:03+00:00",
+    "app_commit": "78188adbdcb4449429116af3161a032516d38aa8",
+    "app_commit_unavailable_reason": null,
+    "dirty": false,
+    "registry_sha256": "3212f30cde643ba6e53e8ef514ecce870f212b1a88bfa208876136cc9b8a0136"
+  },
+  "evaluations": [
+    {
+      "evaluation_id": "sentiment.core",
+      "kind": "single",
+      "task_id": "sentiment_2",
+      "suite_id": "core",
+      "targets": [
+        "sentiment_v1"
+      ],
+      "summaries": {
+        "sentiment_v1": {
+          "version": "v1",
+          "target_id": "sentiment_v1",
+          "task_id": "sentiment_2",
+          "suite_id": "core",
+          "identity": {
+            "target_id": "sentiment_v1",
+            "task_id": "sentiment_2",
+            "suite_id": "core",
+            "provenance": "declared",
+            "declared": {
+              "target_id": "sentiment_v1",
+              "task_id": "sentiment_2",
+              "suite_id": "core"
+            },
+            "model": {
+              "model_id": "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+              "revision": "714eb0fa89d2f80546fda750413ed43d93601a13",
+              "tokenizer_id": "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+              "tokenizer_revision": "714eb0fa89d2f80546fda750413ed43d93601a13",
+              "labels": [
+                "NEGATIVE",
+                "POSITIVE"
+              ],
+              "max_sequence_length": 512
+            },
+            "baseline": {
+              "path": "baseline/sentiment_baseline.json",
+              "sha256": "33077982c79553d0ae700ed0658c5912186958750866d725792e7f9bf4c87bd2"
+            },
+            "evaluation_run_id": "bf0c268072bf48dd",
+            "evaluation_id": "sentiment.core",
+            "case_set_id": null
+          },
+          "coverage": {
+            "planned": 1931,
+            "skipped": 0,
+            "limit_excluded": 0,
+            "deselected": 0,
+            "selected": 1931,
+            "completed": 1931,
+            "missing": 0,
+            "coverage_rate": 1.0
+          },
+          "category_stats": {
+            "malformed": {
+              "eligible": 21,
+              "failed": 2,
+              "review": 0,
+              "diagnostic": 0,
+              "unevaluable": 0,
+              "failure_rate": 0.09523809523809523
+            },
+            "boundary": {
+              "eligible": 11,
+              "failed": 1,
+              "review": 0,
+              "diagnostic": 0,
+              "unevaluable": 0,
+              "failure_rate": 0.09090909090909091
+            },
+            "perturbation": {
+              "eligible": 376,
+              "failed": 22,
+              "review": 0,
+              "diagnostic": 0,
+              "unevaluable": 0,
+              "failure_rate": 0.05851063829787234
+            },
+            "encoding": {
+              "eligible": 935,
+              "failed": 63,
+              "review": 42,
+              "diagnostic": 0,
+              "unevaluable": 0,
+              "failure_rate": 0.06737967914438503
+            },
+            "whitespace": {
+              "eligible": 210,
+              "failed": 0,
+              "review": 0,
+              "diagnostic": 42,
+              "unevaluable": 0,
+              "failure_rate": 0.0
+            },
+            "truncation": {
+              "eligible": 168,
+              "failed": 98,
+              "review": 0,
+              "diagnostic": 84,
+              "unevaluable": 0,
+              "failure_rate": 0.5833333333333334
+            }
+          },
+          "operational": {
+            "unhandled_5xx": 85,
+            "timeouts": 1,
+            "connection_failures": 0,
+            "service_unavailable": 0,
+            "slow_responses": 0,
+            "info_leaks": 0,
+            "invalid_input_accepted": 1
+          },
+          "drift": {
+            "eligible_comparisons": 1604,
+            "qualifying_flips": 99,
+            "flip_rate": 0.06172069825436409,
+            "baseline_denominator": {
+              "eligible": 42,
+              "total": 42,
+              "excluded_below_threshold": 0,
+              "excluded_baselines": [],
+              "no_prediction": [],
+              "statement": "42 of 42 baselines eligible for flip scoring",
+              "threshold": 0.6
+            },
+            "confidence_change": {
+              "mean_delta_on_flips": -0.10859894090228611,
+              "per_flip": [
+                {
+                  "attack_id": "sst2-val-109.encoding.compatibility_fullwidth.whole",
+                  "clean_confidence": 0.9998679161071777,
+                  "attacked_confidence": 0.8940701484680176,
+                  "delta": -0.10579776763916016
+                },
+                {
+                  "attack_id": "sst2-val-120.encoding.compatibility_fullwidth.whole",
+                  "clean_confidence": 0.9998489618301392,
+                  "attacked_confidence": 0.9119508266448975,
+                  "delta": -0.0878981351852417
+                },
+                {
+                  "attack_id": "sst2-val-121.encoding.homoglyph.middle.d3",
+                  "clean_confidence": 0.997744083404541,
+                  "attacked_confidence": 0.8618375658988953,
+                  "delta": -0.13590651750564575
+                },
+                {
+                  "attack_id": "sst2-val-121.encoding.homoglyph.middle.d5",
+                  "clean_confidence": 0.997744083404541,
+                  "attacked_confidence": 0.7735152840614319,
+                  "delta": -0.22422879934310913
+                },
+                {
+                  "attack_id": "sst2-val-121.encoding.homoglyph_greek.middle.d3",
+                  "clean_confidence": 0.997744083404541,
+                  "attacked_confidence": 0.9664337038993835,
+                  "delta": -0.03131037950515747
+                },
+                {
+                  "attack_id": "sst2-val-121.encoding.deletion_backspace.middle.d1",
+                  "clean_confidence": 0.997744083404541,
+                  "attacked_confidence": 0.9303663372993469,
+                  "delta": -0.06737774610519409
+                },
+                {
+                  "attack_id": "sst2-val-121.encoding.compatibility_fullwidth.whole",
+                  "clean_confidence": 0.997744083404541,
+                  "attacked_confidence": 0.9613831043243408,
+                  "delta": -0.036360979080200195
+                },
+                {
+                  "attack_id": "sst2-val-121.truncation.signal_start_short",
+                  "clean_confidence": 0.997744083404541,
+                  "attacked_confidence": 0.8544068932533264,
+                  "delta": -0.1433371901512146
+                },
+                {
+                  "attack_id": "sst2-val-13.perturbation.keyboard_typo",
+                  "clean_confidence": 0.9570925235748291,
+                  "attacked_confidence": 0.736819326877594,
+                  "delta": -0.2202731966972351
+                },
+                {
+                  "attack_id": "sst2-val-13.perturbation.delete_char",
+                  "clean_confidence": 0.9570925235748291,
+                  "attacked_confidence": 0.5492442846298218,
+                  "delta": -0.4078482389450073
+                },
+                {
+                  "attack_id": "sst2-val-13.perturbation.word_split",
+                  "clean_confidence": 0.9570925235748291,
+                  "attacked_confidence": 0.6965945363044739,
+                  "delta": -0.2604979872703552
+                },
+                {
+                  "attack_id": "sst2-val-13.perturbation.insert_char",
+                  "clean_confidence": 0.9570925235748291,
+                  "attacked_confidence": 0.7752896547317505,
+                  "delta": -0.1818028688430786
+                },
+                {
+                  "attack_id": "sst2-val-13.perturbation.misspell",
+                  "clean_confidence": 0.9570925235748291,
+                  "attacked_confidence": 0.6516159176826477,
+                  "delta": -0.3054766058921814
+                },
+                {
+                  "attack_id": "sst2-val-13.encoding.homoglyph.leading.d3",
+                  "clean_confidence": 0.9570925235748291,
+                  "attacked_confidence": 0.8489347696304321,
+                  "delta": -0.10815775394439697
+                },
+                {
+                  "attack_id": "sst2-val-13.encoding.homoglyph.leading.d5",
+                  "clean_confidence": 0.9570925235748291,
+                  "attacked_confidence": 0.9801563024520874,
+                  "delta": 0.0230637788772583
+                },
+                {
+                  "attack_id": "sst2-val-13.encoding.homoglyph.middle.d1",
+                  "clean_confidence": 0.9570925235748291,
+                  "attacked_confidence": 0.6269503235816956,
+                  "delta": -0.33014219999313354
+                },
+                {
+                  "attack_id": "sst2-val-13.encoding.homoglyph.middle.d3",
+                  "clean_confidence": 0.9570925235748291,
+                  "attacked_confidence": 0.7897050380706787,
+                  "delta": -0.1673874855041504
+                },
+                {
+                  "attack_id": "sst2-val-13.encoding.homoglyph.middle.d5",
+                  "clean_confidence": 0.9570925235748291,
+                  "attacked_confidence": 0.9543548226356506,
+                  "delta": -0.002737700939178467
+                },
+                {
+                  "attack_id": "sst2-val-13.encoding.homoglyph_greek.leading.d3",
+                  "clean_confidence": 0.9570925235748291,
+                  "attacked_confidence": 0.9573677182197571,
+                  "delta": 0.0002751946449279785
+                },
+                {
+                  "attack_id": "sst2-val-13.encoding.homoglyph_greek.middle.d1",
+                  "clean_confidence": 0.9570925235748291,
+                  "attacked_confidence": 0.9820916056632996,
+                  "delta": 0.02499908208847046
+                },
+                {
+                  "attack_id": "sst2-val-13.encoding.homoglyph_greek.middle.d3",
+                  "clean_confidence": 0.9570925235748291,
+                  "attacked_confidence": 0.969956636428833,
+                  "delta": 0.012864112854003906
+                },
+                {
+                  "attack_id": "sst2-val-13.encoding.deletion_backspace.middle.d1",
+                  "clean_confidence": 0.9570925235748291,
+                  "attacked_confidence": 0.9865521788597107,
+                  "delta": 0.029459655284881592
+                },
+                {
+                  "attack_id": "sst2-val-13.encoding.compatibility_fullwidth.whole",
+                  "clean_confidence": 0.9570925235748291,
+                  "attacked_confidence": 0.9015923142433167,
+                  "delta": -0.05550020933151245
+                },
+                {
+                  "attack_id": "sst2-val-13.truncation.signal_start_short",
+                  "clean_confidence": 0.9570925235748291,
+                  "attacked_confidence": 0.9975883960723877,
+                  "delta": 0.040495872497558594
+                },
+                {
+                  "attack_id": "sst2-val-13.truncation.signal_end_short",
+                  "clean_confidence": 0.9570925235748291,
+                  "attacked_confidence": 0.9975062012672424,
+                  "delta": 0.04041367769241333
+                },
+                {
+                  "attack_id": "sst2-val-17.encoding.compatibility_fullwidth.whole",
+                  "clean_confidence": 0.999798595905304,
+                  "attacked_confidence": 0.8663927912712097,
+                  "delta": -0.13340580463409424
+                },
+                {
+                  "attack_id": "sst2-val-18.encoding.compatibility_fullwidth.whole",
+                  "clean_confidence": 0.9992817044258118,
+                  "attacked_confidence": 0.545939028263092,
+                  "delta": -0.4533426761627197
+                },
+                {
+                  "attack_id": "sst2-val-201.encoding.homoglyph.trailing.d5",
+                  "clean_confidence": 0.9878334999084473,
+                  "attacked_confidence": 0.8682654500007629,
+                  "delta": -0.11956804990768433
+                },
+                {
+                  "attack_id": "sst2-val-201.encoding.homoglyph_greek.trailing.d3",
+                  "clean_confidence": 0.9878334999084473,
+                  "attacked_confidence": 0.9782158732414246,
+                  "delta": -0.009617626667022705
+                },
+                {
+                  "attack_id": "sst2-val-201.encoding.compatibility_fullwidth.whole",
+                  "clean_confidence": 0.9878334999084473,
+                  "attacked_confidence": 0.8728774189949036,
+                  "delta": -0.1149560809135437
+                },
+                {
+                  "attack_id": "sst2-val-201.truncation.signal_start_short",
+                  "clean_confidence": 0.9878334999084473,
+                  "attacked_confidence": 0.9581447243690491,
+                  "delta": -0.029688775539398193
+                },
+                {
+                  "attack_id": "sst2-val-201.truncation.signal_end_short",
+                  "clean_confidence": 0.9878334999084473,
+                  "attacked_confidence": 0.8647022247314453,
+                  "delta": -0.12313127517700195
+                },
+                {
+                  "attack_id": "sst2-val-211.perturbation.keyboard_typo",
+                  "clean_confidence": 0.9854887127876282,
+                  "attacked_confidence": 0.9690731167793274,
+                  "delta": -0.01641559600830078
+                },
+                {
+                  "attack_id": "sst2-val-211.perturbation.delete_char",
+                  "clean_confidence": 0.9854887127876282,
+                  "attacked_confidence": 0.9361417293548584,
+                  "delta": -0.049346983432769775
+                },
+                {
+                  "attack_id": "sst2-val-211.perturbation.word_split",
+                  "clean_confidence": 0.9854887127876282,
+                  "attacked_confidence": 0.896462619304657,
+                  "delta": -0.08902609348297119
+                },
+                {
+                  "attack_id": "sst2-val-211.perturbation.insert_char",
+                  "clean_confidence": 0.9854887127876282,
+                  "attacked_confidence": 0.8943270444869995,
+                  "delta": -0.09116166830062866
+                },
+                {
+                  "attack_id": "sst2-val-211.perturbation.misspell",
+                  "clean_confidence": 0.9854887127876282,
+                  "attacked_confidence": 0.9361417293548584,
+                  "delta": -0.049346983432769775
+                },
+                {
+                  "attack_id": "sst2-val-227.encoding.homoglyph_greek.middle.d3",
+                  "clean_confidence": 0.9998724460601807,
+                  "attacked_confidence": 0.8778189420700073,
+                  "delta": -0.12205350399017334
+                },
+                {
+                  "attack_id": "sst2-val-227.encoding.compatibility_fullwidth.whole",
+                  "clean_confidence": 0.9998724460601807,
+                  "attacked_confidence": 0.9061433672904968,
+                  "delta": -0.09372907876968384
+                },
+                {
+                  "attack_id": "sst2-val-290.encoding.compatibility_fullwidth.whole",
+                  "clean_confidence": 0.9998041987419128,
+                  "attacked_confidence": 0.9510905146598816,
+                  "delta": -0.04871368408203125
+                },
+                {
+                  "attack_id": "sst2-val-341.perturbation.swap_adjacent",
+                  "clean_confidence": 0.9568802118301392,
+                  "attacked_confidence": 0.9854244589805603,
+                  "delta": 0.028544247150421143
+                },
+                {
+                  "attack_id": "sst2-val-341.perturbation.keyboard_typo",
+                  "clean_confidence": 0.9568802118301392,
+                  "attacked_confidence": 0.9977644681930542,
+                  "delta": 0.04088425636291504
+                },
+                {
+                  "attack_id": "sst2-val-341.perturbation.delete_char",
+                  "clean_confidence": 0.9568802118301392,
+                  "attacked_confidence": 0.5230637788772583,
+                  "delta": -0.43381643295288086
+                },
+                {
+                  "attack_id": "sst2-val-341.perturbation.word_split",
+                  "clean_confidence": 0.9568802118301392,
+                  "attacked_confidence": 0.9973228573799133,
+                  "delta": 0.04044264554977417
+                },
+                {
+                  "attack_id": "sst2-val-341.perturbation.insert_char",
+                  "clean_confidence": 0.9568802118301392,
+                  "attacked_confidence": 0.9553864002227783,
+                  "delta": -0.0014938116073608398
+                },
+                {
+                  "attack_id": "sst2-val-341.perturbation.misspell",
+                  "clean_confidence": 0.9568802118301392,
+                  "attacked_confidence": 0.9718923568725586,
+                  "delta": 0.015012145042419434
+                },
+                {
+                  "attack_id": "sst2-val-341.encoding.homoglyph.leading.d3",
+                  "clean_confidence": 0.9568802118301392,
+                  "attacked_confidence": 0.9168521165847778,
+                  "delta": -0.04002809524536133
+                },
+                {
+                  "attack_id": "sst2-val-341.encoding.homoglyph.leading.d5",
+                  "clean_confidence": 0.9568802118301392,
+                  "attacked_confidence": 0.9168521165847778,
+                  "delta": -0.04002809524536133
+                },
+                {
+                  "attack_id": "sst2-val-341.encoding.homoglyph_greek.leading.d1",
+                  "clean_confidence": 0.9568802118301392,
+                  "attacked_confidence": 0.9696698188781738,
+                  "delta": 0.012789607048034668
+                },
+                {
+                  "attack_id": "sst2-val-341.encoding.homoglyph_greek.leading.d3",
+                  "clean_confidence": 0.9568802118301392,
+                  "attacked_confidence": 0.9850768446922302,
+                  "delta": 0.028196632862091064
+                },
+                {
+                  "attack_id": "sst2-val-341.encoding.homoglyph_greek.middle.d3",
+                  "clean_confidence": 0.9568802118301392,
+                  "attacked_confidence": 0.9618958234786987,
+                  "delta": 0.00501561164855957
+                },
+                {
+                  "attack_id": "sst2-val-341.encoding.compatibility_fullwidth.whole",
+                  "clean_confidence": 0.9568802118301392,
+                  "attacked_confidence": 0.8858370780944824,
+                  "delta": -0.07104313373565674
+                },
+                {
+                  "attack_id": "sst2-val-341.truncation.signal_start_short",
+                  "clean_confidence": 0.9568802118301392,
+                  "attacked_confidence": 0.9955568909645081,
+                  "delta": 0.038676679134368896
+                },
+                {
+                  "attack_id": "sst2-val-341.truncation.signal_end_short",
+                  "clean_confidence": 0.9568802118301392,
+                  "attacked_confidence": 0.9917430281639099,
+                  "delta": 0.03486281633377075
+                },
+                {
+                  "attack_id": "sst2-val-35.perturbation.misspell",
+                  "clean_confidence": 0.9997166991233826,
+                  "attacked_confidence": 0.9096574187278748,
+                  "delta": -0.09005928039550781
+                },
+                {
+                  "attack_id": "sst2-val-35.encoding.homoglyph.middle.d1",
+                  "clean_confidence": 0.9997166991233826,
+                  "attacked_confidence": 0.6758605241775513,
+                  "delta": -0.3238561749458313
+                },
+                {
+                  "attack_id": "sst2-val-35.encoding.homoglyph.middle.d3",
+                  "clean_confidence": 0.9997166991233826,
+                  "attacked_confidence": 0.8861170411109924,
+                  "delta": -0.11359965801239014
+                },
+                {
+                  "attack_id": "sst2-val-35.encoding.homoglyph.middle.d5",
+                  "clean_confidence": 0.9997166991233826,
+                  "attacked_confidence": 0.8861170411109924,
+                  "delta": -0.11359965801239014
+                },
+                {
+                  "attack_id": "sst2-val-35.encoding.compatibility_fullwidth.whole",
+                  "clean_confidence": 0.9997166991233826,
+                  "attacked_confidence": 0.7675715088844299,
+                  "delta": -0.23214519023895264
+                },
+                {
+                  "attack_id": "sst2-val-427.encoding.compatibility_fullwidth.whole",
+                  "clean_confidence": 0.9998067021369934,
+                  "attacked_confidence": 0.914876401424408,
+                  "delta": -0.08493030071258545
+                },
+                {
+                  "attack_id": "sst2-val-480.encoding.compatibility_fullwidth.whole",
+                  "clean_confidence": 0.9996960163116455,
+                  "attacked_confidence": 0.8996462225914001,
+                  "delta": -0.10004979372024536
+                },
+                {
+                  "attack_id": "sst2-val-489.perturbation.keyboard_typo_second_word",
+                  "clean_confidence": 0.9995794892311096,
+                  "attacked_confidence": 0.9352504014968872,
+                  "delta": -0.06432908773422241
+                },
+                {
+                  "attack_id": "sst2-val-489.encoding.homoglyph_greek.trailing.d1",
+                  "clean_confidence": 0.9995794892311096,
+                  "attacked_confidence": 0.938317060470581,
+                  "delta": -0.061262428760528564
+                },
+                {
+                  "attack_id": "sst2-val-52.perturbation.word_split",
+                  "clean_confidence": 0.9986221790313721,
+                  "attacked_confidence": 0.8896331191062927,
+                  "delta": -0.10898905992507935
+                },
+                {
+                  "attack_id": "sst2-val-52.perturbation.misspell",
+                  "clean_confidence": 0.9986221790313721,
+                  "attacked_confidence": 0.53910893201828,
+                  "delta": -0.45951324701309204
+                },
+                {
+                  "attack_id": "sst2-val-52.encoding.homoglyph_greek.leading.d3",
+                  "clean_confidence": 0.9986221790313721,
+                  "attacked_confidence": 0.9792104363441467,
+                  "delta": -0.019411742687225342
+                },
+                {
+                  "attack_id": "sst2-val-52.encoding.homoglyph_greek.middle.d3",
+                  "clean_confidence": 0.9986221790313721,
+                  "attacked_confidence": 0.9911004900932312,
+                  "delta": -0.007521688938140869
+                },
+                {
+                  "attack_id": "sst2-val-52.encoding.compatibility_fullwidth.whole",
+                  "clean_confidence": 0.9986221790313721,
+                  "attacked_confidence": 0.9409055709838867,
+                  "delta": -0.05771660804748535
+                },
+                {
+                  "attack_id": "sst2-val-52.truncation.signal_end_short",
+                  "clean_confidence": 0.9986221790313721,
+                  "attacked_confidence": 0.8763489127159119,
+                  "delta": -0.1222732663154602
+                },
+                {
+                  "attack_id": "sst2-val-588.encoding.homoglyph.middle.d3",
+                  "clean_confidence": 0.9966986775398254,
+                  "attacked_confidence": 0.8716244697570801,
+                  "delta": -0.12507420778274536
+                },
+                {
+                  "attack_id": "sst2-val-588.encoding.homoglyph.middle.d5",
+                  "clean_confidence": 0.9966986775398254,
+                  "attacked_confidence": 0.6109969615936279,
+                  "delta": -0.3857017159461975
+                },
+                {
+                  "attack_id": "sst2-val-588.encoding.homoglyph.trailing.d1",
+                  "clean_confidence": 0.9966986775398254,
+                  "attacked_confidence": 0.9686321020126343,
+                  "delta": -0.028066575527191162
+                },
+                {
+                  "attack_id": "sst2-val-588.encoding.homoglyph_greek.middle.d1",
+                  "clean_confidence": 0.9966986775398254,
+                  "attacked_confidence": 0.9358901381492615,
+                  "delta": -0.060808539390563965
+                },
+                {
+                  "attack_id": "sst2-val-588.encoding.homoglyph_greek.middle.d3",
+                  "clean_confidence": 0.9966986775398254,
+                  "attacked_confidence": 0.9486535787582397,
+                  "delta": -0.04804509878158569
+                },
+                {
+                  "attack_id": "sst2-val-588.encoding.homoglyph_greek.trailing.d1",
+                  "clean_confidence": 0.9966986775398254,
+                  "attacked_confidence": 0.9639745950698853,
+                  "delta": -0.032724082469940186
+                },
+                {
+                  "attack_id": "sst2-val-588.encoding.compatibility_fullwidth.whole",
+                  "clean_confidence": 0.9966986775398254,
+                  "attacked_confidence": 0.8400391340255737,
+                  "delta": -0.1566595435142517
+                },
+                {
+                  "attack_id": "sst2-val-588.truncation.signal_start_short",
+                  "clean_confidence": 0.9966986775398254,
+                  "attacked_confidence": 0.9931902289390564,
+                  "delta": -0.003508448600769043
+                },
+                {
+                  "attack_id": "sst2-val-588.truncation.signal_end_short",
+                  "clean_confidence": 0.9966986775398254,
+                  "attacked_confidence": 0.7109718322753906,
+                  "delta": -0.2857268452644348
+                },
+                {
+                  "attack_id": "sst2-val-59.encoding.homoglyph.leading.d3",
+                  "clean_confidence": 0.8743264675140381,
+                  "attacked_confidence": 0.81070876121521,
+                  "delta": -0.06361770629882812
+                },
+                {
+                  "attack_id": "sst2-val-59.encoding.homoglyph.leading.d5",
+                  "clean_confidence": 0.8743264675140381,
+                  "attacked_confidence": 0.7734096050262451,
+                  "delta": -0.10091686248779297
+                },
+                {
+                  "attack_id": "sst2-val-59.encoding.homoglyph.middle.d1",
+                  "clean_confidence": 0.8743264675140381,
+                  "attacked_confidence": 0.6327666640281677,
+                  "delta": -0.24155980348587036
+                },
+                {
+                  "attack_id": "sst2-val-609.encoding.compatibility_fullwidth.whole",
+                  "clean_confidence": 0.9975911378860474,
+                  "attacked_confidence": 0.9169970154762268,
+                  "delta": -0.08059412240982056
+                },
+                {
+                  "attack_id": "sst2-val-609.truncation.signal_start_short",
+                  "clean_confidence": 0.9975911378860474,
+                  "attacked_confidence": 0.697509765625,
+                  "delta": -0.30008137226104736
+                },
+                {
+                  "attack_id": "sst2-val-656.perturbation.delete_char",
+                  "clean_confidence": 0.9740117192268372,
+                  "attacked_confidence": 0.5029320120811462,
+                  "delta": -0.4710797071456909
+                },
+                {
+                  "attack_id": "sst2-val-656.encoding.homoglyph_greek.middle.d1",
+                  "clean_confidence": 0.9740117192268372,
+                  "attacked_confidence": 0.7183675765991211,
+                  "delta": -0.25564414262771606
+                },
+                {
+                  "attack_id": "sst2-val-656.encoding.homoglyph_greek.trailing.d3",
+                  "clean_confidence": 0.9740117192268372,
+                  "attacked_confidence": 0.7962035536766052,
+                  "delta": -0.17780816555023193
+                },
+                {
+                  "attack_id": "sst2-val-671.truncation.signal_start_short",
+                  "clean_confidence": 0.9996269941329956,
+                  "attacked_confidence": 0.9347531199455261,
+                  "delta": -0.06487387418746948
+                },
+                {
+                  "attack_id": "sst2-val-672.encoding.homoglyph.middle.d3",
+                  "clean_confidence": 0.9990735054016113,
+                  "attacked_confidence": 0.9874348044395447,
+                  "delta": -0.01163870096206665
+                },
+                {
+                  "attack_id": "sst2-val-672.encoding.homoglyph.middle.d5",
+                  "clean_confidence": 0.9990735054016113,
+                  "attacked_confidence": 0.6198087334632874,
+                  "delta": -0.379264771938324
+                },
+                {
+                  "attack_id": "sst2-val-672.encoding.homoglyph_greek.middle.d3",
+                  "clean_confidence": 0.9990735054016113,
+                  "attacked_confidence": 0.9994091987609863,
+                  "delta": 0.000335693359375
+                },
+                {
+                  "attack_id": "sst2-val-674.encoding.compatibility_fullwidth.whole",
+                  "clean_confidence": 0.9992473125457764,
+                  "attacked_confidence": 0.9558283686637878,
+                  "delta": -0.043418943881988525
+                },
+                {
+                  "attack_id": "sst2-val-686.encoding.compatibility_fullwidth.whole",
+                  "clean_confidence": 0.9998393058776855,
+                  "attacked_confidence": 0.7039620280265808,
+                  "delta": -0.29587727785110474
+                },
+                {
+                  "attack_id": "sst2-val-778.encoding.compatibility_fullwidth.whole",
+                  "clean_confidence": 0.9998807907104492,
+                  "attacked_confidence": 0.7207666039466858,
+                  "delta": -0.2791141867637634
+                },
+                {
+                  "attack_id": "sst2-val-785.encoding.homoglyph_greek.trailing.d1",
+                  "clean_confidence": 0.9959178566932678,
+                  "attacked_confidence": 0.7615379691123962,
+                  "delta": -0.23437988758087158
+                },
+                {
+                  "attack_id": "sst2-val-785.encoding.compatibility_fullwidth.whole",
+                  "clean_confidence": 0.9959178566932678,
+                  "attacked_confidence": 0.9057952761650085,
+                  "delta": -0.09012258052825928
+                },
+                {
+                  "attack_id": "sst2-val-785.truncation.signal_start_short",
+                  "clean_confidence": 0.9959178566932678,
+                  "attacked_confidence": 0.9938750863075256,
+                  "delta": -0.0020427703857421875
+                },
+                {
+                  "attack_id": "sst2-val-785.truncation.signal_end_short",
+                  "clean_confidence": 0.9959178566932678,
+                  "attacked_confidence": 0.9919883012771606,
+                  "delta": -0.003929555416107178
+                },
+                {
+                  "attack_id": "sst2-val-805.perturbation.keyboard_typo_second_word",
+                  "clean_confidence": 0.6510835289955139,
+                  "attacked_confidence": 0.8020060062408447,
+                  "delta": 0.1509224772453308
+                },
+                {
+                  "attack_id": "sst2-val-805.encoding.deletion_backspace.trailing.d1",
+                  "clean_confidence": 0.6510835289955139,
+                  "attacked_confidence": 0.5160260796546936,
+                  "delta": -0.1350574493408203
+                }
+              ]
+            },
+            "excluded": {
+              "review_unresolved": 42,
+              "oracle_not_label_match_baseline": 210
+            },
+            "unevaluable": {},
+            "flip_attack_ids": [
+              "sst2-val-109.encoding.compatibility_fullwidth.whole",
+              "sst2-val-120.encoding.compatibility_fullwidth.whole",
+              "sst2-val-121.encoding.homoglyph.middle.d3",
+              "sst2-val-121.encoding.homoglyph.middle.d5",
+              "sst2-val-121.encoding.homoglyph_greek.middle.d3",
+              "sst2-val-121.encoding.deletion_backspace.middle.d1",
+              "sst2-val-121.encoding.compatibility_fullwidth.whole",
+              "sst2-val-121.truncation.signal_start_short",
+              "sst2-val-13.perturbation.keyboard_typo",
+              "sst2-val-13.perturbation.delete_char",
+              "sst2-val-13.perturbation.word_split",
+              "sst2-val-13.perturbation.insert_char",
+              "sst2-val-13.perturbation.misspell",
+              "sst2-val-13.encoding.homoglyph.leading.d3",
+              "sst2-val-13.encoding.homoglyph.leading.d5",
+              "sst2-val-13.encoding.homoglyph.middle.d1",
+              "sst2-val-13.encoding.homoglyph.middle.d3",
+              "sst2-val-13.encoding.homoglyph.middle.d5",
+              "sst2-val-13.encoding.homoglyph_greek.leading.d3",
+              "sst2-val-13.encoding.homoglyph_greek.middle.d1",
+              "sst2-val-13.encoding.homoglyph_greek.middle.d3",
+              "sst2-val-13.encoding.deletion_backspace.middle.d1",
+              "sst2-val-13.encoding.compatibility_fullwidth.whole",
+              "sst2-val-13.truncation.signal_start_short",
+              "sst2-val-13.truncation.signal_end_short",
+              "sst2-val-17.encoding.compatibility_fullwidth.whole",
+              "sst2-val-18.encoding.compatibility_fullwidth.whole",
+              "sst2-val-201.encoding.homoglyph.trailing.d5",
+              "sst2-val-201.encoding.homoglyph_greek.trailing.d3",
+              "sst2-val-201.encoding.compatibility_fullwidth.whole",
+              "sst2-val-201.truncation.signal_start_short",
+              "sst2-val-201.truncation.signal_end_short",
+              "sst2-val-211.perturbation.keyboard_typo",
+              "sst2-val-211.perturbation.delete_char",
+              "sst2-val-211.perturbation.word_split",
+              "sst2-val-211.perturbation.insert_char",
+              "sst2-val-211.perturbation.misspell",
+              "sst2-val-227.encoding.homoglyph_greek.middle.d3",
+              "sst2-val-227.encoding.compatibility_fullwidth.whole",
+              "sst2-val-290.encoding.compatibility_fullwidth.whole",
+              "sst2-val-341.perturbation.swap_adjacent",
+              "sst2-val-341.perturbation.keyboard_typo",
+              "sst2-val-341.perturbation.delete_char",
+              "sst2-val-341.perturbation.word_split",
+              "sst2-val-341.perturbation.insert_char",
+              "sst2-val-341.perturbation.misspell",
+              "sst2-val-341.encoding.homoglyph.leading.d3",
+              "sst2-val-341.encoding.homoglyph.leading.d5",
+              "sst2-val-341.encoding.homoglyph_greek.leading.d1",
+              "sst2-val-341.encoding.homoglyph_greek.leading.d3",
+              "sst2-val-341.encoding.homoglyph_greek.middle.d3",
+              "sst2-val-341.encoding.compatibility_fullwidth.whole",
+              "sst2-val-341.truncation.signal_start_short",
+              "sst2-val-341.truncation.signal_end_short",
+              "sst2-val-35.perturbation.misspell",
+              "sst2-val-35.encoding.homoglyph.middle.d1",
+              "sst2-val-35.encoding.homoglyph.middle.d3",
+              "sst2-val-35.encoding.homoglyph.middle.d5",
+              "sst2-val-35.encoding.compatibility_fullwidth.whole",
+              "sst2-val-427.encoding.compatibility_fullwidth.whole",
+              "sst2-val-480.encoding.compatibility_fullwidth.whole",
+              "sst2-val-489.perturbation.keyboard_typo_second_word",
+              "sst2-val-489.encoding.homoglyph_greek.trailing.d1",
+              "sst2-val-52.perturbation.word_split",
+              "sst2-val-52.perturbation.misspell",
+              "sst2-val-52.encoding.homoglyph_greek.leading.d3",
+              "sst2-val-52.encoding.homoglyph_greek.middle.d3",
+              "sst2-val-52.encoding.compatibility_fullwidth.whole",
+              "sst2-val-52.truncation.signal_end_short",
+              "sst2-val-588.encoding.homoglyph.middle.d3",
+              "sst2-val-588.encoding.homoglyph.middle.d5",
+              "sst2-val-588.encoding.homoglyph.trailing.d1",
+              "sst2-val-588.encoding.homoglyph_greek.middle.d1",
+              "sst2-val-588.encoding.homoglyph_greek.middle.d3",
+              "sst2-val-588.encoding.homoglyph_greek.trailing.d1",
+              "sst2-val-588.encoding.compatibility_fullwidth.whole",
+              "sst2-val-588.truncation.signal_start_short",
+              "sst2-val-588.truncation.signal_end_short",
+              "sst2-val-59.encoding.homoglyph.leading.d3",
+              "sst2-val-59.encoding.homoglyph.leading.d5",
+              "sst2-val-59.encoding.homoglyph.middle.d1",
+              "sst2-val-609.encoding.compatibility_fullwidth.whole",
+              "sst2-val-609.truncation.signal_start_short",
+              "sst2-val-656.perturbation.delete_char",
+              "sst2-val-656.encoding.homoglyph_greek.middle.d1",
+              "sst2-val-656.encoding.homoglyph_greek.trailing.d3",
+              "sst2-val-671.truncation.signal_start_short",
+              "sst2-val-672.encoding.homoglyph.middle.d3",
+              "sst2-val-672.encoding.homoglyph.middle.d5",
+              "sst2-val-672.encoding.homoglyph_greek.middle.d3",
+              "sst2-val-674.encoding.compatibility_fullwidth.whole",
+              "sst2-val-686.encoding.compatibility_fullwidth.whole",
+              "sst2-val-778.encoding.compatibility_fullwidth.whole",
+              "sst2-val-785.encoding.homoglyph_greek.trailing.d1",
+              "sst2-val-785.encoding.compatibility_fullwidth.whole",
+              "sst2-val-785.truncation.signal_start_short",
+              "sst2-val-785.truncation.signal_end_short",
+              "sst2-val-805.perturbation.keyboard_typo_second_word",
+              "sst2-val-805.encoding.deletion_backspace.trailing.d1"
+            ]
+          },
+          "findings": [
+            {
+              "finding": {
+                "finding_id": "F-v1-001",
+                "title": "boundary/length_plus_one: unhandled server error",
+                "category": "boundary",
+                "severity_score": 70.0,
+                "severity_tier": "High",
+                "description": "1 case(s) in boundary/length_plus_one produced unhandled server error -- the endpoint returned an unhandled 5xx; where health still answered afterwards the request failed but the service survived, which is not unavailability. Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
+                "remediation": "1 case(s) observed as 500x1. Check the tokenized length against the model's maximum sequence length before inference and reject over-limit input with a typed 4xx response. Do not add truncation: silently shortening the input would hide the failure this case exists to measure.",
+                "evidence": [
+                  "boundary.length.plus_one"
+                ]
+              },
+              "subfamily": "length_plus_one",
+              "failure_mode": "unhandled_5xx",
+              "validity_tiers": [
+                "GOLD"
+              ],
+              "affected_cases": 1,
+              "remediation_detail": {
+                "rule_id": "RM-5XX-OVERLENGTH",
+                "rule_version": "1.0.0",
+                "rule_sha256": "829a3f8942430d885620f2c4736d9ad54332343d4f2aa16415cc33705d26b894",
+                "is_fallback": false,
+                "observed": "1 of 1 cited case row(s) were available; recorded outcomes: HTTP 500: 1; post-request health-check failures: 0.",
+                "significance": "Input at or beyond the model's sequence limit produced a server-error response rather than a defined rejection. The settled architecture forbids silent truncation, so rejecting is the intended behaviour and erroring is not.",
+                "diagnosis_confidence": "supported",
+                "fix": "Check the tokenized length against the model's maximum sequence length before inference and reject over-limit input with a typed 4xx response. Do not add truncation: silently shortening the input would hide the failure this case exists to measure.",
+                "verification": {
+                  "target_id": "sentiment_v1",
+                  "case_set_file": "results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json",
+                  "includes_baselines": true,
+                  "command": "python -m runner.run --target-id sentiment_v1 --case-set results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json --out results/verify_sentiment_v1",
+                  "expected": "over-limit cases return the documented 4xx rejection and under-limit cases still return 200",
+                  "inspect": "results/verify_sentiment_v1/results_sentiment_v1.jsonl -- check the rows whose attack_id is one of: boundary.length.plus_one"
+                },
+                "unavailable_evidence": []
+              }
+            },
+            {
+              "finding": {
+                "finding_id": "F-v1-002",
+                "title": "encoding/compatibility_fullwidth: prediction flip",
+                "category": "encoding",
+                "severity_score": 59.99403953552246,
+                "severity_tier": "Medium",
+                "description": "20 case(s) in encoding/compatibility_fullwidth produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 20 affected case(s) indicate reproducibility, not impact.",
+                "remediation": "20 case(s) observed as 200x20. This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "evidence": [
+                  "sst2-val-109.encoding.compatibility_fullwidth.whole",
+                  "sst2-val-120.encoding.compatibility_fullwidth.whole",
+                  "sst2-val-121.encoding.compatibility_fullwidth.whole",
+                  "sst2-val-13.encoding.compatibility_fullwidth.whole",
+                  "sst2-val-17.encoding.compatibility_fullwidth.whole",
+                  "sst2-val-18.encoding.compatibility_fullwidth.whole",
+                  "sst2-val-201.encoding.compatibility_fullwidth.whole",
+                  "sst2-val-227.encoding.compatibility_fullwidth.whole",
+                  "sst2-val-290.encoding.compatibility_fullwidth.whole",
+                  "sst2-val-341.encoding.compatibility_fullwidth.whole",
+                  "sst2-val-35.encoding.compatibility_fullwidth.whole",
+                  "sst2-val-427.encoding.compatibility_fullwidth.whole",
+                  "sst2-val-480.encoding.compatibility_fullwidth.whole",
+                  "sst2-val-52.encoding.compatibility_fullwidth.whole",
+                  "sst2-val-588.encoding.compatibility_fullwidth.whole",
+                  "sst2-val-609.encoding.compatibility_fullwidth.whole",
+                  "sst2-val-674.encoding.compatibility_fullwidth.whole",
+                  "sst2-val-686.encoding.compatibility_fullwidth.whole",
+                  "sst2-val-778.encoding.compatibility_fullwidth.whole",
+                  "sst2-val-785.encoding.compatibility_fullwidth.whole"
+                ]
+              },
+              "subfamily": "compatibility_fullwidth",
+              "failure_mode": "prediction_flip",
+              "validity_tiers": [
+                "SILVER"
+              ],
+              "affected_cases": 20,
+              "remediation_detail": {
+                "rule_id": "RM-FLIP-MODEL",
+                "rule_version": "1.0.0",
+                "rule_sha256": "829a3f8942430d885620f2c4736d9ad54332343d4f2aa16415cc33705d26b894",
+                "is_fallback": false,
+                "observed": "20 of 20 cited case row(s) were available; recorded outcomes: HTTP 200: 20; post-request health-check failures: 0.",
+                "significance": "The top label changed under a transformation intended to preserve meaning, while the clean prediction was confident. This is a model-level sensitivity: the input reached the model unchanged in the ways the input controls check, so no endpoint control addresses it.",
+                "diagnosis_confidence": "supported",
+                "fix": "This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "verification": {
+                  "target_id": "sentiment_v1",
+                  "case_set_file": "results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json",
+                  "includes_baselines": true,
+                  "command": "python -m runner.run --target-id sentiment_v1 --case-set results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json --out results/verify_sentiment_v1",
+                  "expected": "after retraining or augmentation, the same case ids are re-run and the flip rate over the same eligible denominator is compared",
+                  "inspect": "results/verify_sentiment_v1/results_sentiment_v1.jsonl -- check the rows whose attack_id is one of: sst2-val-109.encoding.compatibility_fullwidth.whole, sst2-val-120.encoding.compatibility_fullwidth.whole, sst2-val-121.encoding.compatibility_fullwidth.whole (and the rest of the cited ids)"
+                },
+                "unavailable_evidence": [],
+                "limitation": "This is a model-level weakness. No endpoint control fixes it, and inventing one would misrepresent the finding; the fix above is an evaluation and retraining procedure instead."
+              }
+            },
+            {
+              "finding": {
+                "finding_id": "F-v1-003",
+                "title": "encoding/deletion_backspace: prediction flip",
+                "category": "encoding",
+                "severity_score": 59.88720417022705,
+                "severity_tier": "Medium",
+                "description": "3 case(s) in encoding/deletion_backspace produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 3 affected case(s) indicate reproducibility, not impact.",
+                "remediation": "3 case(s) observed as 200x3. This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "evidence": [
+                  "sst2-val-121.encoding.deletion_backspace.middle.d1",
+                  "sst2-val-13.encoding.deletion_backspace.middle.d1",
+                  "sst2-val-805.encoding.deletion_backspace.trailing.d1"
+                ]
+              },
+              "subfamily": "deletion_backspace",
+              "failure_mode": "prediction_flip",
+              "validity_tiers": [
+                "SILVER"
+              ],
+              "affected_cases": 3,
+              "remediation_detail": {
+                "rule_id": "RM-FLIP-MODEL",
+                "rule_version": "1.0.0",
+                "rule_sha256": "829a3f8942430d885620f2c4736d9ad54332343d4f2aa16415cc33705d26b894",
+                "is_fallback": false,
+                "observed": "3 of 3 cited case row(s) were available; recorded outcomes: HTTP 200: 3; post-request health-check failures: 0.",
+                "significance": "The top label changed under a transformation intended to preserve meaning, while the clean prediction was confident. This is a model-level sensitivity: the input reached the model unchanged in the ways the input controls check, so no endpoint control addresses it.",
+                "diagnosis_confidence": "supported",
+                "fix": "This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "verification": {
+                  "target_id": "sentiment_v1",
+                  "case_set_file": "results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json",
+                  "includes_baselines": true,
+                  "command": "python -m runner.run --target-id sentiment_v1 --case-set results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json --out results/verify_sentiment_v1",
+                  "expected": "after retraining or augmentation, the same case ids are re-run and the flip rate over the same eligible denominator is compared",
+                  "inspect": "results/verify_sentiment_v1/results_sentiment_v1.jsonl -- check the rows whose attack_id is one of: sst2-val-121.encoding.deletion_backspace.middle.d1, sst2-val-13.encoding.deletion_backspace.middle.d1, sst2-val-805.encoding.deletion_backspace.trailing.d1"
+                },
+                "unavailable_evidence": [],
+                "limitation": "This is a model-level weakness. No endpoint control fixes it, and inventing one would misrepresent the finding; the fix above is an evaluation and retraining procedure instead."
+              }
+            },
+            {
+              "finding": {
+                "finding_id": "F-v1-004",
+                "title": "encoding/homoglyph: prediction flip",
+                "category": "encoding",
+                "severity_score": 59.98583495616913,
+                "severity_tier": "Medium",
+                "description": "21 case(s) in encoding/homoglyph produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 21 affected case(s) indicate reproducibility, not impact.",
+                "remediation": "21 case(s) observed as 200x21. Mixed-script confusables need a confusables-aware input check rather than more normalisation. The model-level sensitivity remains underneath, so this reduces exposure to this family without making the classifier robust to it.",
+                "evidence": [
+                  "sst2-val-121.encoding.homoglyph.middle.d3",
+                  "sst2-val-121.encoding.homoglyph.middle.d5",
+                  "sst2-val-13.encoding.homoglyph.leading.d3",
+                  "sst2-val-13.encoding.homoglyph.leading.d5",
+                  "sst2-val-13.encoding.homoglyph.middle.d1",
+                  "sst2-val-13.encoding.homoglyph.middle.d3",
+                  "sst2-val-13.encoding.homoglyph.middle.d5",
+                  "sst2-val-201.encoding.homoglyph.trailing.d5",
+                  "sst2-val-341.encoding.homoglyph.leading.d3",
+                  "sst2-val-341.encoding.homoglyph.leading.d5",
+                  "sst2-val-35.encoding.homoglyph.middle.d1",
+                  "sst2-val-35.encoding.homoglyph.middle.d3",
+                  "sst2-val-35.encoding.homoglyph.middle.d5",
+                  "sst2-val-588.encoding.homoglyph.middle.d3",
+                  "sst2-val-588.encoding.homoglyph.middle.d5",
+                  "sst2-val-588.encoding.homoglyph.trailing.d1",
+                  "sst2-val-59.encoding.homoglyph.leading.d3",
+                  "sst2-val-59.encoding.homoglyph.leading.d5",
+                  "sst2-val-59.encoding.homoglyph.middle.d1",
+                  "sst2-val-672.encoding.homoglyph.middle.d3",
+                  "sst2-val-672.encoding.homoglyph.middle.d5"
+                ]
+              },
+              "subfamily": "homoglyph",
+              "failure_mode": "prediction_flip",
+              "validity_tiers": [
+                "SILVER"
+              ],
+              "affected_cases": 21,
+              "remediation_detail": {
+                "rule_id": "RM-FLIP-NORMALISABLE",
+                "rule_version": "1.0.0",
+                "rule_sha256": "829a3f8942430d885620f2c4736d9ad54332343d4f2aa16415cc33705d26b894",
+                "is_fallback": false,
+                "observed": "21 of 21 cited case row(s) were available; recorded outcomes: HTTP 200: 21; post-request health-check failures: 0.",
+                "significance": "The top label changed under a cross-script confusable substitution. Unicode compatibility normalisation does not fold these: confusables are a security mapping (UTS #39), separate from the compatibility mapping NFKC applies.",
+                "diagnosis_confidence": "supported",
+                "fix": "Mixed-script confusables need a confusables-aware input check rather than more normalisation. The model-level sensitivity remains underneath, so this reduces exposure to this family without making the classifier robust to it.",
+                "verification": {
+                  "target_id": "sentiment_v1",
+                  "case_set_file": "results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json",
+                  "includes_baselines": true,
+                  "command": "python -m runner.run --target-id sentiment_v1 --case-set results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json --out results/verify_sentiment_v1",
+                  "expected": "the same homoglyph case ids are re-run and the substituted characters are folded or the request is rejected",
+                  "inspect": "results/verify_sentiment_v1/results_sentiment_v1.jsonl -- check the rows whose attack_id is one of: sst2-val-121.encoding.homoglyph.middle.d3, sst2-val-121.encoding.homoglyph.middle.d5, sst2-val-13.encoding.homoglyph.leading.d3 (and the rest of the cited ids)"
+                },
+                "unavailable_evidence": [],
+                "limitation": "This is a model-level weakness. No endpoint control fixes it, and inventing one would misrepresent the finding; the fix above is an evaluation and retraining procedure instead."
+              }
+            },
+            {
+              "finding": {
+                "finding_id": "F-v1-005",
+                "title": "encoding/homoglyph_greek: prediction flip",
+                "category": "encoding",
+                "severity_score": 59.99362230300903,
+                "severity_tier": "Medium",
+                "description": "19 case(s) in encoding/homoglyph_greek produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 19 affected case(s) indicate reproducibility, not impact.",
+                "remediation": "19 case(s) observed as 200x19. Mixed-script confusables need a confusables-aware input check rather than more normalisation. The model-level sensitivity remains underneath, so this reduces exposure to this family without making the classifier robust to it.",
+                "evidence": [
+                  "sst2-val-121.encoding.homoglyph_greek.middle.d3",
+                  "sst2-val-13.encoding.homoglyph_greek.leading.d3",
+                  "sst2-val-13.encoding.homoglyph_greek.middle.d1",
+                  "sst2-val-13.encoding.homoglyph_greek.middle.d3",
+                  "sst2-val-201.encoding.homoglyph_greek.trailing.d3",
+                  "sst2-val-227.encoding.homoglyph_greek.middle.d3",
+                  "sst2-val-341.encoding.homoglyph_greek.leading.d1",
+                  "sst2-val-341.encoding.homoglyph_greek.leading.d3",
+                  "sst2-val-341.encoding.homoglyph_greek.middle.d3",
+                  "sst2-val-489.encoding.homoglyph_greek.trailing.d1",
+                  "sst2-val-52.encoding.homoglyph_greek.leading.d3",
+                  "sst2-val-52.encoding.homoglyph_greek.middle.d3",
+                  "sst2-val-588.encoding.homoglyph_greek.middle.d1",
+                  "sst2-val-588.encoding.homoglyph_greek.middle.d3",
+                  "sst2-val-588.encoding.homoglyph_greek.trailing.d1",
+                  "sst2-val-656.encoding.homoglyph_greek.middle.d1",
+                  "sst2-val-656.encoding.homoglyph_greek.trailing.d3",
+                  "sst2-val-672.encoding.homoglyph_greek.middle.d3",
+                  "sst2-val-785.encoding.homoglyph_greek.trailing.d1"
+                ]
+              },
+              "subfamily": "homoglyph_greek",
+              "failure_mode": "prediction_flip",
+              "validity_tiers": [
+                "SILVER"
+              ],
+              "affected_cases": 19,
+              "remediation_detail": {
+                "rule_id": "RM-FLIP-NORMALISABLE",
+                "rule_version": "1.0.0",
+                "rule_sha256": "829a3f8942430d885620f2c4736d9ad54332343d4f2aa16415cc33705d26b894",
+                "is_fallback": false,
+                "observed": "19 of 19 cited case row(s) were available; recorded outcomes: HTTP 200: 19; post-request health-check failures: 0.",
+                "significance": "The top label changed under a cross-script confusable substitution. Unicode compatibility normalisation does not fold these: confusables are a security mapping (UTS #39), separate from the compatibility mapping NFKC applies.",
+                "diagnosis_confidence": "supported",
+                "fix": "Mixed-script confusables need a confusables-aware input check rather than more normalisation. The model-level sensitivity remains underneath, so this reduces exposure to this family without making the classifier robust to it.",
+                "verification": {
+                  "target_id": "sentiment_v1",
+                  "case_set_file": "results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json",
+                  "includes_baselines": true,
+                  "command": "python -m runner.run --target-id sentiment_v1 --case-set results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json --out results/verify_sentiment_v1",
+                  "expected": "the same homoglyph case ids are re-run and the substituted characters are folded or the request is rejected",
+                  "inspect": "results/verify_sentiment_v1/results_sentiment_v1.jsonl -- check the rows whose attack_id is one of: sst2-val-121.encoding.homoglyph_greek.middle.d3, sst2-val-13.encoding.homoglyph_greek.leading.d3, sst2-val-13.encoding.homoglyph_greek.middle.d1 (and the rest of the cited ids)"
+                },
+                "unavailable_evidence": [],
+                "limitation": "This is a model-level weakness. No endpoint control fixes it, and inventing one would misrepresent the finding; the fix above is an evaluation and retraining procedure instead."
+              }
+            },
+            {
+              "finding": {
+                "finding_id": "F-v1-006",
+                "title": "malformed/extra_field: invalid input accepted",
+                "category": "malformed",
+                "severity_score": 40.0,
+                "severity_tier": "Medium",
+                "description": "1 case(s) in malformed/extra_field produced invalid input accepted -- the manifest oracle says this request should have been rejected, but the endpoint accepted it and answered. Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
+                "remediation": "1 case(s) observed as 200x1. Tighten request-model validation so this shape is rejected with a 422: strict field types and forbidding unexpected fields, checked before any inference call.",
+                "evidence": [
+                  "malformed.extra_field"
+                ]
+              },
+              "subfamily": "extra_field",
+              "failure_mode": "invalid_input_accepted",
+              "validity_tiers": [
+                "GOLD"
+              ],
+              "affected_cases": 1,
+              "remediation_detail": {
+                "rule_id": "RM-INVALID-ACCEPTED",
+                "rule_version": "1.0.0",
+                "rule_sha256": "829a3f8942430d885620f2c4736d9ad54332343d4f2aa16415cc33705d26b894",
+                "is_fallback": false,
+                "observed": "1 of 1 cited case row(s) were available; recorded outcomes: HTTP 200: 1; post-request health-check failures: 0.",
+                "significance": "The pre-registered oracle for this case says the request should have been rejected, but the endpoint accepted it and answered. A confident answer to a structurally invalid request is a schema-enforcement gap, not a model problem.",
+                "diagnosis_confidence": "supported",
+                "fix": "Tighten request-model validation so this shape is rejected with a 422: strict field types and forbidding unexpected fields, checked before any inference call.",
+                "verification": {
+                  "target_id": "sentiment_v1",
+                  "case_set_file": "results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json",
+                  "includes_baselines": true,
+                  "command": "python -m runner.run --target-id sentiment_v1 --case-set results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json --out results/verify_sentiment_v1",
+                  "expected": "the same request returns 422 with standard validation fields and no prediction",
+                  "inspect": "results/verify_sentiment_v1/results_sentiment_v1.jsonl -- check the rows whose attack_id is one of: malformed.extra_field"
+                },
+                "unavailable_evidence": []
+              }
+            },
+            {
+              "finding": {
+                "finding_id": "F-v1-007",
+                "title": "malformed/oversized_10mb: hit the request timeout",
+                "category": "malformed",
+                "severity_score": 60.0,
+                "severity_tier": "High",
+                "description": "1 case(s) in malformed/oversized_10mb produced hit the request timeout -- no response was produced within the 10 second deadline; the recorded error is client-side and carries no server-stage information, so no cause is attributed. Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
+                "remediation": "1 case(s) observed as no responsex1. Bound the work a single request can do before the deadline: reject oversized bodies at the server layer and cap per-request inference time. Establishing the cause needs server-side timing instrumentation this run did not collect.",
+                "evidence": [
+                  "malformed.oversized_10mb"
+                ]
+              },
+              "subfamily": "oversized_10mb",
+              "failure_mode": "timeout",
+              "validity_tiers": [
+                "GOLD"
+              ],
+              "affected_cases": 1,
+              "remediation_detail": {
+                "rule_id": "RM-TIMEOUT",
+                "rule_version": "1.0.0",
+                "rule_sha256": "829a3f8942430d885620f2c4736d9ad54332343d4f2aa16415cc33705d26b894",
+                "is_fallback": false,
+                "observed": "1 of 1 cited case row(s) were available; recorded outcomes: no response: 1; post-request health-check failures: 0.",
+                "significance": "No response was produced inside the request deadline. The recorded error is client-side and carries no server-stage information, so where the time went is not established by this evidence.",
+                "diagnosis_confidence": "suspected",
+                "fix": "Bound the work a single request can do before the deadline: reject oversized bodies at the server layer and cap per-request inference time. Establishing the cause needs server-side timing instrumentation this run did not collect.",
+                "verification": {
+                  "target_id": "sentiment_v1",
+                  "case_set_file": "results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json",
+                  "includes_baselines": true,
+                  "command": "python -m runner.run --target-id sentiment_v1 --case-set results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json --out results/verify_sentiment_v1",
+                  "expected": "the same case returns a bounded response or a documented rejection inside the deadline",
+                  "inspect": "results/verify_sentiment_v1/results_sentiment_v1.jsonl -- check the rows whose attack_id is one of: malformed.oversized_10mb"
+                },
+                "unavailable_evidence": [
+                  "No response body was captured for these rows, so body-derived claims (leak signatures, error shape) cannot be made from this evidence."
+                ]
+              }
+            },
+            {
+              "finding": {
+                "finding_id": "F-v1-008",
+                "title": "perturbation/delete_char: prediction flip",
+                "category": "perturbation",
+                "severity_score": 59.27443563938141,
+                "severity_tier": "Medium",
+                "description": "4 case(s) in perturbation/delete_char produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 4 affected case(s) indicate reproducibility, not impact.",
+                "remediation": "4 case(s) observed as 200x4. This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "evidence": [
+                  "sst2-val-13.perturbation.delete_char",
+                  "sst2-val-211.perturbation.delete_char",
+                  "sst2-val-341.perturbation.delete_char",
+                  "sst2-val-656.perturbation.delete_char"
+                ]
+              },
+              "subfamily": "delete_char",
+              "failure_mode": "prediction_flip",
+              "validity_tiers": [
+                "SILVER"
+              ],
+              "affected_cases": 4,
+              "remediation_detail": {
+                "rule_id": "RM-FLIP-MODEL",
+                "rule_version": "1.0.0",
+                "rule_sha256": "829a3f8942430d885620f2c4736d9ad54332343d4f2aa16415cc33705d26b894",
+                "is_fallback": false,
+                "observed": "4 of 4 cited case row(s) were available; recorded outcomes: HTTP 200: 4; post-request health-check failures: 0.",
+                "significance": "The top label changed under a transformation intended to preserve meaning, while the clean prediction was confident. This is a model-level sensitivity: the input reached the model unchanged in the ways the input controls check, so no endpoint control addresses it.",
+                "diagnosis_confidence": "supported",
+                "fix": "This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "verification": {
+                  "target_id": "sentiment_v1",
+                  "case_set_file": "results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json",
+                  "includes_baselines": true,
+                  "command": "python -m runner.run --target-id sentiment_v1 --case-set results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json --out results/verify_sentiment_v1",
+                  "expected": "after retraining or augmentation, the same case ids are re-run and the flip rate over the same eligible denominator is compared",
+                  "inspect": "results/verify_sentiment_v1/results_sentiment_v1.jsonl -- check the rows whose attack_id is one of: sst2-val-13.perturbation.delete_char, sst2-val-211.perturbation.delete_char, sst2-val-341.perturbation.delete_char (and the rest of the cited ids)"
+                },
+                "unavailable_evidence": [],
+                "limitation": "This is a model-level weakness. No endpoint control fixes it, and inventing one would misrepresent the finding; the fix above is an evaluation and retraining procedure instead."
+              }
+            },
+            {
+              "finding": {
+                "finding_id": "F-v1-009",
+                "title": "perturbation/insert_char: prediction flip",
+                "category": "perturbation",
+                "severity_score": 59.27443563938141,
+                "severity_tier": "Medium",
+                "description": "3 case(s) in perturbation/insert_char produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 3 affected case(s) indicate reproducibility, not impact.",
+                "remediation": "3 case(s) observed as 200x3. This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "evidence": [
+                  "sst2-val-13.perturbation.insert_char",
+                  "sst2-val-211.perturbation.insert_char",
+                  "sst2-val-341.perturbation.insert_char"
+                ]
+              },
+              "subfamily": "insert_char",
+              "failure_mode": "prediction_flip",
+              "validity_tiers": [
+                "SILVER"
+              ],
+              "affected_cases": 3,
+              "remediation_detail": {
+                "rule_id": "RM-FLIP-MODEL",
+                "rule_version": "1.0.0",
+                "rule_sha256": "829a3f8942430d885620f2c4736d9ad54332343d4f2aa16415cc33705d26b894",
+                "is_fallback": false,
+                "observed": "3 of 3 cited case row(s) were available; recorded outcomes: HTTP 200: 3; post-request health-check failures: 0.",
+                "significance": "The top label changed under a transformation intended to preserve meaning, while the clean prediction was confident. This is a model-level sensitivity: the input reached the model unchanged in the ways the input controls check, so no endpoint control addresses it.",
+                "diagnosis_confidence": "supported",
+                "fix": "This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "verification": {
+                  "target_id": "sentiment_v1",
+                  "case_set_file": "results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json",
+                  "includes_baselines": true,
+                  "command": "python -m runner.run --target-id sentiment_v1 --case-set results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json --out results/verify_sentiment_v1",
+                  "expected": "after retraining or augmentation, the same case ids are re-run and the flip rate over the same eligible denominator is compared",
+                  "inspect": "results/verify_sentiment_v1/results_sentiment_v1.jsonl -- check the rows whose attack_id is one of: sst2-val-13.perturbation.insert_char, sst2-val-211.perturbation.insert_char, sst2-val-341.perturbation.insert_char"
+                },
+                "unavailable_evidence": [],
+                "limitation": "This is a model-level weakness. No endpoint control fixes it, and inventing one would misrepresent the finding; the fix above is an evaluation and retraining procedure instead."
+              }
+            },
+            {
+              "finding": {
+                "finding_id": "F-v1-010",
+                "title": "perturbation/keyboard_typo: prediction flip",
+                "category": "perturbation",
+                "severity_score": 59.27443563938141,
+                "severity_tier": "Medium",
+                "description": "3 case(s) in perturbation/keyboard_typo produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 3 affected case(s) indicate reproducibility, not impact.",
+                "remediation": "3 case(s) observed as 200x3. This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "evidence": [
+                  "sst2-val-13.perturbation.keyboard_typo",
+                  "sst2-val-211.perturbation.keyboard_typo",
+                  "sst2-val-341.perturbation.keyboard_typo"
+                ]
+              },
+              "subfamily": "keyboard_typo",
+              "failure_mode": "prediction_flip",
+              "validity_tiers": [
+                "SILVER"
+              ],
+              "affected_cases": 3,
+              "remediation_detail": {
+                "rule_id": "RM-FLIP-MODEL",
+                "rule_version": "1.0.0",
+                "rule_sha256": "829a3f8942430d885620f2c4736d9ad54332343d4f2aa16415cc33705d26b894",
+                "is_fallback": false,
+                "observed": "3 of 3 cited case row(s) were available; recorded outcomes: HTTP 200: 3; post-request health-check failures: 0.",
+                "significance": "The top label changed under a transformation intended to preserve meaning, while the clean prediction was confident. This is a model-level sensitivity: the input reached the model unchanged in the ways the input controls check, so no endpoint control addresses it.",
+                "diagnosis_confidence": "supported",
+                "fix": "This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "verification": {
+                  "target_id": "sentiment_v1",
+                  "case_set_file": "results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json",
+                  "includes_baselines": true,
+                  "command": "python -m runner.run --target-id sentiment_v1 --case-set results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json --out results/verify_sentiment_v1",
+                  "expected": "after retraining or augmentation, the same case ids are re-run and the flip rate over the same eligible denominator is compared",
+                  "inspect": "results/verify_sentiment_v1/results_sentiment_v1.jsonl -- check the rows whose attack_id is one of: sst2-val-13.perturbation.keyboard_typo, sst2-val-211.perturbation.keyboard_typo, sst2-val-341.perturbation.keyboard_typo"
+                },
+                "unavailable_evidence": [],
+                "limitation": "This is a model-level weakness. No endpoint control fixes it, and inventing one would misrepresent the finding; the fix above is an evaluation and retraining procedure instead."
+              }
+            },
+            {
+              "finding": {
+                "finding_id": "F-v1-011",
+                "title": "perturbation/keyboard_typo_second_word: prediction flip",
+                "category": "perturbation",
+                "severity_score": 59.97897446155548,
+                "severity_tier": "Medium",
+                "description": "2 case(s) in perturbation/keyboard_typo_second_word produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 2 affected case(s) indicate reproducibility, not impact.",
+                "remediation": "2 case(s) observed as 200x2. This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "evidence": [
+                  "sst2-val-489.perturbation.keyboard_typo_second_word",
+                  "sst2-val-805.perturbation.keyboard_typo_second_word"
+                ]
+              },
+              "subfamily": "keyboard_typo_second_word",
+              "failure_mode": "prediction_flip",
+              "validity_tiers": [
+                "SILVER"
+              ],
+              "affected_cases": 2,
+              "remediation_detail": {
+                "rule_id": "RM-FLIP-MODEL",
+                "rule_version": "1.0.0",
+                "rule_sha256": "829a3f8942430d885620f2c4736d9ad54332343d4f2aa16415cc33705d26b894",
+                "is_fallback": false,
+                "observed": "2 of 2 cited case row(s) were available; recorded outcomes: HTTP 200: 2; post-request health-check failures: 0.",
+                "significance": "The top label changed under a transformation intended to preserve meaning, while the clean prediction was confident. This is a model-level sensitivity: the input reached the model unchanged in the ways the input controls check, so no endpoint control addresses it.",
+                "diagnosis_confidence": "supported",
+                "fix": "This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "verification": {
+                  "target_id": "sentiment_v1",
+                  "case_set_file": "results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json",
+                  "includes_baselines": true,
+                  "command": "python -m runner.run --target-id sentiment_v1 --case-set results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json --out results/verify_sentiment_v1",
+                  "expected": "after retraining or augmentation, the same case ids are re-run and the flip rate over the same eligible denominator is compared",
+                  "inspect": "results/verify_sentiment_v1/results_sentiment_v1.jsonl -- check the rows whose attack_id is one of: sst2-val-489.perturbation.keyboard_typo_second_word, sst2-val-805.perturbation.keyboard_typo_second_word"
+                },
+                "unavailable_evidence": [],
+                "limitation": "This is a model-level weakness. No endpoint control fixes it, and inventing one would misrepresent the finding; the fix above is an evaluation and retraining procedure instead."
+              }
+            },
+            {
+              "finding": {
+                "finding_id": "F-v1-012",
+                "title": "perturbation/misspell: prediction flip",
+                "category": "perturbation",
+                "severity_score": 59.98583495616913,
+                "severity_tier": "Medium",
+                "description": "5 case(s) in perturbation/misspell produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 5 affected case(s) indicate reproducibility, not impact.",
+                "remediation": "5 case(s) observed as 200x5. This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "evidence": [
+                  "sst2-val-13.perturbation.misspell",
+                  "sst2-val-211.perturbation.misspell",
+                  "sst2-val-341.perturbation.misspell",
+                  "sst2-val-35.perturbation.misspell",
+                  "sst2-val-52.perturbation.misspell"
+                ]
+              },
+              "subfamily": "misspell",
+              "failure_mode": "prediction_flip",
+              "validity_tiers": [
+                "SILVER"
+              ],
+              "affected_cases": 5,
+              "remediation_detail": {
+                "rule_id": "RM-FLIP-MODEL",
+                "rule_version": "1.0.0",
+                "rule_sha256": "829a3f8942430d885620f2c4736d9ad54332343d4f2aa16415cc33705d26b894",
+                "is_fallback": false,
+                "observed": "5 of 5 cited case row(s) were available; recorded outcomes: HTTP 200: 5; post-request health-check failures: 0.",
+                "significance": "The top label changed under a transformation intended to preserve meaning, while the clean prediction was confident. This is a model-level sensitivity: the input reached the model unchanged in the ways the input controls check, so no endpoint control addresses it.",
+                "diagnosis_confidence": "supported",
+                "fix": "This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "verification": {
+                  "target_id": "sentiment_v1",
+                  "case_set_file": "results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json",
+                  "includes_baselines": true,
+                  "command": "python -m runner.run --target-id sentiment_v1 --case-set results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json --out results/verify_sentiment_v1",
+                  "expected": "after retraining or augmentation, the same case ids are re-run and the flip rate over the same eligible denominator is compared",
+                  "inspect": "results/verify_sentiment_v1/results_sentiment_v1.jsonl -- check the rows whose attack_id is one of: sst2-val-13.perturbation.misspell, sst2-val-211.perturbation.misspell, sst2-val-341.perturbation.misspell (and the rest of the cited ids)"
+                },
+                "unavailable_evidence": [],
+                "limitation": "This is a model-level weakness. No endpoint control fixes it, and inventing one would misrepresent the finding; the fix above is an evaluation and retraining procedure instead."
+              }
+            },
+            {
+              "finding": {
+                "finding_id": "F-v1-013",
+                "title": "perturbation/swap_adjacent: prediction flip",
+                "category": "perturbation",
+                "severity_score": 57.84401059150696,
+                "severity_tier": "Medium",
+                "description": "1 case(s) in perturbation/swap_adjacent produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
+                "remediation": "1 case(s) observed as 200x1. This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "evidence": [
+                  "sst2-val-341.perturbation.swap_adjacent"
+                ]
+              },
+              "subfamily": "swap_adjacent",
+              "failure_mode": "prediction_flip",
+              "validity_tiers": [
+                "SILVER"
+              ],
+              "affected_cases": 1,
+              "remediation_detail": {
+                "rule_id": "RM-FLIP-MODEL",
+                "rule_version": "1.0.0",
+                "rule_sha256": "829a3f8942430d885620f2c4736d9ad54332343d4f2aa16415cc33705d26b894",
+                "is_fallback": false,
+                "observed": "1 of 1 cited case row(s) were available; recorded outcomes: HTTP 200: 1; post-request health-check failures: 0.",
+                "significance": "The top label changed under a transformation intended to preserve meaning, while the clean prediction was confident. This is a model-level sensitivity: the input reached the model unchanged in the ways the input controls check, so no endpoint control addresses it.",
+                "diagnosis_confidence": "supported",
+                "fix": "This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "verification": {
+                  "target_id": "sentiment_v1",
+                  "case_set_file": "results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json",
+                  "includes_baselines": true,
+                  "command": "python -m runner.run --target-id sentiment_v1 --case-set results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json --out results/verify_sentiment_v1",
+                  "expected": "after retraining or augmentation, the same case ids are re-run and the flip rate over the same eligible denominator is compared",
+                  "inspect": "results/verify_sentiment_v1/results_sentiment_v1.jsonl -- check the rows whose attack_id is one of: sst2-val-341.perturbation.swap_adjacent"
+                },
+                "unavailable_evidence": [],
+                "limitation": "This is a model-level weakness. No endpoint control fixes it, and inventing one would misrepresent the finding; the fix above is an evaluation and retraining procedure instead."
+              }
+            },
+            {
+              "finding": {
+                "finding_id": "F-v1-014",
+                "title": "perturbation/word_split: prediction flip",
+                "category": "perturbation",
+                "severity_score": 59.9311089515686,
+                "severity_tier": "Medium",
+                "description": "4 case(s) in perturbation/word_split produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 4 affected case(s) indicate reproducibility, not impact.",
+                "remediation": "4 case(s) observed as 200x4. This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "evidence": [
+                  "sst2-val-13.perturbation.word_split",
+                  "sst2-val-211.perturbation.word_split",
+                  "sst2-val-341.perturbation.word_split",
+                  "sst2-val-52.perturbation.word_split"
+                ]
+              },
+              "subfamily": "word_split",
+              "failure_mode": "prediction_flip",
+              "validity_tiers": [
+                "SILVER"
+              ],
+              "affected_cases": 4,
+              "remediation_detail": {
+                "rule_id": "RM-FLIP-MODEL",
+                "rule_version": "1.0.0",
+                "rule_sha256": "829a3f8942430d885620f2c4736d9ad54332343d4f2aa16415cc33705d26b894",
+                "is_fallback": false,
+                "observed": "4 of 4 cited case row(s) were available; recorded outcomes: HTTP 200: 4; post-request health-check failures: 0.",
+                "significance": "The top label changed under a transformation intended to preserve meaning, while the clean prediction was confident. This is a model-level sensitivity: the input reached the model unchanged in the ways the input controls check, so no endpoint control addresses it.",
+                "diagnosis_confidence": "supported",
+                "fix": "This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "verification": {
+                  "target_id": "sentiment_v1",
+                  "case_set_file": "results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json",
+                  "includes_baselines": true,
+                  "command": "python -m runner.run --target-id sentiment_v1 --case-set results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json --out results/verify_sentiment_v1",
+                  "expected": "after retraining or augmentation, the same case ids are re-run and the flip rate over the same eligible denominator is compared",
+                  "inspect": "results/verify_sentiment_v1/results_sentiment_v1.jsonl -- check the rows whose attack_id is one of: sst2-val-13.perturbation.word_split, sst2-val-211.perturbation.word_split, sst2-val-341.perturbation.word_split (and the rest of the cited ids)"
+                },
+                "unavailable_evidence": [],
+                "limitation": "This is a model-level weakness. No endpoint control fixes it, and inventing one would misrepresent the finding; the fix above is an evaluation and retraining procedure instead."
+              }
+            },
+            {
+              "finding": {
+                "finding_id": "F-v1-015",
+                "title": "truncation/signal_end_over_limit: unhandled server error",
+                "category": "truncation",
+                "severity_score": 70.0,
+                "severity_tier": "High",
+                "description": "42 case(s) in truncation/signal_end_over_limit produced unhandled server error -- the endpoint returned an unhandled 5xx; where health still answered afterwards the request failed but the service survived, which is not unavailability. Severity is scored from the single highest-scoring instance; the 42 affected case(s) indicate reproducibility, not impact.",
+                "remediation": "42 case(s) observed as 500x42. Check the tokenized length against the model's maximum sequence length before inference and reject over-limit input with a typed 4xx response. Do not add truncation: silently shortening the input would hide the failure this case exists to measure.",
+                "evidence": [
+                  "sst2-val-109.truncation.signal_end_over_limit",
+                  "sst2-val-110.truncation.signal_end_over_limit",
+                  "sst2-val-111.truncation.signal_end_over_limit",
+                  "sst2-val-120.truncation.signal_end_over_limit",
+                  "sst2-val-121.truncation.signal_end_over_limit",
+                  "sst2-val-13.truncation.signal_end_over_limit",
+                  "sst2-val-136.truncation.signal_end_over_limit",
+                  "sst2-val-162.truncation.signal_end_over_limit",
+                  "sst2-val-17.truncation.signal_end_over_limit",
+                  "sst2-val-18.truncation.signal_end_over_limit",
+                  "sst2-val-201.truncation.signal_end_over_limit",
+                  "sst2-val-211.truncation.signal_end_over_limit",
+                  "sst2-val-227.truncation.signal_end_over_limit",
+                  "sst2-val-248.truncation.signal_end_over_limit",
+                  "sst2-val-290.truncation.signal_end_over_limit",
+                  "sst2-val-319.truncation.signal_end_over_limit",
+                  "sst2-val-341.truncation.signal_end_over_limit",
+                  "sst2-val-35.truncation.signal_end_over_limit",
+                  "sst2-val-361.truncation.signal_end_over_limit",
+                  "sst2-val-427.truncation.signal_end_over_limit",
+                  "sst2-val-432.truncation.signal_end_over_limit",
+                  "sst2-val-480.truncation.signal_end_over_limit",
+                  "sst2-val-489.truncation.signal_end_over_limit",
+                  "sst2-val-52.truncation.signal_end_over_limit",
+                  "sst2-val-561.truncation.signal_end_over_limit",
+                  "sst2-val-588.truncation.signal_end_over_limit",
+                  "sst2-val-59.truncation.signal_end_over_limit",
+                  "sst2-val-590.truncation.signal_end_over_limit",
+                  "sst2-val-601.truncation.signal_end_over_limit",
+                  "sst2-val-609.truncation.signal_end_over_limit",
+                  "sst2-val-656.truncation.signal_end_over_limit",
+                  "sst2-val-671.truncation.signal_end_over_limit",
+                  "sst2-val-672.truncation.signal_end_over_limit",
+                  "sst2-val-674.truncation.signal_end_over_limit",
+                  "sst2-val-686.truncation.signal_end_over_limit",
+                  "sst2-val-730.truncation.signal_end_over_limit",
+                  "sst2-val-743.truncation.signal_end_over_limit",
+                  "sst2-val-748.truncation.signal_end_over_limit",
+                  "sst2-val-761.truncation.signal_end_over_limit",
+                  "sst2-val-778.truncation.signal_end_over_limit",
+                  "sst2-val-785.truncation.signal_end_over_limit",
+                  "sst2-val-805.truncation.signal_end_over_limit"
+                ]
+              },
+              "subfamily": "signal_end_over_limit",
+              "failure_mode": "unhandled_5xx",
+              "validity_tiers": [
+                "GOLD"
+              ],
+              "affected_cases": 42,
+              "remediation_detail": {
+                "rule_id": "RM-5XX-OVERLENGTH",
+                "rule_version": "1.0.0",
+                "rule_sha256": "829a3f8942430d885620f2c4736d9ad54332343d4f2aa16415cc33705d26b894",
+                "is_fallback": false,
+                "observed": "42 of 42 cited case row(s) were available; recorded outcomes: HTTP 500: 42; post-request health-check failures: 0.",
+                "significance": "Input at or beyond the model's sequence limit produced a server-error response rather than a defined rejection. The settled architecture forbids silent truncation, so rejecting is the intended behaviour and erroring is not.",
+                "diagnosis_confidence": "supported",
+                "fix": "Check the tokenized length against the model's maximum sequence length before inference and reject over-limit input with a typed 4xx response. Do not add truncation: silently shortening the input would hide the failure this case exists to measure.",
+                "verification": {
+                  "target_id": "sentiment_v1",
+                  "case_set_file": "results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json",
+                  "includes_baselines": true,
+                  "command": "python -m runner.run --target-id sentiment_v1 --case-set results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json --out results/verify_sentiment_v1",
+                  "expected": "over-limit cases return the documented 4xx rejection and under-limit cases still return 200",
+                  "inspect": "results/verify_sentiment_v1/results_sentiment_v1.jsonl -- check the rows whose attack_id is one of: sst2-val-109.truncation.signal_end_over_limit, sst2-val-110.truncation.signal_end_over_limit, sst2-val-111.truncation.signal_end_over_limit (and the rest of the cited ids)"
+                },
+                "unavailable_evidence": []
+              }
+            },
+            {
+              "finding": {
+                "finding_id": "F-v1-016",
+                "title": "truncation/signal_end_short: prediction flip",
+                "category": "truncation",
+                "severity_score": 59.9311089515686,
+                "severity_tier": "Medium",
+                "description": "6 case(s) in truncation/signal_end_short produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 6 affected case(s) indicate reproducibility, not impact.",
+                "remediation": "6 case(s) observed as 200x6. This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "evidence": [
+                  "sst2-val-13.truncation.signal_end_short",
+                  "sst2-val-201.truncation.signal_end_short",
+                  "sst2-val-341.truncation.signal_end_short",
+                  "sst2-val-52.truncation.signal_end_short",
+                  "sst2-val-588.truncation.signal_end_short",
+                  "sst2-val-785.truncation.signal_end_short"
+                ]
+              },
+              "subfamily": "signal_end_short",
+              "failure_mode": "prediction_flip",
+              "validity_tiers": [
+                "SILVER"
+              ],
+              "affected_cases": 6,
+              "remediation_detail": {
+                "rule_id": "RM-FLIP-MODEL",
+                "rule_version": "1.0.0",
+                "rule_sha256": "829a3f8942430d885620f2c4736d9ad54332343d4f2aa16415cc33705d26b894",
+                "is_fallback": false,
+                "observed": "6 of 6 cited case row(s) were available; recorded outcomes: HTTP 200: 6; post-request health-check failures: 0.",
+                "significance": "The top label changed under a transformation intended to preserve meaning, while the clean prediction was confident. This is a model-level sensitivity: the input reached the model unchanged in the ways the input controls check, so no endpoint control addresses it.",
+                "diagnosis_confidence": "supported",
+                "fix": "This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "verification": {
+                  "target_id": "sentiment_v1",
+                  "case_set_file": "results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json",
+                  "includes_baselines": true,
+                  "command": "python -m runner.run --target-id sentiment_v1 --case-set results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json --out results/verify_sentiment_v1",
+                  "expected": "after retraining or augmentation, the same case ids are re-run and the flip rate over the same eligible denominator is compared",
+                  "inspect": "results/verify_sentiment_v1/results_sentiment_v1.jsonl -- check the rows whose attack_id is one of: sst2-val-13.truncation.signal_end_short, sst2-val-201.truncation.signal_end_short, sst2-val-341.truncation.signal_end_short (and the rest of the cited ids)"
+                },
+                "unavailable_evidence": [],
+                "limitation": "This is a model-level weakness. No endpoint control fixes it, and inventing one would misrepresent the finding; the fix above is an evaluation and retraining procedure instead."
+              }
+            },
+            {
+              "finding": {
+                "finding_id": "F-v1-017",
+                "title": "truncation/signal_start_over_limit: unhandled server error",
+                "category": "truncation",
+                "severity_score": 70.0,
+                "severity_tier": "High",
+                "description": "42 case(s) in truncation/signal_start_over_limit produced unhandled server error -- the endpoint returned an unhandled 5xx; where health still answered afterwards the request failed but the service survived, which is not unavailability. Severity is scored from the single highest-scoring instance; the 42 affected case(s) indicate reproducibility, not impact.",
+                "remediation": "42 case(s) observed as 500x42. Check the tokenized length against the model's maximum sequence length before inference and reject over-limit input with a typed 4xx response. Do not add truncation: silently shortening the input would hide the failure this case exists to measure.",
+                "evidence": [
+                  "sst2-val-109.truncation.signal_start_over_limit",
+                  "sst2-val-110.truncation.signal_start_over_limit",
+                  "sst2-val-111.truncation.signal_start_over_limit",
+                  "sst2-val-120.truncation.signal_start_over_limit",
+                  "sst2-val-121.truncation.signal_start_over_limit",
+                  "sst2-val-13.truncation.signal_start_over_limit",
+                  "sst2-val-136.truncation.signal_start_over_limit",
+                  "sst2-val-162.truncation.signal_start_over_limit",
+                  "sst2-val-17.truncation.signal_start_over_limit",
+                  "sst2-val-18.truncation.signal_start_over_limit",
+                  "sst2-val-201.truncation.signal_start_over_limit",
+                  "sst2-val-211.truncation.signal_start_over_limit",
+                  "sst2-val-227.truncation.signal_start_over_limit",
+                  "sst2-val-248.truncation.signal_start_over_limit",
+                  "sst2-val-290.truncation.signal_start_over_limit",
+                  "sst2-val-319.truncation.signal_start_over_limit",
+                  "sst2-val-341.truncation.signal_start_over_limit",
+                  "sst2-val-35.truncation.signal_start_over_limit",
+                  "sst2-val-361.truncation.signal_start_over_limit",
+                  "sst2-val-427.truncation.signal_start_over_limit",
+                  "sst2-val-432.truncation.signal_start_over_limit",
+                  "sst2-val-480.truncation.signal_start_over_limit",
+                  "sst2-val-489.truncation.signal_start_over_limit",
+                  "sst2-val-52.truncation.signal_start_over_limit",
+                  "sst2-val-561.truncation.signal_start_over_limit",
+                  "sst2-val-588.truncation.signal_start_over_limit",
+                  "sst2-val-59.truncation.signal_start_over_limit",
+                  "sst2-val-590.truncation.signal_start_over_limit",
+                  "sst2-val-601.truncation.signal_start_over_limit",
+                  "sst2-val-609.truncation.signal_start_over_limit",
+                  "sst2-val-656.truncation.signal_start_over_limit",
+                  "sst2-val-671.truncation.signal_start_over_limit",
+                  "sst2-val-672.truncation.signal_start_over_limit",
+                  "sst2-val-674.truncation.signal_start_over_limit",
+                  "sst2-val-686.truncation.signal_start_over_limit",
+                  "sst2-val-730.truncation.signal_start_over_limit",
+                  "sst2-val-743.truncation.signal_start_over_limit",
+                  "sst2-val-748.truncation.signal_start_over_limit",
+                  "sst2-val-761.truncation.signal_start_over_limit",
+                  "sst2-val-778.truncation.signal_start_over_limit",
+                  "sst2-val-785.truncation.signal_start_over_limit",
+                  "sst2-val-805.truncation.signal_start_over_limit"
+                ]
+              },
+              "subfamily": "signal_start_over_limit",
+              "failure_mode": "unhandled_5xx",
+              "validity_tiers": [
+                "GOLD"
+              ],
+              "affected_cases": 42,
+              "remediation_detail": {
+                "rule_id": "RM-5XX-OVERLENGTH",
+                "rule_version": "1.0.0",
+                "rule_sha256": "829a3f8942430d885620f2c4736d9ad54332343d4f2aa16415cc33705d26b894",
+                "is_fallback": false,
+                "observed": "42 of 42 cited case row(s) were available; recorded outcomes: HTTP 500: 42; post-request health-check failures: 0.",
+                "significance": "Input at or beyond the model's sequence limit produced a server-error response rather than a defined rejection. The settled architecture forbids silent truncation, so rejecting is the intended behaviour and erroring is not.",
+                "diagnosis_confidence": "supported",
+                "fix": "Check the tokenized length against the model's maximum sequence length before inference and reject over-limit input with a typed 4xx response. Do not add truncation: silently shortening the input would hide the failure this case exists to measure.",
+                "verification": {
+                  "target_id": "sentiment_v1",
+                  "case_set_file": "results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json",
+                  "includes_baselines": true,
+                  "command": "python -m runner.run --target-id sentiment_v1 --case-set results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json --out results/verify_sentiment_v1",
+                  "expected": "over-limit cases return the documented 4xx rejection and under-limit cases still return 200",
+                  "inspect": "results/verify_sentiment_v1/results_sentiment_v1.jsonl -- check the rows whose attack_id is one of: sst2-val-109.truncation.signal_start_over_limit, sst2-val-110.truncation.signal_start_over_limit, sst2-val-111.truncation.signal_start_over_limit (and the rest of the cited ids)"
+                },
+                "unavailable_evidence": []
+              }
+            },
+            {
+              "finding": {
+                "finding_id": "F-v1-018",
+                "title": "truncation/signal_start_short: prediction flip",
+                "category": "truncation",
+                "severity_score": 59.98134970664978,
+                "severity_tier": "Medium",
+                "description": "8 case(s) in truncation/signal_start_short produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 8 affected case(s) indicate reproducibility, not impact.",
+                "remediation": "8 case(s) observed as 200x8. This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "evidence": [
+                  "sst2-val-121.truncation.signal_start_short",
+                  "sst2-val-13.truncation.signal_start_short",
+                  "sst2-val-201.truncation.signal_start_short",
+                  "sst2-val-341.truncation.signal_start_short",
+                  "sst2-val-588.truncation.signal_start_short",
+                  "sst2-val-609.truncation.signal_start_short",
+                  "sst2-val-671.truncation.signal_start_short",
+                  "sst2-val-785.truncation.signal_start_short"
+                ]
+              },
+              "subfamily": "signal_start_short",
+              "failure_mode": "prediction_flip",
+              "validity_tiers": [
+                "SILVER"
+              ],
+              "affected_cases": 8,
+              "remediation_detail": {
+                "rule_id": "RM-FLIP-MODEL",
+                "rule_version": "1.0.0",
+                "rule_sha256": "829a3f8942430d885620f2c4736d9ad54332343d4f2aa16415cc33705d26b894",
+                "is_fallback": false,
+                "observed": "8 of 8 cited case row(s) were available; recorded outcomes: HTTP 200: 8; post-request health-check failures: 0.",
+                "significance": "The top label changed under a transformation intended to preserve meaning, while the clean prediction was confident. This is a model-level sensitivity: the input reached the model unchanged in the ways the input controls check, so no endpoint control addresses it.",
+                "diagnosis_confidence": "supported",
+                "fix": "This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "verification": {
+                  "target_id": "sentiment_v1",
+                  "case_set_file": "results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json",
+                  "includes_baselines": true,
+                  "command": "python -m runner.run --target-id sentiment_v1 --case-set results/v63_real_sentiment_core_bf0c268072bf48dd/runs/sentiment_core/verification_case_set.json --out results/verify_sentiment_v1",
+                  "expected": "after retraining or augmentation, the same case ids are re-run and the flip rate over the same eligible denominator is compared",
+                  "inspect": "results/verify_sentiment_v1/results_sentiment_v1.jsonl -- check the rows whose attack_id is one of: sst2-val-121.truncation.signal_start_short, sst2-val-13.truncation.signal_start_short, sst2-val-201.truncation.signal_start_short (and the rest of the cited ids)"
+                },
+                "unavailable_evidence": [],
+                "limitation": "This is a model-level weakness. No endpoint control fixes it, and inventing one would misrepresent the finding; the fix above is an evaluation and retraining procedure instead."
+              }
+            }
+          ],
+          "validity_tier_census": {
+            "GOLD": 5,
+            "SILVER": 13
+          },
+          "diagnostic_observations": [
+            {
+              "attack_id": "sst2-val-109.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-109.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-109.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-110.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-110.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-110.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-111.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-111.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-111.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-120.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-120.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-120.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-121.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-121.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-121.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-13.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-13.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-13.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-136.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-136.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-136.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-162.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-162.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-162.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-17.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-17.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-17.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-18.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-18.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-18.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-201.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-201.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-201.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-211.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-211.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-211.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-227.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-227.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-227.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-248.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-248.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-248.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-290.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-290.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-290.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-319.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-319.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-319.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-341.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-341.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-341.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-35.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-35.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-35.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-361.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-361.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-361.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-427.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-427.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-427.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-432.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-432.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-432.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-480.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-480.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-480.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-489.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-489.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-489.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-52.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-52.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-52.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-561.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-561.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-561.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-588.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-588.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-588.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-59.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-59.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-59.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-590.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-590.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-590.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-601.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-601.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-601.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-609.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-609.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-609.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-656.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-656.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-656.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-671.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-671.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-671.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-672.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-672.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-672.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-674.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-674.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-674.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-686.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-686.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-686.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-730.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-730.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-730.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-743.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-743.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-743.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-748.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-748.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-748.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-761.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-761.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-761.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-778.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-778.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-778.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-785.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-785.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-785.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-805.whitespace.repeated_punctuation",
+              "category": "whitespace",
+              "subfamily": "repeated_punctuation",
+              "validity_tier": "REVIEW",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": true
+            },
+            {
+              "attack_id": "sst2-val-805.truncation.signal_head_only",
+              "category": "truncation",
+              "subfamily": "signal_head_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            },
+            {
+              "attack_id": "sst2-val-805.truncation.signal_tail_only",
+              "category": "truncation",
+              "subfamily": "signal_tail_only",
+              "validity_tier": "DIAGNOSTIC",
+              "oracle": "diagnostic_no_fixed_oracle",
+              "tier_differs_from_diagnostic": false
+            }
+          ],
+          "review_cases": [
+            {
+              "attack_id": "sst2-val-109.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-110.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-111.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-120.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-121.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-13.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-136.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-162.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-17.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-18.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-201.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-211.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-227.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-248.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-290.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-319.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-341.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-35.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-361.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-427.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-432.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-480.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-489.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-52.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-561.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-588.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-59.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-590.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-601.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-609.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-656.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-671.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-672.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-674.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-686.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-730.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-743.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-748.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-761.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-778.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-785.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            },
+            {
+              "attack_id": "sst2-val-805.encoding.bidi_reorder.middle",
+              "category": "encoding",
+              "subfamily": "bidi_reorder"
+            }
+          ],
+          "limitations": [
+            "Drift is measured against each endpoint's own clean prediction, never the dataset label a baseline sentence was written to represent. Where a baseline does not predict its intended label the comparison remains valid, and no model-accuracy claim in this analysis rests on those baselines.",
+            "V2's defenses are application-layer only; no retraining was done. V2 is therefore not expected to reduce model-level sensitivity to typos or other meaning-preserving perturbations. A perturbation finding that persists on V2 is an honest non-improvement, not a gap in the hardening.",
+            "A failed health check records observed unavailability only. It is not evidence that the operating-system process died, and no process-death claim is made anywhere here.",
+            "Validity tiers are preserved per finding. Most of the suite is SILVER -- mechanically justified but not hand-verified -- so findings resting on SILVER evidence carry weaker semantic assurance than GOLD ones."
+          ]
+        }
+      },
+      "comparison": null,
+      "coverage": {
+        "coverage_map": {
+          "version": "1.0.0",
+          "sha256": "1837121e8719272bfcf8bdbfa1d260fd6a13111c935a56bfcc873e465bc94ff1",
+          "source": "C:\\Users\\ahsan\\OneDrive\\Desktop\\stage3-ahsan\\results\\v63_real_sentiment_core_bf0c268072bf48dd\\runs\\sentiment_core\\sentiment_v1\\manifest.json",
+          "is_overlay": false,
+          "created_at_utc": null,
+          "source_manifest_sha256": null,
+          "declaration_timing": "declared with the suite"
+        },
+        "totals": {
+          "planned": 1889,
+          "selected": 1889,
+          "completed": 1889,
+          "not_selected": 0,
+          "not_executed": 0,
+          "undeclared": 0
+        },
+        "classes": {
+          "in_scope": {
+            "planned": 659,
+            "selected": 659,
+            "completed": 659,
+            "buckets": {
+              "eligible_pass": 507,
+              "eligible_fail": 110,
+              "review": 42,
+              "diagnostic": 0,
+              "unevaluable": 0
+            },
+            "failed_case_ids": [
+              "malformed.extra_field",
+              "malformed.oversized_10mb",
+              "boundary.length.plus_one",
+              "sst2-val-109.encoding.compatibility_fullwidth.whole",
+              "sst2-val-109.truncation.signal_start_over_limit",
+              "sst2-val-109.truncation.signal_end_over_limit",
+              "sst2-val-110.truncation.signal_start_over_limit",
+              "sst2-val-110.truncation.signal_end_over_limit",
+              "sst2-val-111.truncation.signal_start_over_limit",
+              "sst2-val-111.truncation.signal_end_over_limit",
+              "sst2-val-120.encoding.compatibility_fullwidth.whole",
+              "sst2-val-120.truncation.signal_start_over_limit",
+              "sst2-val-120.truncation.signal_end_over_limit",
+              "sst2-val-121.encoding.deletion_backspace.middle.d1",
+              "sst2-val-121.encoding.compatibility_fullwidth.whole",
+              "sst2-val-121.truncation.signal_start_over_limit",
+              "sst2-val-121.truncation.signal_end_over_limit",
+              "sst2-val-13.encoding.deletion_backspace.middle.d1",
+              "sst2-val-13.encoding.compatibility_fullwidth.whole",
+              "sst2-val-13.truncation.signal_start_over_limit",
+              "sst2-val-13.truncation.signal_end_over_limit",
+              "sst2-val-136.truncation.signal_start_over_limit",
+              "sst2-val-136.truncation.signal_end_over_limit",
+              "sst2-val-162.truncation.signal_start_over_limit",
+              "sst2-val-162.truncation.signal_end_over_limit",
+              "sst2-val-17.encoding.compatibility_fullwidth.whole",
+              "sst2-val-17.truncation.signal_start_over_limit",
+              "sst2-val-17.truncation.signal_end_over_limit",
+              "sst2-val-18.encoding.compatibility_fullwidth.whole",
+              "sst2-val-18.truncation.signal_start_over_limit",
+              "sst2-val-18.truncation.signal_end_over_limit",
+              "sst2-val-201.encoding.compatibility_fullwidth.whole",
+              "sst2-val-201.truncation.signal_start_over_limit",
+              "sst2-val-201.truncation.signal_end_over_limit",
+              "sst2-val-211.truncation.signal_start_over_limit",
+              "sst2-val-211.truncation.signal_end_over_limit",
+              "sst2-val-227.encoding.compatibility_fullwidth.whole",
+              "sst2-val-227.truncation.signal_start_over_limit",
+              "sst2-val-227.truncation.signal_end_over_limit",
+              "sst2-val-248.truncation.signal_start_over_limit",
+              "sst2-val-248.truncation.signal_end_over_limit",
+              "sst2-val-290.encoding.compatibility_fullwidth.whole",
+              "sst2-val-290.truncation.signal_start_over_limit",
+              "sst2-val-290.truncation.signal_end_over_limit",
+              "sst2-val-319.truncation.signal_start_over_limit",
+              "sst2-val-319.truncation.signal_end_over_limit",
+              "sst2-val-341.encoding.compatibility_fullwidth.whole",
+              "sst2-val-341.truncation.signal_start_over_limit",
+              "sst2-val-341.truncation.signal_end_over_limit",
+              "sst2-val-35.encoding.compatibility_fullwidth.whole",
+              "sst2-val-35.truncation.signal_start_over_limit",
+              "sst2-val-35.truncation.signal_end_over_limit",
+              "sst2-val-361.truncation.signal_start_over_limit",
+              "sst2-val-361.truncation.signal_end_over_limit",
+              "sst2-val-427.encoding.compatibility_fullwidth.whole",
+              "sst2-val-427.truncation.signal_start_over_limit",
+              "sst2-val-427.truncation.signal_end_over_limit",
+              "sst2-val-432.truncation.signal_start_over_limit",
+              "sst2-val-432.truncation.signal_end_over_limit",
+              "sst2-val-480.encoding.compatibility_fullwidth.whole",
+              "sst2-val-480.truncation.signal_start_over_limit",
+              "sst2-val-480.truncation.signal_end_over_limit",
+              "sst2-val-489.truncation.signal_start_over_limit",
+              "sst2-val-489.truncation.signal_end_over_limit",
+              "sst2-val-52.encoding.compatibility_fullwidth.whole",
+              "sst2-val-52.truncation.signal_start_over_limit",
+              "sst2-val-52.truncation.signal_end_over_limit",
+              "sst2-val-561.truncation.signal_start_over_limit",
+              "sst2-val-561.truncation.signal_end_over_limit",
+              "sst2-val-588.encoding.compatibility_fullwidth.whole",
+              "sst2-val-588.truncation.signal_start_over_limit",
+              "sst2-val-588.truncation.signal_end_over_limit",
+              "sst2-val-59.truncation.signal_start_over_limit",
+              "sst2-val-59.truncation.signal_end_over_limit",
+              "sst2-val-590.truncation.signal_start_over_limit",
+              "sst2-val-590.truncation.signal_end_over_limit",
+              "sst2-val-601.truncation.signal_start_over_limit",
+              "sst2-val-601.truncation.signal_end_over_limit",
+              "sst2-val-609.encoding.compatibility_fullwidth.whole",
+              "sst2-val-609.truncation.signal_start_over_limit",
+              "sst2-val-609.truncation.signal_end_over_limit",
+              "sst2-val-656.truncation.signal_start_over_limit",
+              "sst2-val-656.truncation.signal_end_over_limit",
+              "sst2-val-671.truncation.signal_start_over_limit",
+              "sst2-val-671.truncation.signal_end_over_limit",
+              "sst2-val-672.truncation.signal_start_over_limit",
+              "sst2-val-672.truncation.signal_end_over_limit",
+              "sst2-val-674.encoding.compatibility_fullwidth.whole",
+              "sst2-val-674.truncation.signal_start_over_limit",
+              "sst2-val-674.truncation.signal_end_over_limit",
+              "sst2-val-686.encoding.compatibility_fullwidth.whole",
+              "sst2-val-686.truncation.signal_start_over_limit",
+              "sst2-val-686.truncation.signal_end_over_limit",
+              "sst2-val-730.truncation.signal_start_over_limit",
+              "sst2-val-730.truncation.signal_end_over_limit",
+              "sst2-val-743.truncation.signal_start_over_limit",
+              "sst2-val-743.truncation.signal_end_over_limit",
+              "sst2-val-748.truncation.signal_start_over_limit",
+              "sst2-val-748.truncation.signal_end_over_limit",
+              "sst2-val-761.truncation.signal_start_over_limit",
+              "sst2-val-761.truncation.signal_end_over_limit",
+              "sst2-val-778.encoding.compatibility_fullwidth.whole",
+              "sst2-val-778.truncation.signal_start_over_limit",
+              "sst2-val-778.truncation.signal_end_over_limit",
+              "sst2-val-785.encoding.compatibility_fullwidth.whole",
+              "sst2-val-785.truncation.signal_start_over_limit",
+              "sst2-val-785.truncation.signal_end_over_limit",
+              "sst2-val-805.encoding.deletion_backspace.trailing.d1",
+              "sst2-val-805.truncation.signal_start_over_limit",
+              "sst2-val-805.truncation.signal_end_over_limit"
+            ],
+            "failure_rate": {
+              "numerator": 110,
+              "denominator": 617,
+              "rate": 0.178282
+            }
+          },
+          "mixed": {
+            "planned": 5,
+            "selected": 5,
+            "completed": 5,
+            "buckets": {
+              "eligible_pass": 5,
+              "eligible_fail": 0,
+              "review": 0,
+              "diagnostic": 0,
+              "unevaluable": 0
+            },
+            "failed_case_ids": [],
+            "failure_rate": {
+              "numerator": 0,
+              "denominator": 5,
+              "rate": 0.0
+            }
+          },
+          "not_targeted": {
+            "planned": 1219,
+            "selected": 1219,
+            "completed": 1219,
+            "buckets": {
+              "eligible_pass": 1017,
+              "eligible_fail": 76,
+              "review": 0,
+              "diagnostic": 126,
+              "unevaluable": 0
+            },
+            "failed_case_ids": [
+              "sst2-val-121.encoding.homoglyph.middle.d3",
+              "sst2-val-121.encoding.homoglyph.middle.d5",
+              "sst2-val-121.encoding.homoglyph_greek.middle.d3",
+              "sst2-val-121.truncation.signal_start_short",
+              "sst2-val-13.perturbation.keyboard_typo",
+              "sst2-val-13.perturbation.delete_char",
+              "sst2-val-13.perturbation.word_split",
+              "sst2-val-13.perturbation.insert_char",
+              "sst2-val-13.perturbation.misspell",
+              "sst2-val-13.encoding.homoglyph.leading.d3",
+              "sst2-val-13.encoding.homoglyph.leading.d5",
+              "sst2-val-13.encoding.homoglyph.middle.d1",
+              "sst2-val-13.encoding.homoglyph.middle.d3",
+              "sst2-val-13.encoding.homoglyph.middle.d5",
+              "sst2-val-13.encoding.homoglyph_greek.leading.d3",
+              "sst2-val-13.encoding.homoglyph_greek.middle.d1",
+              "sst2-val-13.encoding.homoglyph_greek.middle.d3",
+              "sst2-val-13.truncation.signal_start_short",
+              "sst2-val-13.truncation.signal_end_short",
+              "sst2-val-201.encoding.homoglyph.trailing.d5",
+              "sst2-val-201.encoding.homoglyph_greek.trailing.d3",
+              "sst2-val-201.truncation.signal_start_short",
+              "sst2-val-201.truncation.signal_end_short",
+              "sst2-val-211.perturbation.keyboard_typo",
+              "sst2-val-211.perturbation.delete_char",
+              "sst2-val-211.perturbation.word_split",
+              "sst2-val-211.perturbation.insert_char",
+              "sst2-val-211.perturbation.misspell",
+              "sst2-val-227.encoding.homoglyph_greek.middle.d3",
+              "sst2-val-341.perturbation.swap_adjacent",
+              "sst2-val-341.perturbation.keyboard_typo",
+              "sst2-val-341.perturbation.delete_char",
+              "sst2-val-341.perturbation.word_split",
+              "sst2-val-341.perturbation.insert_char",
+              "sst2-val-341.perturbation.misspell",
+              "sst2-val-341.encoding.homoglyph.leading.d3",
+              "sst2-val-341.encoding.homoglyph.leading.d5",
+              "sst2-val-341.encoding.homoglyph_greek.leading.d1",
+              "sst2-val-341.encoding.homoglyph_greek.leading.d3",
+              "sst2-val-341.encoding.homoglyph_greek.middle.d3",
+              "sst2-val-341.truncation.signal_start_short",
+              "sst2-val-341.truncation.signal_end_short",
+              "sst2-val-35.perturbation.misspell",
+              "sst2-val-35.encoding.homoglyph.middle.d1",
+              "sst2-val-35.encoding.homoglyph.middle.d3",
+              "sst2-val-35.encoding.homoglyph.middle.d5",
+              "sst2-val-489.perturbation.keyboard_typo_second_word",
+              "sst2-val-489.encoding.homoglyph_greek.trailing.d1",
+              "sst2-val-52.perturbation.word_split",
+              "sst2-val-52.perturbation.misspell",
+              "sst2-val-52.encoding.homoglyph_greek.leading.d3",
+              "sst2-val-52.encoding.homoglyph_greek.middle.d3",
+              "sst2-val-52.truncation.signal_end_short",
+              "sst2-val-588.encoding.homoglyph.middle.d3",
+              "sst2-val-588.encoding.homoglyph.middle.d5",
+              "sst2-val-588.encoding.homoglyph.trailing.d1",
+              "sst2-val-588.encoding.homoglyph_greek.middle.d1",
+              "sst2-val-588.encoding.homoglyph_greek.middle.d3",
+              "sst2-val-588.encoding.homoglyph_greek.trailing.d1",
+              "sst2-val-588.truncation.signal_start_short",
+              "sst2-val-588.truncation.signal_end_short",
+              "sst2-val-59.encoding.homoglyph.leading.d3",
+              "sst2-val-59.encoding.homoglyph.leading.d5",
+              "sst2-val-59.encoding.homoglyph.middle.d1",
+              "sst2-val-609.truncation.signal_start_short",
+              "sst2-val-656.perturbation.delete_char",
+              "sst2-val-656.encoding.homoglyph_greek.middle.d1",
+              "sst2-val-656.encoding.homoglyph_greek.trailing.d3",
+              "sst2-val-671.truncation.signal_start_short",
+              "sst2-val-672.encoding.homoglyph.middle.d3",
+              "sst2-val-672.encoding.homoglyph.middle.d5",
+              "sst2-val-672.encoding.homoglyph_greek.middle.d3",
+              "sst2-val-785.encoding.homoglyph_greek.trailing.d1",
+              "sst2-val-785.truncation.signal_start_short",
+              "sst2-val-785.truncation.signal_end_short",
+              "sst2-val-805.perturbation.keyboard_typo_second_word"
+            ],
+            "failure_rate": {
+              "numerator": 76,
+              "denominator": 1093,
+              "rate": 0.069533
+            }
+          },
+          "out_of_scope": {
+            "planned": 6,
+            "selected": 6,
+            "completed": 6,
+            "buckets": {
+              "eligible_pass": 6,
+              "eligible_fail": 0,
+              "review": 0,
+              "diagnostic": 0,
+              "unevaluable": 0
+            },
+            "failed_case_ids": [],
+            "failure_rate": {
+              "numerator": 0,
+              "denominator": 6,
+              "rate": 0.0
+            }
+          },
+          "undeclared": {
+            "planned": 0,
+            "selected": 0,
+            "completed": 0,
+            "buckets": {
+              "eligible_pass": 0,
+              "eligible_fail": 0,
+              "review": 0,
+              "diagnostic": 0,
+              "unevaluable": 0
+            },
+            "failed_case_ids": [],
+            "failure_rate": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            }
+          }
+        },
+        "controls": {
+          "per_control": {
+            "length": {
+              "planned": 90,
+              "selected": 90,
+              "completed": 90,
+              "buckets": {
+                "eligible_pass": 4,
+                "eligible_fail": 86,
+                "review": 0,
+                "diagnostic": 0,
+                "unevaluable": 0
+              },
+              "failure_rate": {
+                "numerator": 86,
+                "denominator": 90,
+                "rate": 0.955556
+              }
+            },
+            "strict_type_schema": {
+              "planned": 16,
+              "selected": 16,
+              "completed": 16,
+              "buckets": {
+                "eligible_pass": 15,
+                "eligible_fail": 1,
+                "review": 0,
+                "diagnostic": 0,
+                "unevaluable": 0
+              },
+              "failure_rate": {
+                "numerator": 1,
+                "denominator": 16,
+                "rate": 0.0625
+              }
+            },
+            "normalization": {
+              "planned": 558,
+              "selected": 558,
+              "completed": 558,
+              "buckets": {
+                "eligible_pass": 493,
+                "eligible_fail": 23,
+                "review": 42,
+                "diagnostic": 0,
+                "unevaluable": 0
+              },
+              "failure_rate": {
+                "numerator": 23,
+                "denominator": 516,
+                "rate": 0.044574
+              }
+            }
+          },
+          "note": "Per-control counts overlap: a case may target more than one control. They are not a disjoint partition and must not be summed."
+        },
+        "not_selected_attack_ids": [],
+        "not_executed_attack_ids": [],
+        "undeclared_attack_ids": [],
+        "interpretation": {
+          "classes_are_intent": "Coverage classes record intended input-control coverage taken from case and control construction. They are not effectiveness and not causal attribution.",
+          "cross_cutting_error_handling": "The scoped exception handler is cross-cutting: its observable responses are reported, but no isolated causal proof is claimed for it.",
+          "shared_framework_behaviour": "Strict type/schema cases exercise a declared control even where both wrappers already reject the input at the framework layer; see incremental_vs_v1 rather than deleting the cases."
+        }
+      },
+      "oces": null,
+      "baseline_file": "baseline/sentiment_baseline.json",
+      "baseline_file_sha256": "33077982c79553d0ae700ed0658c5912186958750866d725792e7f9bf4c87bd2"
+    }
+  ],
+  "limitations": [
+    "Drift is measured against each endpoint's own clean prediction, never the dataset label a baseline sentence was written to represent. Where a baseline does not predict its intended label the comparison remains valid, and no model-accuracy claim in this analysis rests on those baselines.",
+    "A failed health check records observed unavailability only. It is not evidence that the operating-system process died, and no process-death claim is made anywhere here.",
+    "Validity tiers are preserved per finding. Most of the suite is SILVER -- mechanically justified but not hand-verified -- so findings resting on SILVER evidence carry weaker semantic assurance than GOLD ones."
+  ]
+}

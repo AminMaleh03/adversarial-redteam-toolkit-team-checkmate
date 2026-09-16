@@ -1,0 +1,223 @@
+{
+  "report_identity": {
+    "name": "Red Lab Master Technical Report",
+    "product_version_label": "Red Lab v6.3",
+    "contracts_version": "3.0.0",
+    "generator_module": "report.master_report",
+    "generator_version": "1.0.0",
+    "oces_generator_version": "1.2.1"
+  },
+  "evaluation_identities": [
+    "emotion.core",
+    "sentiment.core",
+    "emotion.oces",
+    "sentiment.oces",
+    "ci.emotion"
+  ],
+  "sources": [
+    {
+      "id": "emotion_core_historical_analysis",
+      "path": "artifacts/verified_full_report/analysis.json",
+      "sha256": "12d47b35c700c6c172ceff5fc071f78952aef7a8695473dc457e9d69229737da",
+      "bytes": 309305,
+      "classification": "real",
+      "evaluation_id": "emotion.core",
+      "section": "D",
+      "description": "Historical V5 full emotion Core benchmark analysis (V1+V2 paired, 1928/1928 each)."
+    },
+    {
+      "id": "emotion_core_historical_export_meta",
+      "path": "artifacts/verified_full_report/export_meta.json",
+      "sha256": "6e445d037ce485d90dd64a90b4824b4df5cb7bdd9aa99e35e6d7734f5509271a",
+      "bytes": 424,
+      "classification": "real",
+      "evaluation_id": "emotion.core",
+      "section": "D",
+      "description": "Export hash metadata for the archived /verified-full/ bundle."
+    },
+    {
+      "id": "emotion_core_historical_report_html",
+      "path": "artifacts/verified_full_report/report.html",
+      "sha256": "ab66edbfec500e7ecac9a7c783f6c42bf747817dba13d2b8d377ccc3670c8fdb",
+      "bytes": 504035,
+      "classification": "real",
+      "evaluation_id": "emotion.core",
+      "section": "D",
+      "description": "Archived V5 rendered report, served at /verified-full/."
+    },
+    {
+      "id": "emotion_core_benchmark_v6_provenance",
+      "path": "artifacts/benchmark_v6/PROVENANCE.md",
+      "sha256": "151bddcf1f11dab460a7e6678f63c41e3b5ce6efaed817e6e03123fc6e9953ba",
+      "bytes": 8373,
+      "classification": "real",
+      "evaluation_id": "emotion.core",
+      "section": "D",
+      "description": "Byte-provenance and reproduction proof for the emotion.core historical run."
+    },
+    {
+      "id": "emotion_core_benchmark_v6_manifest",
+      "path": "artifacts/benchmark_v6/run/manifest.json",
+      "sha256": "0471bccbf293095d15287904a7ddfdef15161e3fb2efdcb773ccd1b952cca717",
+      "bytes": 1887715,
+      "classification": "real",
+      "evaluation_id": "emotion.core",
+      "section": "D",
+      "description": "Frozen request manifest for the emotion.core historical run (both endpoints)."
+    },
+    {
+      "id": "sentiment_core_analysis",
+      "path": "artifacts/sentiment_core_v1/analysis/analysis.json",
+      "sha256": "7847d2c4bbd6cca79f399ccc83f0aabfe4cd79a1230ae5c814f4dfdfa1678f27",
+      "bytes": 182534,
+      "classification": "real",
+      "evaluation_id": "sentiment.core",
+      "section": "E",
+      "description": "Real single-target sentiment.core run analysis (schema v3)."
+    },
+    {
+      "id": "sentiment_core_provenance",
+      "path": "artifacts/sentiment_core_v1/PROVENANCE.md",
+      "sha256": "5ac00da6535b08d2b8c975d9dc2ff9ca40233ebd3b541d7ab309298f288d0457",
+      "bytes": 4191,
+      "classification": "real",
+      "evaluation_id": "sentiment.core",
+      "section": "E",
+      "description": "Provenance and verified counts for the sentiment.core run."
+    },
+    {
+      "id": "emotion_oces_analysis",
+      "path": "artifacts/emotion_oces_v1/analysis/analysis.json",
+      "sha256": "cb6d9c3531d60b05a628ff2a5ca65ba5f74b203a4d4cd1990f484e265db55e57",
+      "bytes": 78331,
+      "classification": "real",
+      "evaluation_id": "emotion.oces",
+      "section": "F",
+      "description": "Real paired emotion.oces run analysis (schema v3)."
+    },
+    {
+      "id": "emotion_oces_provenance",
+      "path": "artifacts/emotion_oces_v1/PROVENANCE.md",
+      "sha256": "2da16725be7c0934bfda5216bd97ae3bb540dd0a64448a10af8bd6545393fc76",
+      "bytes": 5155,
+      "classification": "real",
+      "evaluation_id": "emotion.oces",
+      "section": "F",
+      "description": "Provenance and verified counts for the emotion.oces run."
+    },
+    {
+      "id": "emotion_oces_freeze_hashes",
+      "path": "artifacts/emotion_oces_v1/run/oces_freeze_content_hashes.json",
+      "sha256": "f39fd296a49e3f02076a2b50b6496b1934d9ed693be3c52fd2adddc8ab695f09",
+      "bytes": 1020,
+      "classification": "real",
+      "evaluation_id": "emotion.oces",
+      "section": "F",
+      "description": "Frozen-defense content hashes recorded at emotion.oces run time."
+    },
+    {
+      "id": "sentiment_oces_analysis",
+      "path": "artifacts/sentiment_oces_v1/analysis/analysis.json",
+      "sha256": "18bc903eb63367bbd4a729ddfbce1b787f27a94b922f8235b41e714b55c2e4ce",
+      "bytes": 43161,
+      "classification": "real",
+      "evaluation_id": "sentiment.oces",
+      "section": "F",
+      "description": "Real single-target sentiment.oces run analysis (schema v3)."
+    },
+    {
+      "id": "sentiment_oces_provenance",
+      "path": "artifacts/sentiment_oces_v1/PROVENANCE.md",
+      "sha256": "f83cf273bc375d1ad2bf1ca6bf20ccf7aa13aae1f8aeafb51f350c27e35830ef",
+      "bytes": 4112,
+      "classification": "real",
+      "evaluation_id": "sentiment.oces",
+      "section": "F",
+      "description": "Provenance and verified counts for the sentiment.oces run."
+    },
+    {
+      "id": "oces_review_sheet",
+      "path": "attacks/data/oces/oces_review_sheet.csv",
+      "sha256": "59791c1332c1ea5181979d65513aec557de347980528a72ff62cad17962d5067",
+      "bytes": 48305,
+      "classification": "real",
+      "evaluation_id": null,
+      "section": "F",
+      "description": "Pre-registered OCES case authoring sheet: 82 rows, proposed_tier column (0 GOLD / 50 SILVER / 32 REVIEW)."
+    },
+    {
+      "id": "ci_gate_result",
+      "path": "artifacts/ci_gate_evidence_v1/gate_result.json",
+      "sha256": "e20f158da1d5b9143ff680560a974bd99a34cf5c53e133b56b57b63f4bdce0e3",
+      "bytes": 5212,
+      "classification": "real",
+      "evaluation_id": "ci.emotion",
+      "section": "H",
+      "description": "Real local ci.emotion gate outcome (pass, exit 0, 13/13 checks) at this milestone's commit."
+    },
+    {
+      "id": "ci_gate_analysis",
+      "path": "artifacts/ci_gate_evidence_v1/analysis/analysis.json",
+      "sha256": "af9d5357a4aa63a3c0641675146b55f810cd96f6a8df02bf16931bdbd4e97280",
+      "bytes": 174313,
+      "classification": "real",
+      "evaluation_id": "ci.emotion",
+      "section": "H",
+      "description": "Analysis document backing the local ci.emotion gate run."
+    },
+    {
+      "id": "ci_gate_provenance",
+      "path": "artifacts/ci_gate_evidence_v1/PROVENANCE.md",
+      "sha256": "b4c6ab200b843410b405003d7332e3a1be0516efb702c962ef2f5f7a1a1caf23",
+      "bytes": 5583,
+      "classification": "real",
+      "evaluation_id": "ci.emotion",
+      "section": "H",
+      "description": "Provenance for the local ci.emotion gate reproduction, incl. its relationship to the cited GitHub Actions run."
+    },
+    {
+      "id": "ci_policy",
+      "path": "analysis/policies/ci_core_v1.json",
+      "sha256": "e4cb0a86a3590037e92da5e568e4056ff098955f90ccc3a2c9703b4c06f0533d",
+      "bytes": 12202,
+      "classification": "real",
+      "evaluation_id": "ci.emotion",
+      "section": "H",
+      "description": "Frozen CI release-gate policy (Khalid-owned, analysis/policies/)."
+    },
+    {
+      "id": "targets_registry",
+      "path": "endpoint/targets.json",
+      "sha256": "3212f30cde643ba6e53e8ef514ecce870f212b1a88bfa208876136cc9b8a0136",
+      "bytes": 5840,
+      "classification": "real",
+      "evaluation_id": null,
+      "section": "C",
+      "description": "Static, model-free target/evaluation registry defining all five evaluation identities."
+    }
+  ],
+  "external_citations": [
+    {
+      "id": "ci_github_actions_run",
+      "description": "GitHub Actions 'Stage 3 release gate' run on stage3/ahsan, reported as the V6.2 final successful run. This session has no gh/GitHub API access, so the run's own uploaded artifact bytes could not be downloaded or hashed.",
+      "run_number": "35069693601",
+      "classification": "external_citation_unverifiable",
+      "evaluation_id": "ci.emotion",
+      "section": "H"
+    }
+  ],
+  "not_applicable": [
+    {
+      "field": "sentiment.core / sentiment.oces hardening comparison",
+      "reason": "There is no sentiment_v2 target. comparison is null in both analysis documents by contract; no before/after claim is made."
+    },
+    {
+      "field": "emotion.core / emotion.oces model revision independent attestation",
+      "reason": "artifacts/benchmark_v6/PROVENANCE.md: the historical run predates revision pinning; the revision is strongly supported (re-verified cache scan) but not recorded by the run itself."
+    },
+    {
+      "field": "OCES GOLD-tier cases",
+      "reason": "attacks/data/oces/oces_review_sheet.csv proposed_tier column contains zero GOLD rows (0 GOLD / 50 SILVER / 32 REVIEW of 82)."
+    }
+  ]
+}

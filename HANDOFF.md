@@ -638,3 +638,148 @@ template/report code that reads `summary.identity.*` based on this fixture alone
 cross-check against `analysis/analyze.py`'s actual construction first. This is a
 pre-existing fixture/reality drift, not something this session's scope authorized fixing in
 the fixture itself.
+
+# RED LAB v6.3 — multi-target master technical report
+
+2026-09-16T12:40:00+04:00, Claude Sonnet 5, Asia/Dubai. Same worktree
+`C:\Users\ahsan\OneDrive\Desktop\stage3-ahsan`, branch `stage3/ahsan`. Observed pre-work
+HEAD `78188adbdcb4449429116af3161a032516d38aa8`, matching the user-stated required starting
+HEAD exactly. Base `stage3/integration` confirmed at
+`40ceef06cfecd10fb34ab53c5e41de35cd694ae8`. PR #11 remains open, draft, unmerged. The main
+integration checkout's uncommitted `HANDOFF.md` was not touched. User authorized this scope
+in the V6.3 milestone brief (2026-09-16); the message arrived truncated mid-section-F and
+was completed in a follow-up message before any code was written.
+
+## Real evidence gathered (no fixtures used as proof of a real evaluation)
+
+Located and reused as-is, unmodified: `artifacts/verified_full_report/` and
+`artifacts/benchmark_v6/` (historical emotion.core, 1928/1928 both endpoints, V1 1370
+eligible/218 flips/29 findings, V2 1373 eligible/112 flips/14 findings — confirmed by
+reading `artifacts/verified_full_report/analysis.json` directly, not restated from memory).
+
+No committed, hashable evidence existed for sentiment.core, emotion.oces or sentiment.oces
+(the only prior sentiment.core run, Rayyan's `results/task2-full-sentiment-core/`, is
+real but lives under gitignored `results/` and was not present in this worktree; OCES
+runtime loading was blocked as of the Task 1 handoff). All required models were already
+cached at their pinned revisions (`huggingface_hub.scan_cache_dir` confirmed
+`emotion-english-distilroberta-base@0e1cd914e3d4` and
+`distilbert-base-uncased-finetuned-sst-2-english@714eb0fa89d2`), so per the brief's
+"rerun only if real evidence does not already exist" instruction, this session ran each
+missing evaluation for real, once, against live local endpoints, at this commit:
+
+| Evaluation | Command | Real result |
+| --- | --- | --- |
+| `sentiment.core` | `python -m run_all --mode full --evaluation sentiment.core --html-only --no-open --run-name v63_real_sentiment_core` | 1931/1931 completed; 1604 eligible, 99 flips (6.17%); 18 findings; 85 unhandled 5xx, 1 timeout |
+| `emotion.oces` | `... --evaluation emotion.oces ...` | 63/63 both endpoints (21 seeds + 42 attacks); 18 eligible, 0 flips, 0 findings on both `emotion_v1`/`emotion_v2` |
+| `sentiment.oces` | `... --evaluation sentiment.oces ...` | 60/60 (20 seeds + 40 attacks); 28 eligible, 2 flips, 2 findings |
+| `ci.emotion` (local reproduction) | `python -m runner.gate --policy analysis/policies/ci_core_v1.json --out results/gate --results-root results/gate-runs --run-name v63-local-78188ad --html-only` | outcome `pass`, exit 0, 162/162 selected, 13/13 checks pass |
+
+Every run's `run_identity.app_commit` recorded `78188adbdcb4449429116af3161a032516d38aa8`
+independently (not asserted by hand). OCES tier/composition figures (0 GOLD, 50 SILVER, 32
+REVIEW of 82; 42 emotion + 40 sentiment variants) were read directly from
+`attacks/data/oces/oces_review_sheet.csv`'s `proposed_tier`/`task` columns, not restated
+from the brief. The `ci.emotion` local run is an honest reproduction, not a downloaded copy
+of the cited GitHub Actions run — this session has no `gh`/API access, so run `35069693601`
+(user-stated V6.2 final success) is cited by number only in the report, never hashed as if
+its artifact bytes were present.
+
+Each real run was copied byte-for-byte (never hand-edited) into a new committed evidence
+bundle with its own generated `PROVENANCE.md` and hash sidecar: `artifacts/sentiment_core_v1/`,
+`artifacts/emotion_oces_v1/`, `artifacts/sentiment_oces_v1/`, `artifacts/ci_gate_evidence_v1/`.
+Selected hashes (full lists in each bundle's `PROVENANCE.md`/`provenance.json`):
+sentiment.core `analysis.json` `7847d2c4bbd6cca7…`; emotion.oces `analysis.json`
+`cb6d9c3531d60b05…`; ci.emotion `gate_result.json` `e20f158da1d5b914…`;
+`analysis/policies/ci_core_v1.json` (frozen, untouched) `e4cb0a86a3590037…`.
+
+## Master evidence manifest and generator
+
+`report/master_evidence/manifest.json` (new, Ahsan-owned) lists 18 real sources by repo
+path + SHA-256, plus one explicit external citation (the GitHub Actions run, marked
+`external_citation_unverifiable`, no path/hash) and three explicit not-applicable notes
+(no sentiment V2 comparison, emotion.core revision not independently attested by the
+historical run itself, zero OCES GOLD cases). `report/master_report.py` (new) re-hashes
+every listed file at generation time and raises `EvidenceIntegrityError` — refusing to
+write any output — on a missing or modified file; verified with both a missing-file and a
+modified-bytes case in `tests/test_master_report.py`, and manually by appending a byte to
+`artifacts/sentiment_core_v1/analysis/analysis.json` and confirming generation failed
+closed (exit 1), then restoring the original bytes and regenerating cleanly. All
+quantitative claims in the rendered report are read from these JSON/CSV files in
+`report/master_report.build_context`, never hardcoded in the Jinja template.
+
+## Report route and content
+
+`report/master_template.html` (new) reuses the existing detailed report's sidebar
+structure verbatim (fixed/collapsible `<aside>`, grouped `toc-nav`, scrollspy/active-state
+JS, `report/style.css` classes) rather than a redesign. `run_all.TECHNICAL_REPORT_DIR` =
+`artifacts/technical_report/` (same pre-generated/committed pattern as
+`VERIFIED_FULL_REPORT_DIR`, never regenerated by the running app); `web/app.py` mounts it
+at `/technical-report/` with `html=True`. The three "Technical Report" nav links in
+`web/templates/index.html`/`lab.html` now read a new `technical_report_href`/
+`technical_report_available` context pair instead of `verified_full_href`; `/verified-full/`
+itself is untouched (confirmed byte-identical: `analysis.json` still hashes to
+`12d47b35c700c6c172ceff5fc071f78952aef7a8695473dc457e9d69229737da`, `report.pdf` to
+`0853108d4939bab1ff2069a1e3dc42b8ad68b14096d12cfd1bfa81fbb56718ca`, and its `report.html`
+still reads "Red Lab v5.0"). No master PDF button is present or linked anywhere in the new
+template (V6.4 scope). `report/generate.py`'s `PRODUCT_VERSION_LABEL` is now
+`"Red Lab v6.2"` → `"Red Lab v6.3"`; `report/master_report.py` reuses that same constant
+rather than a second copy.
+
+Sections implemented per the brief: A Executive Overview, B System Architecture
+(paired emotion V1/V2 vs. single-target sentiment vs. schema-v3-is-a-data-format
+distinctions), C Evaluation Matrix (all five real target IDs/suites/models/purposes read
+from `endpoint/targets.json`), D Emotion Core Results (historical figures + resolved/
+persisting-finding narrative, links to `/verified-full/`, never rewritten), E Sentiment
+Core Results (real 1931/1604/99/18 counts, explicit `comparison: null`, never reusing
+1928), F OCES (plain-language explainer before the acronym, explicit "not an external or
+blind holdout" disclosure, real 0/50/32 tier counts and 42/40 variant counts), G
+Evidence-Specific Findings and Remediation (four named-key real finding examples across
+endpoint-layer/model-sensitivity/sentiment-single-target buckets, each with
+observed/why-it-matters/action/verify; diagnostic bucket is a narrative note, per contract,
+since diagnostic cases are never scored findings), H CI Release Gate (plain-language
+exit-code table, real local 13/13-check pass, explicit developer/maintainer audience and
+"working reference implementation, not universal certification" framing), I Reproducibility
+and Provenance (real app commit, both model identities, policy identity, OCES generator
+version `1.2.1` read from the run's own `oces_freeze_content_hashes.json`, evidence-vs-
+report-generation distinction), J Limitations (all eight required disclosures).
+
+## Focused validation (this session's own results; no historical claim restated as current)
+
+- `tests/test_master_report.py` (new, 14 tests): manifest hash verification against real
+  committed evidence, fail-closed on missing/modified evidence, all five evaluation
+  identities present, emotion paired with real 1370/218/1373/112 figures, sentiment single
+  with no V2 claim and real 1931/1604 figures, OCES honesty disclosure and 0/50/32/42/40
+  counts, CI exit-code table, no PDF button, `Red Lab v6.3` branding, sidebar anchors all
+  resolve, quantitative claims traced to `build_context` (not template text).
+- `tests/test_web.py` (3 new: technical-report route serves, no PDF button, verified-full
+  bytes+branding unmodified; 1 rewritten: nav link now asserts `/technical-report/`; 2
+  version-string bumps): **59 passed**.
+- `tests/test_report.py` (4 version-string bumps to v6.3): unaffected otherwise.
+- Combined `tests/test_master_report.py tests/test_web.py tests/test_report.py
+  tests/test_lab.py tests/test_run_all.py tests/test_gate.py
+  tests/test_analysis_identity.py`: **387 passed**, 1 pre-existing Starlette deprecation
+  warning.
+- `git diff --check`: clean (only pre-existing LF/CRLF autocrlf notices on the two touched
+  test files).
+- Local smoke test: started `uvicorn web.app:app` on a scratch port; `/` 200 with
+  `<a href="/technical-report/">Technical Report</a>`; `/lab` 200; `/technical-report/` 200
+  with `Red Lab v6.3`/`MASTER TECHNICAL REPORT`; `/technical-report/master_report.py` 404
+  (no source exposed); `/verified-full/analysis.json` served bytes hash to
+  `12d47b35c700c6…` over HTTP, matching the recorded historical value; server process
+  stopped and confirmed unreachable afterward.
+- Did not run: the full pytest suite, Playwright, Docker, CI-policy regeneration, PDF
+  generation, or deployment (all out of scope per the brief).
+
+Code was validated, then the explicit file list below is staged and committed as
+`feat(v6.3): add multi-target master technical report`. Immediate next action is
+fetch/verify/push (below).
+
+## Explicitly deferred to v6.4+ (per the brief — do not start)
+
+Master technical-report PDF and its pagination/print-layout refinement; freezing the final
+master report bundle; broad website UI redesign; mobile/responsive redesign; Docker
+rebuild; deployment; final Red Lab v7.0 branding.
+
+Next: fetch origin and confirm `origin/stage3/ahsan` is still `78188ad` (unchanged since the
+last v6.2 push) before pushing this commit, push normally (no force), observe the one
+automatically triggered gate run, confirm its deploy job is skipped, and leave PR #11 draft
+and unmerged. Do not touch Hugging Face.

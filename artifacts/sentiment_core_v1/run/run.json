@@ -1,0 +1,48 @@
+{
+  "run_id": "bf0c268072bf48dd",
+  "run_name": "v63_real_sentiment_core",
+  "created_at_utc": "2026-09-16T08:19:03+00:00",
+  "app_commit": "78188adbdcb4449429116af3161a032516d38aa8",
+  "dirty": false,
+  "mode": "full",
+  "status": "complete",
+  "registry": {
+    "registry_version": "3.0.0",
+    "source_path": "endpoint/targets.json",
+    "source_sha256": "3212f30cde643ba6e53e8ef514ecce870f212b1a88bfa208876136cc9b8a0136"
+  },
+  "evaluations": [
+    {
+      "evaluation_id": "sentiment.core",
+      "kind": "single",
+      "task_id": "sentiment_2",
+      "suite_id": "core",
+      "declared_families": [
+        "malformed",
+        "boundary",
+        "perturbation",
+        "encoding",
+        "whitespace",
+        "truncation"
+      ],
+      "case_set_id": null,
+      "baseline_file": "baseline/sentiment_baseline.json",
+      "target_dirs": {
+        "sentiment_v1": "runs/sentiment_core/sentiment_v1"
+      }
+    }
+  ],
+  "completed_at_utc": "2026-09-16T08:22:08+00:00",
+  "resources": {
+    "sentiment_v1": {
+      "peak_process_memory_bytes": 1168789504,
+      "elapsed_seconds": 164.844,
+      "measurement_scope": "uvicorn endpoint process; sequential startup does not prove only one model was resident"
+    }
+  },
+  "artifacts": {
+    "analysis_json": "report/analysis.json",
+    "report_html": "report/report.html",
+    "report_pdf": null
+  }
+}

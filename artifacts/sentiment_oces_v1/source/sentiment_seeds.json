@@ -1,0 +1,122 @@
+[
+  {
+    "baseline_id": "sst2-val-18",
+    "text": "... the movie is just a plain old monster .",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-35",
+    "text": "a sequence of ridiculous shoot - 'em - up scenes .",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-59",
+    "text": "it 's just disappointingly superficial -- a movie that has all the elements necessary to be a fascinating , involving character study , but never does more than scratch the surface .",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-110",
+    "text": "scores no points for originality , wit , or intelligence .",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-111",
+    "text": "there is n't nearly enough fun here , despite the presence of some appealing ingredients .",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-121",
+    "text": "it seems to me the film is about the art of ripping people off without ever letting them consciously know you have done so",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-136",
+    "text": "looks and feels like a project better suited for the small screen .",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-162",
+    "text": "there seems to be no clear path as to where the story 's going , or how long it 's going to take to get there .",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-211",
+    "text": "to say this was done better in wilder 's some like it hot is like saying the sun rises in the east .",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-319",
+    "text": "too much of it feels unfocused and underdeveloped .",
+    "label": "NEGATIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-13",
+    "text": "we root for ( clara and paul ) , even like them , though perhaps it 's an emotion closer to pity .",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-17",
+    "text": "audrey tatou has a knack for picking roles that magnify her outrageous charm , and in this literate french comedy , she 's as morning-glory exuberant as she was in amélie .",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-52",
+    "text": "mr. tsai is a very original artist in his medium , and what time is it there ?",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-109",
+    "text": "it 's great escapist fun that recreates a place and time that will never happen again .",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-120",
+    "text": "warm water under a red bridge is a quirky and poignant japanese film that explores the fascinating connections between women , water , nature , and sexuality .",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-201",
+    "text": "inside the film 's conflict-powered plot there is a decent moral trying to get out , but it 's not that , it 's the tension that keeps you in your seat .",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-227",
+    "text": "as the two leads , lathan and diggs are charming and have chemistry both as friends and lovers .",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-248",
+    "text": "a full world has been presented onscreen , not some series of carefully structured plot points building to a pat resolution .",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-290",
+    "text": "deliriously funny , fast and loose , accessible to the uninitiated , and full of surprises",
+    "label": "POSITIVE",
+    "source": "dataset"
+  },
+  {
+    "baseline_id": "sst2-val-341",
+    "text": "it deserves to be seen by anyone with even a passing interest in the events shaping the world beyond their own horizons .",
+    "label": "POSITIVE",
+    "source": "dataset"
+  }
+]

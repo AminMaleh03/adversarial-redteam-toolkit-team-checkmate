@@ -610,8 +610,16 @@ def build_featured_flip(selection, attack_index, v1_attacks, v2_attacks, v1_base
 
 
 def build_demo_evidence(run_dir: Path, analysis: dict, attack_index: dict) -> dict:
-    v1_results = analysis_mod.load_results(run_dir / "v1" / "results_v1.jsonl")
-    v2_results = analysis_mod.load_results(run_dir / "v2" / "results_v2.jsonl")
+    # Rows recorded by the runner carry their own target_id, and analysis refuses to score
+    # those against a guessed label space. Read each run's declared space from the run
+    # metadata it wrote, exactly as analysis.run_analysis does, rather than re-deriving it
+    # here -- this orchestrator must not invent an identity the run did not record.
+    labels = {}
+    for version in ("v1", "v2"):
+        meta_path = run_dir / version / f"run_meta_{version}.json"
+        labels[version] = analysis_mod.labels_from_meta(analysis_mod.load_run_meta(meta_path))
+    v1_results = analysis_mod.load_results(run_dir / "v1" / "results_v1.jsonl", labels=labels["v1"])
+    v2_results = analysis_mod.load_results(run_dir / "v2" / "results_v2.jsonl", labels=labels["v2"])
     v1_attacks = {r.attack_id: r for r in v1_results if r.case_type == "attack"}
     v2_attacks = {r.attack_id: r for r in v2_results if r.case_type == "attack"}
     v1_baselines = {r.baseline_id: r for r in v1_results if r.case_type == "baseline"}

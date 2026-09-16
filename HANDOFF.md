@@ -1,3 +1,135 @@
+# RED LAB v7 UI POLISH — COMMITTED LOCALLY ON stage3/ahsan, NOT PUSHED
+
+2026-09-16, Claude Opus 5, Asia/Dubai. Worktree `C:/Users/ahsan/OneDrive/Desktop/stage3-ahsan`,
+branch `stage3/ahsan`. Base observed at start: `4822b99baaa1d2b0e92f8dd6fee2087d651bfcb6`
+(`feat(v6.5): homepage/lab/report content and layout corrections`), tree clean.
+
+Task: visual refinement of the accepted v6.5 application and of the current technical report
+into "Red Lab v7". Explicitly scoped by the user as a polish pass, not a product redesign:
+information architecture, workflows, evidence and evaluation logic are unchanged. User
+instructions in force for this task: do not touch the separate `stage3/integration` checkout
+or its uncommitted `HANDOFF.md`; do not relabel the historical `/verified-full/` V5 archive;
+do not merge PR #11; do not deploy, push or run full Core/OCES evaluations, Docker builds or
+model inference; leave the version at v7 for the later deployment.
+
+**Status: implementation complete and committed locally. Not pushed, not merged, not deployed.**
+
+## What changed
+
+One dark brand system, defined once as tokens in `web/static/app.css` and mirrored with
+identical values in `report/style.css`, replacing the V5.5 light palette outright rather than
+layering page overrides on it. Space Grotesk / Inter / JetBrains Mono by role, with local
+fallback stacks; the web app imports the webfonts from `app.css` (one stylesheet reference per
+page, so `test_lab_page_loads_shared_app_css_and_no_lab_only_stylesheet` still holds), while
+the generated reports deliberately stay on the local fallbacks because their CSP forbids
+external resources and PDF rendering denies every resource fetch.
+
+Surfaces: landing `oklch(0.15 0.012 30)`; execution screens `oklch(0.24 0.014 30)` selected by
+`body:has(#view-execution:not([hidden]))` from the real view state, never a styling-only class;
+static results / input form / technical report `oklch(0.17 0.012 30)`.
+
+- Landing: two blurred, slowly rotating conic swirls (`#view-home::before/::after`, `position:
+  fixed` so a full-bleed swirl can never create a horizontal scrollbar) plus 17 glowing drifting
+  dots rewritten in `web/static/particles.js`. Only `transform` animates.
+- Model selectors: native `<select>` kept; orange caret, orange inset accent and orange focus
+  ring; a new orange `.model-picker-tag` restates the real selection in words.
+- Execution screens: breadcrumb, pulsing LIVE dot, CONTROLLED EXPERIMENT label, 14px-radius
+  40px-padded panel, real target/configuration chips rendered from the descriptor's own
+  `evaluation_id`/`kind`/`target_ids`, scan band, progress shimmer, active-stage glow and
+  spinner. All loading motion is removed on `.is-complete`/`.is-failed`, which `app.js`/`lab.js`
+  set from real status payloads.
+- Results and technical report: 12px cards, 10px stat tiles, compact uppercase severity pills,
+  140px findings label column, JetBrains-Mono identifiers, 280px-target maroon sidebar with a
+  low-alpha red active state. Static — no decorative motion.
+- The V1 red / V2 green treatment is applied only to a genuinely paired evaluation:
+  `template_v3.html` adds the version class only when `evaluation.kind != 'single'`, so
+  `sentiment_v1` gets a neutral card and can never display a hardened-V2 green.
+- `@media print` redefines the tokens as ink-on-white hex, so the PDF carries the same report
+  content set for paper.
+
+Version label bumped in the two sources of truth (`report/generate.py` `PRODUCT_VERSION_LABEL`,
+`report/master_evidence/build_manifest.py` `REPORT_IDENTITY`) and the manifest and report
+artifacts regenerated. The `/verified-full/` V5 archive is untouched.
+
+## Evidence unchanged
+
+`report/master_evidence/manifest.json` diff is exactly one line (`"Red Lab v6.5"` ->
+`"Red Lab v7"`); all 18 source entries, their SHA-256s, byte counts, external citation and
+not-applicable entries are byte-identical. No finding, metric, caveat or provenance statement
+was added, removed or altered.
+
+## Regenerated artifacts
+
+`artifacts/technical_report/`, rebuilt with `python -m report.master_evidence.build_manifest`
+then `python -m report.master_report`:
+
+- `index.html` sha256 `ebc4b113cfbffdda3a1381bc969e53f91ffb8e16445e7c64df698bd8f7e7c3f6`, 344838 bytes
+- `report.pdf` sha256 `416631e137c76f380b11a17936d269a08a3a33c9c096772662fc5fc16f5da03d`, 79390 bytes, 18 A4 pages
+- manifest `rendered_index_sha256` `ce236c22602073c3eb7181990a254658654b42e80291bc74b4cb4c7d345bd2c7`
+
+`rendered_index_sha256` hashes the UTF-8 rendered string while the committed file is written
+through Windows newline translation, so the two differ. That convention is pre-existing and
+identical at `4822b99` (recorded `b54ac78d…` vs file `97d87817…`); it is not introduced here.
+`report.pdf` remains non-byte-reproducible, as `report/master_report.generate`'s docstring
+already documents.
+
+## Validation actually run by this agent
+
+- `pytest tests/test_report.py tests/test_master_report.py tests/test_web.py tests/test_lab.py`
+  -> **306 passed**. Earlier in the session the same set plus `tests/test_run_all.py` -> 325 passed.
+- `REDLAB_BROWSER_TESTS=1 pytest tests/test_ui_browser.py` -> 24 passed, 3 failed.
+- `git diff --check` clean (only the usual local LF/CRLF autocrlf notice).
+- Visual review via a scratchpad Playwright harness using the same TestClient + `page.route`
+  pattern as `tests/test_ui_browser.py`. **No model job was started and no endpoint was launched.**
+
+Three `test_ui_browser.py` failures are **pre-existing at `4822b99`**, not caused by this work,
+and were left alone because they are content/markup drift outside this task's scope:
+
+- `test_lab_metric_icons_preserve_values_labels_and_readable_layout` — expects `V1 label flips`,
+  `lab.js` has said `V1 label flips (scored)` since before this change (verified with
+  `git show HEAD:web/static/lab.js`).
+- `test_report_anchors_replace_history_and_back_returns_to_entry[home-390]` and `[home-1440]` —
+  wait for a `.hero-report` element that does not exist at `4822b99` either
+  (`git grep hero-report HEAD -- web/` returns nothing).
+
+One assertion was deliberately widened: `test_responsive_chrome_ctas_and_no_overflow` asserted
+`back["y"] == 20`. v7 shrank the app masthead Back control to the shared 40x40 circle and
+re-centred it at `top: 22px`; the frozen `/verified-full/` archive is untouched and still sits
+at 20px, so the assertion now checks the control stays vertically centred (`18 <= y <= 24`)
+rather than one exact value.
+
+## Viewport observations
+
+- Landing, 1366x768 and 1920x1080 at 100%: all three primary actions above the fold, 0px
+  horizontal overflow. Mobile 390x844 scrolls, as allowed, 0px horizontal overflow.
+- Emotion demo execution: 2 endpoint cards, 8 stages. Sentiment: 1 target card, 7 stages, no V2
+  anywhere. Try Your Own Input execution matches the demo execution design in both models.
+- Technical report at 1600px: sidebar computes to 280px, 10 links, first `Executive Overview`,
+  last `Archived Red Lab v5 Benchmark`; clicking `ci.emotion Evidence` moves the active state
+  correctly. At 1100px the rail stays fluid (clamped, ~231px); at 900px the drawer opens to
+  `left: 0` as designed.
+- Reduced motion: swirls and dots static, no scan band, shimmer, spinner or shimmering form
+  border; headline does not rotate.
+
+## Known remaining visual issues
+
+- Mobile (390px) horizontal overflow persists: 180px on a generated single-target results page
+  and 71px on the technical report (the off-canvas drawer). Both measured at `4822b99` as 179px
+  and 72px, so they are pre-existing and unchanged, not v7 regressions. Not fixed here because
+  the fix is a layout change, not polish.
+- The generated reports render in the local fallback faces (Segoe UI / Consolas class), not
+  Space Grotesk / Inter / JetBrains Mono, because they must stay self-contained. Only the web
+  app shows the brand faces.
+- PDF pages were reviewed through Chromium print-media emulation of the same HTML plus the
+  page count and hash, not by rasterising `report.pdf`; no PDF rasteriser is installed here.
+
+This was a visual review. It is **not** a full functional acceptance test of the application.
+
+## Next actionable step
+
+None in progress. When the user authorises deployment, push `stage3/ahsan` and deploy at v7 —
+do not introduce v7.1 or any other label as part of deploying.
+
 # TASK 1 — AHSAN PRODUCT INTEGRATION PARTIALLY COMPLETE; DEPENDENCIES BLOCK FINAL ACCEPTANCE
 
 2026-09-15, Codex, Asia/Dubai. Assigned branch `stage3/ahsan`; observed HEAD

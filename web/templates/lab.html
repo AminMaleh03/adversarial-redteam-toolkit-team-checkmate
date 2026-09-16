@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Red Lab Live Red-Team Lab: test your own sentence against a hardened and unhardened AI endpoint.">
   <title>{{ product_name }} &mdash; Live Red-Team Lab</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="/static/app.css">
 </head>
-<body class="has-back">
+<body class="has-back page-lab">
   <header class="masthead">
     <a href="/" id="nav-back" class="rl-back-btn" aria-label="Back" title="Back">&larr;</a>
     <div class="masthead-inner">
@@ -36,6 +37,7 @@
   <main>
     <div id="view-lab-input">
       <section class="hero lab-hero" id="lab-input">
+        <p class="exec-breadcrumb"><a href="/">Red Lab</a><span class="sep" aria-hidden="true">/</span>Try Your Own Input</p>
         <p class="rl-creator">{{ creator_name }} <span class="lab-feature">Interactive lab</span></p>
         <h1 class="lab-heading">Live Red-Team Lab</h1>
         <p class="deck" id="lab-intro-deck">
@@ -49,7 +51,10 @@
         <form id="lab-form" class="lab-editor" novalidate>
           <p class="eyebrow">01 / Start with a clean reference</p>
           <div class="model-picker">
-            <label for="lab-evaluation">Model journey</label>
+            <div class="model-picker-row">
+              <label for="lab-evaluation">Model journey</label>
+              <span id="lab-evaluation-tag" class="model-picker-tag"></span>
+            </div>
             <select id="lab-evaluation" name="evaluation_id">
               <option value="emotion.core">Emotion &mdash; V1 and V2 comparison</option>
               <option value="sentiment.core">Sentiment &mdash; single configured target</option>
@@ -73,7 +78,8 @@
     <section id="view-lab-execution" class="execution-view" hidden>
       <div class="execution-inner">
         <p class="exec-identity">{{ creator_name }} / {{ product_version_label }}</p>
-        <p class="exec-kicker">LIVE RED-TEAM LAB</p>
+        <p class="exec-breadcrumb"><a href="/">Red Lab</a><span class="sep" aria-hidden="true">/</span>Try Your Own Input</p>
+        <p class="exec-kicker"><span class="live-dot" aria-hidden="true"></span>LIVE RED-TEAM LAB <span class="exec-mode">CONTROLLED EXPERIMENT</span></p>
         <h1 id="lab-exec-heading" class="exec-heading" tabindex="-1" aria-live="polite">Preparing custom test&hellip;</h1>
 
         <div id="lab-exec-body">
@@ -82,6 +88,7 @@
           </div>
           <p id="lab-exec-percent" class="exec-percent" aria-hidden="true">0%</p>
 
+          <ul id="lab-exec-config" class="exec-config"></ul>
           <p id="lab-comparison-label" class="same-model-label" hidden>Same model <span id="lab-comparison-note"></span></p>
           <div id="lab-endpoint-context" class="version-context"></div>
           <p class="tracker-label">Experiment stages</p>
@@ -112,6 +119,7 @@
 
     <section id="view-lab-results" class="lab-results" hidden>
       <div class="execution-inner">
+        <p class="exec-breadcrumb"><a href="/">Red Lab</a><span class="sep" aria-hidden="true">/</span>Try Your Own Input<span class="sep" aria-hidden="true">/</span>Results</p>
         <p class="exec-identity">{{ creator_name }} / {{ product_version_label }}</p>
         <h1 class="lab-heading">Live Red-Team Lab Results</h1>
         <p class="notice warning">Interactive result &mdash; not part of the frozen verified evaluation suite.</p>

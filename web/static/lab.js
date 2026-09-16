@@ -34,6 +34,8 @@
   var comparisonLabelEl = document.getElementById("lab-comparison-label");
   var comparisonNoteEl = document.getElementById("lab-comparison-note");
   var endpointContextEl = document.getElementById("lab-endpoint-context");
+  var execConfigEl = document.getElementById("lab-exec-config");
+  var evaluationTagEl = document.getElementById("lab-evaluation-tag");
 
   // v6.1 Phase 3: one descriptor per registry evaluation (emotion.core paired, sentiment.core
   // single-target) -- the execution/progress DOM is generated from whichever one matches the
@@ -52,6 +54,7 @@
     window.rlRenderProgress(descriptorFor(evaluationId), {
       cardsEl: endpointContextEl, sameModelLabelEl: comparisonLabelEl,
       sameModelNoteEl: comparisonNoteEl, stageListEl: stageListEl, footerNoteEl: execModelNote,
+      configEl: execConfigEl,
     });
   }
 
@@ -83,6 +86,7 @@
   }
 
   function showExecution() {
+    if (viewExecution) viewExecution.classList.remove("is-failed");
     if (viewInput) viewInput.hidden = true;
     if (viewExecution) viewExecution.hidden = false;
     if (viewResults) viewResults.hidden = true;
@@ -101,6 +105,8 @@
   }
 
   function showFailure(message) {
+    // Real terminal state: stop the loading motion for a run that is no longer in flight.
+    if (viewExecution) viewExecution.classList.add("is-failed");
     if (viewInput) viewInput.hidden = true;
     if (viewExecution) viewExecution.hidden = false;
     if (viewResults) viewResults.hidden = true;
@@ -113,6 +119,7 @@
   }
 
   function showBusy() {
+    if (viewExecution) viewExecution.classList.add("is-failed");
     if (viewInput) viewInput.hidden = true;
     if (viewExecution) viewExecution.hidden = false;
     if (viewResults) viewResults.hidden = true;
@@ -562,6 +569,7 @@
       "endpoint hardening and which persist.";
     if (heroControlPaired) heroControlPaired.hidden = sentiment;
     if (heroControlSingle) heroControlSingle.hidden = !sentiment;
+    window.rlSelectorTag(evaluationTagEl, sentiment ? "sentiment.core" : "emotion.core");
   }
   if (evaluationSelect) evaluationSelect.addEventListener("change", function () {
     generation++; clearTimeout(pollTimer); clearJobId(); lastText = "";

@@ -211,7 +211,11 @@ def test_responsive_chrome_ctas_and_no_overflow(ui, width):
         else:
             back = page.locator(".masthead > .rl-back-btn").bounding_box()
             assert 12 <= back["x"] <= 28
-            assert back["y"] == 20
+            # v7 shrank the active app's masthead Back control to the shared 40x40
+            # circle and re-centred it in the 84px bar (top: 22px). The frozen
+            # /verified-full/ V5 archive is untouched and still sits at 20px, so this
+            # asserts the control stays vertically centred rather than one exact value.
+            assert 18 <= back["y"] <= 24
 
 
 def test_report_sidebar_fast_feedback_ordering_and_fixed_back(ui):

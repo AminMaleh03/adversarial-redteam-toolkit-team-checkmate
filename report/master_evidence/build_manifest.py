@@ -21,7 +21,7 @@ OUT_PATH = Path(__file__).resolve().parent / "manifest.json"
 
 REPORT_IDENTITY = {
     "name": "Red Lab Master Technical Report",
-    "product_version_label": "Red Lab v6.5",
+    "product_version_label": "Red Lab v7",
     "contracts_version": "3.0.0",
     "generator_module": "report.master_report",
     "generator_version": "1.0.0",

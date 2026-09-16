@@ -17,6 +17,8 @@
   var cardsEl = document.getElementById("version-context");
   var stageListEl = document.getElementById("stage-list");
   var footerNoteEl = document.getElementById("exec-model-note");
+  var execConfigEl = document.getElementById("exec-config");
+  var evaluationTagEl = document.getElementById("demo-evaluation-tag");
   var timer = null;
   var launching = false;
   var checking = false;
@@ -41,7 +43,7 @@
     renderedEvaluationId = evaluationId;
     window.rlRenderProgress(descriptorFor(evaluationId), {
       cardsEl: cardsEl, sameModelLabelEl: sameModelLabelEl, sameModelNoteEl: sameModelNoteEl,
-      stageListEl: stageListEl, footerNoteEl: footerNoteEl,
+      stageListEl: stageListEl, footerNoteEl: footerNoteEl, configEl: execConfigEl,
     });
   }
 
@@ -49,6 +51,7 @@
   function showHome() {
     generation++;
     clearTimeout(timer); timer = null;
+    viewExecution.classList.remove("is-failed");
     viewHome.hidden = false; viewExecution.hidden = true; execBack.hidden = true;
     document.body.classList.remove("has-back");
     navLiveDemo.removeAttribute("aria-current");
@@ -59,6 +62,7 @@
     var entering = viewExecution.hidden;
     viewHome.hidden = true; viewExecution.hidden = false; execBack.hidden = false;
     document.body.classList.add("has-back");
+    viewExecution.classList.remove("is-failed");
     document.getElementById("exec-failure").hidden = true;
     document.getElementById("exec-body").hidden = false;
     navLiveDemo.setAttribute("aria-current", "page");
@@ -66,6 +70,9 @@
     if (entering) execHeading.focus();
   }
   function showFailure(message) {
+    // Real terminal state: settle every loading animation rather than leaving a scan band
+    // and spinner running over a run that is no longer in flight.
+    viewExecution.classList.add("is-failed");
     execHeading.textContent = "Live demo paused";
     document.getElementById("exec-body").hidden = true;
     document.getElementById("exec-failure").hidden = false;
@@ -222,6 +229,7 @@
     // sentiment_v2, so it gets its own single-target indicator instead of inheriting them.
     if (heroControlPaired) heroControlPaired.hidden = sentiment;
     if (heroControlSingle) heroControlSingle.hidden = !sentiment;
+    window.rlSelectorTag(evaluationTagEl, sentiment ? "sentiment.core" : "emotion.core");
   }
   if (evaluationSelect) evaluationSelect.addEventListener("change", function () {
     generation++; clearTimeout(timer); timer = null;

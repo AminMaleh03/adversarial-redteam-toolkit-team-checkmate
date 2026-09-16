@@ -88,7 +88,7 @@
 
     {% for target_id in evaluation.targets %}
     {% set summary = evaluation.summaries[target_id] %}
-    <article class="panel endpoint-card v3-target" id="target-{{ loop.index }}-{{ target_id }}">
+    <article class="panel endpoint-card v3-target{% if evaluation.kind != 'single' %} {{ summary.version }}{% endif %}" id="target-{{ loop.index }}-{{ target_id }}">
       <p class="eyebrow">{{ target_id }} &middot; {{ summary.version|upper }}</p>
       <h3>{{ target_id|replace('_', ' ')|title }}</h3>
       {% set model_ident = summary.get('identity', {}).get('model') %}

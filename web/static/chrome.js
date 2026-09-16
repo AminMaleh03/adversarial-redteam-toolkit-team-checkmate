@@ -82,5 +82,35 @@
       });
     }
     if (refs.footerNoteEl) refs.footerNoteEl.textContent = descriptor.footer_note;
+    // v7: the target/configuration summary is rendered from the descriptor's own recorded
+    // evaluation id, kind and target ids -- never from a hardcoded V1/V2 assumption, so a
+    // single-target evaluation shows exactly one target and no implied second endpoint.
+    if (refs.configEl) {
+      refs.configEl.textContent = "";
+      var rows = [
+        ["Evaluation", descriptor.evaluation_id],
+        ["Design", descriptor.kind === "paired" ? "Paired · two endpoints" : "Single configured target"],
+        ["Targets", (descriptor.target_ids || []).join(", ") ||
+          descriptor.cards.map(function (c) { return c.lane; }).join(", ")]
+      ];
+      rows.forEach(function (row) {
+        if (!row[1]) return;
+        var li = document.createElement("li");
+        var label = document.createElement("b");
+        label.textContent = row[0];
+        li.appendChild(label);
+        li.appendChild(document.createTextNode(row[1]));
+        refs.configEl.appendChild(li);
+      });
+    }
+  };
+
+  // v7: the orange selector tag restates the selected evaluation's real shape in words.
+  // Emotion is the paired V1/V2 evaluation; sentiment is one configured target with no V2.
+  window.rlSelectorTag = function (tagEl, evaluationId) {
+    if (!tagEl) return;
+    tagEl.textContent = evaluationId === "sentiment.core"
+      ? "Sentiment · single target"
+      : "Emotion · paired V1 + V2";
   };
 })();

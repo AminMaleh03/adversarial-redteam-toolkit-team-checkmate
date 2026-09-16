@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Red Lab by Team Checkmate: run a real live adversarial attack test against a hardened and unhardened AI endpoint.">
   <title>{{ product_name }} &mdash; {{ product_tagline }}</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="/static/app.css">
 </head>
-<body>
+<body class="page-home">
   <header class="masthead">
     <a href="/" id="exec-back" class="rl-back-btn" aria-label="Back" title="Back" hidden>&larr;</a>
     <div class="masthead-inner">
@@ -60,7 +61,10 @@
           <span class="control-single">sentiment_v1 &middot; Single configured target, no V2</span>
         </div>
         <div class="model-picker">
-          <label for="demo-evaluation">Model journey</label>
+          <div class="model-picker-row">
+            <label for="demo-evaluation">Model journey</label>
+            <span id="demo-evaluation-tag" class="model-picker-tag"></span>
+          </div>
           <select id="demo-evaluation" name="evaluation_id">
             <option value="emotion.core">Emotion &mdash; compare unhardened V1 with hardened V2</option>
             <option value="sentiment.core">Sentiment &mdash; evaluate the configured sentiment endpoint</option>
@@ -84,7 +88,8 @@
       <div class="execution-inner">
 
         <p class="exec-identity">{{ creator_name }} / {{ product_version_label }}</p>
-        <p class="exec-kicker">LIVE DEMO <span class="exec-mode">Controlled experiment</span></p>
+        <p class="exec-breadcrumb"><a href="/">Red Lab</a><span class="sep" aria-hidden="true">/</span>Live Demo</p>
+        <p class="exec-kicker"><span class="live-dot" aria-hidden="true"></span>LIVE DEMO <span class="exec-mode">CONTROLLED EXPERIMENT</span></p>
         <h1 id="exec-heading" class="exec-heading" tabindex="-1" aria-live="polite">Launching adversarial test&hellip;</h1>
 
         <div id="exec-body">
@@ -93,6 +98,7 @@
           </div>
           <p id="exec-percent" class="exec-percent" aria-hidden="true">0%</p>
 
+          <ul id="exec-config" class="exec-config"></ul>
           <p id="same-model-label" class="same-model-label" hidden>Same model <span id="same-model-note"></span></p>
           <div class="version-context" id="version-context"></div>
           <p class="tracker-label">Experiment stages</p>

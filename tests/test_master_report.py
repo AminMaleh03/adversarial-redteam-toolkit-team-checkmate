@@ -169,8 +169,8 @@ def test_pdf_has_multiple_pages_and_substantive_size(generated_with_pdf):
 
 def test_active_version_label_is_v6_5(generated):
     html, _ = generated
-    assert "Red Lab v6.5" in html
-    assert "Red Lab v6.4" not in html
+    assert "Red Lab v7" in html
+    assert "Red Lab v6.5" not in html
 
 
 def test_sidebar_anchors_all_resolve(generated):

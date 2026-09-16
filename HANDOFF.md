@@ -489,3 +489,111 @@ Next: stage the 15 files listed above explicitly (never `git add -A`/`.`), commi
 `feat(v6.1): make runtime UI target-aware`, fetch origin and confirm `origin/stage3/ahsan`
 is still `2aa883e`, push normally (no force), observe the one triggered gate run, confirm
 deployment is skipped, and leave PR #11 draft and unmerged. Do not touch Hugging Face.
+
+**v6.1 closed out**: committed as `7c463038de1635d9c10ad7172c49cbfbbf3cb84f`; `origin/
+stage3/ahsan` had not advanced (still `2aa883e`) at push time; pushed cleanly (`2aa883e..
+7c46303`). GitHub Actions run `35064427517` ("Stage 3 release gate") completed `success`;
+its "Deploy tested release to Hugging Face Space" job was `skipped`. PR #11 confirmed open,
+draft, unmerged. Hugging Face `space` remote was never touched.
+
+# RED LAB v6.2 — accurate target-aware report metadata, provenance and comparison wording
+
+2026-09-16T11:20:00+04:00, Claude Sonnet 5, Asia/Dubai. Branch `stage3/ahsan`, same worktree
+`C:\Users\ahsan\OneDrive\Desktop\stage3-ahsan`. Observed pre-work HEAD
+`7c463038de1635d9c10ad7172c49cbfbbf3cb84f`, matching the user-stated required starting HEAD
+exactly. Base `stage3/integration` confirmed at `40ceef06cfecd10fb34ab53c5e41de35cd694ae8`.
+PR #11 remains open, draft, unmerged. The main integration checkout's uncommitted
+`HANDOFF.md` was not touched; independently re-verified still hashing to
+`901bfd4e739f0e9b1ea2d8dad173df6663fa203e2e56716da8a99048e9337ae2`. User authorized this
+scope in the v6.2 milestone brief (2026-09-16).
+
+Investigation before fixing anything: read `runner.run.code_provenance`,
+`run_all._run_registry_experiment`'s `analysis_document` assembly, `analysis.analyze`'s
+`build_comparison_summary`/`LIMITATION_NOTES`, and `report/template_v3.html` (the schema-v3
+template that actually renders every Live Demo/CLI-registry report). Two of the three
+described defects turned out to already be computed correctly in the live code path --
+`code_provenance(ROOT)` is called once and threaded through consistently, and
+`build_comparison_summary`'s `common_denominator` genuinely is the matched-case
+intersection, confirmed against `tests/fixtures/stage3/expected_analysis_v3.json`. The one
+concrete, reproducible defect found: `analysis.analyze.LIMITATION_NOTES` (frozen, Khalid's
+`analysis/`) is emitted unconditionally onto every target's summary regardless of pairing,
+and its second entry is written in V1/V2-hardening terms -- so a sentiment-only run's
+top-level `limitations` list (built by `run_all.py`, Ahsan-owned) always carried that note
+even though sentiment has no V2 at all.
+
+Implemented (Ahsan-owned files only: `report/`, `run_all.py`, `tests/`; nothing under
+`analysis/`, `attacks/`, `runner/`, `endpoint/`, `baseline/`, `contract.py`, `CONTRACTS.md`,
+or `artifacts/verified_full_report/` was touched):
+
+- **Branding**: `report/generate.py`'s `PRODUCT_VERSION_LABEL` bumped to `"Red Lab v6.2"`.
+- **Application commit**: `_run_registry_experiment` already called `runner_mod.
+  code_provenance(ROOT)` once and reused it; added a new, directly unit-tested
+  `_app_commit_unavailable_reason(provenance)` helper that produces an explicit, honest
+  reason string (never "unknown", a branch name, or a remote head) whenever the commit is
+  genuinely missing, stored as `run_identity.app_commit_unavailable_reason`.
+  `report/template_v3.html`'s "Application commit" line now shows the real commit when
+  present, or "Not recorded — <reason>" when not, instead of a bare, unexplained fallback.
+  `report/generate.py` was confirmed (and now has a regression test) to import no
+  `subprocess` and never shell out to `git` -- provenance is threaded through existing run
+  evidence only.
+- **Common eligible denominator**: no code change to the computation itself (already correct
+  and frozen under Khalid's `analysis/`); added rendering-layer regression tests pinning that
+  the template shows the matched-intersection value (not either side's own denominator
+  alone), that a withheld comparison shows its explicit reason rather than "Not recorded",
+  and that single-target sentiment renders the (now more complete) "Not applicable" notice
+  with no "Common eligible denominator" line at all.
+- **Sentiment limitations leak**: new `run_all._applicable_limitations(analysis_blocks)`
+  replaces the old bare flatten-and-dedupe of every target's `summary.limitations` --
+  filters out the one paired-only (V2-hardening) note, matched by content not tuple index,
+  whenever the run contains no paired evaluation at all. A run that includes any paired
+  evaluation (e.g. emotion.core alongside sentiment.core) keeps the note untouched.
+- **Report identity consistency**: each endpoint card in `template_v3.html` now shows its
+  declared/inferred model id + revision and tokenizer id + revision (previously present in
+  the analysis data but never rendered anywhere); the single-target notice now names the
+  pinned target, states no hardening comparison is available or implied, and that
+  remediation must rest on single-target evidence only.
+
+Validation by this Claude session (Python 3.11, `.venv` from the main checkout, invoked
+against this worktree):
+- `tests/test_run_all.py`: 18 passed (8 new: synthetic-40-char-SHA `run.json` check via the
+  existing `_plan_evaluation` early-stop technique, `_app_commit_unavailable_reason` unit
+  tests incl. empty-string and present-commit cases, `_applicable_limitations` unit tests
+  for sentiment-only exclusion / paired-run retention / ordering+dedup).
+- `tests/test_report.py`: 153 passed (4 version-string literals updated to v6.2; 1 wording
+  assertion updated for the expanded single-target notice; 9 new v6.2 tests: real
+  40-char-commit rendering, explicit missing-provenance reason, no model-revision/branch-name
+  substitution, no-subprocess-import regression, matched-intersection denominator not
+  either side alone, withheld-comparison explicit reason, single-target not-applicable
+  wording, no V2/hardening affirmative claims in a sentiment block, and no V2/hardening
+  limitation note when the run has no paired evaluation).
+- `tests/test_web.py`: 55 passed (2 version-string literals updated to v6.2).
+- `tests/test_lab.py`: 61 passed (unaffected, run as part of the combined check).
+- `tests/test_gate.py`: 41 passed (unaffected).
+- Combined run of the five files above: **329 passed**, 1 pre-existing Starlette deprecation
+  warning, no failures.
+- `tests/test_analysis_identity.py`: 37 passed (sanity check that nothing under `analysis/`
+  was disturbed; not modified, not expected to change, ran anyway per the brief's mention of
+  "analysis/provenance or identity tests if directly affected").
+- `git diff --check`: clean.
+- Minimal report-generation smoke check (direct `report.render_html` calls on
+  `tests/fixtures/stage3/expected_analysis_v3.json`, no models loaded): emotion paired
+  fixture's real 40-char `app_commit` (`9386d75a...`) appears verbatim; `common_denominator`
+  (`6`, an int) renders correctly; the sentiment block contains no V2/hardening-comparison
+  claims; sentiment `comparison` is `null` and its notice reads "No hardening comparison is
+  available or implied"; `"Red Lab v6.2"` appears in the rendered HTML.
+- Did not run: the full pytest suite, full emotion.core/sentiment.core, OCES, Docker,
+  Playwright, CI-policy regeneration, or deployment (all out of scope per the brief).
+
+Code was validated, then committed as `12ab918815292d3d81c49167d724821823c3f63f` with
+message `feat(v6.2): correct report provenance and comparison context`. Immediate next
+action is fetch/verify/push (below).
+
+Explicitly deferred to v6.3+ (per the brief -- do not start): replacement of
+`/verified-full/`; the new multi-target master technical report; combined Core and OCES
+narrative; CI-gate evidence section in the master report; new master-report PDF; broad UI
+redesign; responsive/mobile polish; Docker rebuild; deployment; final Red Lab v7.0 branding.
+
+Next: fetch origin and confirm `origin/stage3/ahsan` is still `7c46303` (unchanged since
+v6.1's push) before pushing this commit, push normally (no force), observe the one
+automatically triggered gate run, confirm its deploy job is skipped, and leave PR #11 draft
+and unmerged. Do not touch Hugging Face.

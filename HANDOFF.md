@@ -976,3 +976,11 @@ Next: fetch origin and confirm `origin/stage3/ahsan` is still `91c4d7f` (unchang
 the v6.3 docs-closeout push) before pushing this commit, push normally (no force), observe
 the one automatically triggered gate run, confirm its deploy job is skipped, and leave
 PR #11 draft and unmerged. Do not touch Hugging Face.
+
+**v6.4 closed out.** Committed as `920a6caa048406fd33652c8c0149ceec548ce722`
+(`feat(v6.4): finalize master technical report HTML and PDF`). `origin/stage3/ahsan` had
+not advanced (still `91c4d7f`) at push time; pushed cleanly (`91c4d7f..920a6ca`). GitHub
+Actions run `35082203070` ("Stage 3 release gate", PR #11) completed **success** (checked
+via the public, unauthenticated GitHub REST API); its "Deploy tested release to Hugging
+Face Space" job was `skipped`. PR #11 confirmed open, draft, unmerged via the same API.
+Hugging Face `space` remote was never touched at any point in this session.

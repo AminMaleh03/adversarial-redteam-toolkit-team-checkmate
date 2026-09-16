@@ -9,6 +9,7 @@ webbrowser.open is allowed to be called).
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -19,6 +20,36 @@ sys.path.insert(0, str(ROOT))
 
 import run_all  # noqa: E402
 from contract import EVAL_KIND_PAIRED  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "evaluation_id,target_id,expected",
+    [
+        ("emotion.oces", "emotion_v1", (18, 0, 24)),
+        ("emotion.oces", "emotion_v2", (18, 0, 24)),
+        ("sentiment.oces", "sentiment_v1", (26, 2, 12)),
+    ],
+)
+def test_oces_joins_recorded_attack_to_its_clean_baseline(
+    tmp_path, evaluation_id, target_id, expected
+):
+    """Real manifests omit baseline_id; the association belongs to RunResult."""
+    bundle = evaluation_id.replace(".", "_") + "_v1"
+    evaluation_dir = tmp_path / "run"
+    shutil.copytree(ROOT / "artifacts" / bundle / "run", evaluation_dir)
+    registry = _real_registry()
+    evaluation = registry.evaluation(evaluation_id)
+    manifest = json.loads((evaluation_dir / target_id / "manifest.json").read_text())
+    assert all("baseline_id" not in meta for meta in manifest.values())
+
+    block = run_all._oces_block(registry, evaluation, evaluation_dir)
+    statuses = block["summaries"][target_id]["statuses"]
+    meets, violates, excluded = expected
+    assert statuses == {
+        "meets_expectation": meets, "violates_expectation": violates,
+        "excluded": excluded, "unevaluable": 0, "not_executed": 0,
+    }
+    assert block["summaries"][target_id]["violation_rate"]["denominator"] == meets + violates
 
 
 def test_demo_excluded_attack_ids_contains_oversized_10mb():

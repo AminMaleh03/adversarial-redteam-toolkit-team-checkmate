@@ -1,0 +1,1957 @@
+{
+  "schema_version": 3,
+  "contracts_version": "3.0.0",
+  "run_identity": {
+    "run_id": "dc339010739b4f1c",
+    "run_name": "v63_real_emotion_oces",
+    "created_at_utc": "2026-09-16T08:19:10+00:00",
+    "app_commit": "78188adbdcb4449429116af3161a032516d38aa8",
+    "app_commit_unavailable_reason": null,
+    "dirty": false,
+    "registry_sha256": "3212f30cde643ba6e53e8ef514ecce870f212b1a88bfa208876136cc9b8a0136"
+  },
+  "evaluations": [
+    {
+      "evaluation_id": "emotion.oces",
+      "kind": "paired",
+      "task_id": "emotion_7",
+      "suite_id": "oces",
+      "targets": [
+        "emotion_v1",
+        "emotion_v2"
+      ],
+      "summaries": {
+        "emotion_v1": {
+          "version": "v1",
+          "target_id": "emotion_v1",
+          "task_id": "emotion_7",
+          "suite_id": "oces",
+          "identity": {
+            "target_id": "emotion_v1",
+            "task_id": "emotion_7",
+            "suite_id": "oces",
+            "provenance": "declared",
+            "declared": {
+              "target_id": "emotion_v1",
+              "task_id": "emotion_7",
+              "suite_id": "oces"
+            },
+            "model": {
+              "model_id": "j-hartmann/emotion-english-distilroberta-base",
+              "revision": "0e1cd914e3d46199ed785853e12b57304e04178b",
+              "tokenizer_id": "j-hartmann/emotion-english-distilroberta-base",
+              "tokenizer_revision": "0e1cd914e3d46199ed785853e12b57304e04178b",
+              "labels": [
+                "anger",
+                "disgust",
+                "fear",
+                "joy",
+                "neutral",
+                "sadness",
+                "surprise"
+              ],
+              "max_sequence_length": 512
+            },
+            "baseline": {
+              "path": "baseline/oces/emotion_seeds.json",
+              "sha256": "d5cc6011848ad5800fdfbb2b006a2cc77e7f8de0bd0d6cef3e5d012565951af3"
+            },
+            "evaluation_run_id": "dc339010739b4f1c",
+            "evaluation_id": "emotion.oces",
+            "case_set_id": null
+          },
+          "coverage": {
+            "planned": 63,
+            "skipped": 0,
+            "limit_excluded": 0,
+            "deselected": 0,
+            "selected": 63,
+            "completed": 63,
+            "missing": 0,
+            "coverage_rate": 1.0
+          },
+          "category_stats": {
+            "oces.paraphrase": {
+              "eligible": 8,
+              "failed": 0,
+              "review": 13,
+              "diagnostic": 0,
+              "unevaluable": 0,
+              "failure_rate": 0.0
+            },
+            "oces.distractor": {
+              "eligible": 14,
+              "failed": 0,
+              "review": 7,
+              "diagnostic": 0,
+              "unevaluable": 0,
+              "failure_rate": 0.0
+            }
+          },
+          "operational": {
+            "unhandled_5xx": 0,
+            "timeouts": 0,
+            "connection_failures": 0,
+            "service_unavailable": 0,
+            "slow_responses": 0,
+            "info_leaks": 0,
+            "invalid_input_accepted": 0
+          },
+          "drift": {
+            "eligible_comparisons": 18,
+            "qualifying_flips": 0,
+            "flip_rate": 0.0,
+            "baseline_denominator": {
+              "eligible": 18,
+              "total": 21,
+              "excluded_below_threshold": 3,
+              "excluded_baselines": [
+                {
+                  "baseline_id": "handwritten-neutral-0",
+                  "clean_confidence": 0.4687827229499817
+                },
+                {
+                  "baseline_id": "dataset-surprise-0",
+                  "clean_confidence": 0.4905828833580017
+                },
+                {
+                  "baseline_id": "handwritten-disgust-2",
+                  "clean_confidence": 0.522786021232605
+                }
+              ],
+              "no_prediction": [],
+              "statement": "18 of 21 baselines eligible for flip scoring",
+              "threshold": 0.6
+            },
+            "confidence_change": {
+              "mean_delta_on_flips": null,
+              "per_flip": []
+            },
+            "excluded": {
+              "review_unresolved": 20,
+              "low_clean_confidence": 4
+            },
+            "unevaluable": {},
+            "flip_attack_ids": []
+          },
+          "findings": [],
+          "validity_tier_census": {},
+          "diagnostic_observations": [],
+          "review_cases": [
+            {
+              "attack_id": "dataset-anger-0.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "lexical"
+            },
+            {
+              "attack_id": "dataset-anger-1.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "syntactic"
+            },
+            {
+              "attack_id": "dataset-anger-2.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "lexical"
+            },
+            {
+              "attack_id": "dataset-anger-2.oces.distractor",
+              "category": "oces.distractor",
+              "subfamily": "temporal"
+            },
+            {
+              "attack_id": "dataset-fear-0.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "syntactic"
+            },
+            {
+              "attack_id": "dataset-fear-0.oces.distractor",
+              "category": "oces.distractor",
+              "subfamily": "administrative"
+            },
+            {
+              "attack_id": "dataset-fear-1.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "lexical"
+            },
+            {
+              "attack_id": "dataset-joy-0.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "lexical"
+            },
+            {
+              "attack_id": "dataset-joy-0.oces.distractor",
+              "category": "oces.distractor",
+              "subfamily": "logistical"
+            },
+            {
+              "attack_id": "dataset-joy-1.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "lexical"
+            },
+            {
+              "attack_id": "dataset-sadness-0.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "lexical"
+            },
+            {
+              "attack_id": "dataset-sadness-0.oces.distractor",
+              "category": "oces.distractor",
+              "subfamily": "ordinary_observation"
+            },
+            {
+              "attack_id": "dataset-sadness-1.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "syntactic"
+            },
+            {
+              "attack_id": "dataset-sadness-1.oces.distractor",
+              "category": "oces.distractor",
+              "subfamily": "mundane_factual"
+            },
+            {
+              "attack_id": "dataset-sadness-2.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "lexical"
+            },
+            {
+              "attack_id": "dataset-surprise-0.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "lexical"
+            },
+            {
+              "attack_id": "dataset-surprise-0.oces.distractor",
+              "category": "oces.distractor",
+              "subfamily": "temporal"
+            },
+            {
+              "attack_id": "dataset-surprise-1.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "syntactic"
+            },
+            {
+              "attack_id": "dataset-surprise-2.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "clause_restructuring"
+            },
+            {
+              "attack_id": "dataset-surprise-2.oces.distractor",
+              "category": "oces.distractor",
+              "subfamily": "ordinary_observation"
+            }
+          ],
+          "limitations": [
+            "Drift is measured against each endpoint's own clean prediction, never the dataset label a baseline sentence was written to represent. Where a baseline does not predict its intended label the comparison remains valid, and no model-accuracy claim in this analysis rests on those baselines.",
+            "V2's defenses are application-layer only; no retraining was done. V2 is therefore not expected to reduce model-level sensitivity to typos or other meaning-preserving perturbations. A perturbation finding that persists on V2 is an honest non-improvement, not a gap in the hardening.",
+            "A failed health check records observed unavailability only. It is not evidence that the operating-system process died, and no process-death claim is made anywhere here.",
+            "Validity tiers are preserved per finding. Most of the suite is SILVER -- mechanically justified but not hand-verified -- so findings resting on SILVER evidence carry weaker semantic assurance than GOLD ones."
+          ]
+        },
+        "emotion_v2": {
+          "version": "v2",
+          "target_id": "emotion_v2",
+          "task_id": "emotion_7",
+          "suite_id": "oces",
+          "identity": {
+            "target_id": "emotion_v2",
+            "task_id": "emotion_7",
+            "suite_id": "oces",
+            "provenance": "declared",
+            "declared": {
+              "target_id": "emotion_v2",
+              "task_id": "emotion_7",
+              "suite_id": "oces"
+            },
+            "model": {
+              "model_id": "j-hartmann/emotion-english-distilroberta-base",
+              "revision": "0e1cd914e3d46199ed785853e12b57304e04178b",
+              "tokenizer_id": "j-hartmann/emotion-english-distilroberta-base",
+              "tokenizer_revision": "0e1cd914e3d46199ed785853e12b57304e04178b",
+              "labels": [
+                "anger",
+                "disgust",
+                "fear",
+                "joy",
+                "neutral",
+                "sadness",
+                "surprise"
+              ],
+              "max_sequence_length": 512
+            },
+            "baseline": {
+              "path": "baseline/oces/emotion_seeds.json",
+              "sha256": "d5cc6011848ad5800fdfbb2b006a2cc77e7f8de0bd0d6cef3e5d012565951af3"
+            },
+            "evaluation_run_id": "dc339010739b4f1c",
+            "evaluation_id": "emotion.oces",
+            "case_set_id": null
+          },
+          "coverage": {
+            "planned": 63,
+            "skipped": 0,
+            "limit_excluded": 0,
+            "deselected": 0,
+            "selected": 63,
+            "completed": 63,
+            "missing": 0,
+            "coverage_rate": 1.0
+          },
+          "category_stats": {
+            "oces.paraphrase": {
+              "eligible": 8,
+              "failed": 0,
+              "review": 13,
+              "diagnostic": 0,
+              "unevaluable": 0,
+              "failure_rate": 0.0
+            },
+            "oces.distractor": {
+              "eligible": 14,
+              "failed": 0,
+              "review": 7,
+              "diagnostic": 0,
+              "unevaluable": 0,
+              "failure_rate": 0.0
+            }
+          },
+          "operational": {
+            "unhandled_5xx": 0,
+            "timeouts": 0,
+            "connection_failures": 0,
+            "service_unavailable": 0,
+            "slow_responses": 0,
+            "info_leaks": 0,
+            "invalid_input_accepted": 0
+          },
+          "drift": {
+            "eligible_comparisons": 18,
+            "qualifying_flips": 0,
+            "flip_rate": 0.0,
+            "baseline_denominator": {
+              "eligible": 18,
+              "total": 21,
+              "excluded_below_threshold": 3,
+              "excluded_baselines": [
+                {
+                  "baseline_id": "handwritten-neutral-0",
+                  "clean_confidence": 0.4687827229499817
+                },
+                {
+                  "baseline_id": "dataset-surprise-0",
+                  "clean_confidence": 0.4905828833580017
+                },
+                {
+                  "baseline_id": "handwritten-disgust-2",
+                  "clean_confidence": 0.522786021232605
+                }
+              ],
+              "no_prediction": [],
+              "statement": "18 of 21 baselines eligible for flip scoring",
+              "threshold": 0.6
+            },
+            "confidence_change": {
+              "mean_delta_on_flips": null,
+              "per_flip": []
+            },
+            "excluded": {
+              "review_unresolved": 20,
+              "low_clean_confidence": 4
+            },
+            "unevaluable": {},
+            "flip_attack_ids": []
+          },
+          "findings": [],
+          "validity_tier_census": {},
+          "diagnostic_observations": [],
+          "review_cases": [
+            {
+              "attack_id": "dataset-anger-0.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "lexical"
+            },
+            {
+              "attack_id": "dataset-anger-1.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "syntactic"
+            },
+            {
+              "attack_id": "dataset-anger-2.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "lexical"
+            },
+            {
+              "attack_id": "dataset-anger-2.oces.distractor",
+              "category": "oces.distractor",
+              "subfamily": "temporal"
+            },
+            {
+              "attack_id": "dataset-fear-0.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "syntactic"
+            },
+            {
+              "attack_id": "dataset-fear-0.oces.distractor",
+              "category": "oces.distractor",
+              "subfamily": "administrative"
+            },
+            {
+              "attack_id": "dataset-fear-1.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "lexical"
+            },
+            {
+              "attack_id": "dataset-joy-0.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "lexical"
+            },
+            {
+              "attack_id": "dataset-joy-0.oces.distractor",
+              "category": "oces.distractor",
+              "subfamily": "logistical"
+            },
+            {
+              "attack_id": "dataset-joy-1.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "lexical"
+            },
+            {
+              "attack_id": "dataset-sadness-0.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "lexical"
+            },
+            {
+              "attack_id": "dataset-sadness-0.oces.distractor",
+              "category": "oces.distractor",
+              "subfamily": "ordinary_observation"
+            },
+            {
+              "attack_id": "dataset-sadness-1.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "syntactic"
+            },
+            {
+              "attack_id": "dataset-sadness-1.oces.distractor",
+              "category": "oces.distractor",
+              "subfamily": "mundane_factual"
+            },
+            {
+              "attack_id": "dataset-sadness-2.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "lexical"
+            },
+            {
+              "attack_id": "dataset-surprise-0.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "lexical"
+            },
+            {
+              "attack_id": "dataset-surprise-0.oces.distractor",
+              "category": "oces.distractor",
+              "subfamily": "temporal"
+            },
+            {
+              "attack_id": "dataset-surprise-1.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "syntactic"
+            },
+            {
+              "attack_id": "dataset-surprise-2.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "clause_restructuring"
+            },
+            {
+              "attack_id": "dataset-surprise-2.oces.distractor",
+              "category": "oces.distractor",
+              "subfamily": "ordinary_observation"
+            }
+          ],
+          "limitations": [
+            "Drift is measured against each endpoint's own clean prediction, never the dataset label a baseline sentence was written to represent. Where a baseline does not predict its intended label the comparison remains valid, and no model-accuracy claim in this analysis rests on those baselines.",
+            "V2's defenses are application-layer only; no retraining was done. V2 is therefore not expected to reduce model-level sensitivity to typos or other meaning-preserving perturbations. A perturbation finding that persists on V2 is an honest non-improvement, not a gap in the hardening.",
+            "A failed health check records observed unavailability only. It is not evidence that the operating-system process died, and no process-death claim is made anywhere here.",
+            "Validity tiers are preserved per finding. Most of the suite is SILVER -- mechanically justified but not hand-verified -- so findings resting on SILVER evidence carry weaker semantic assurance than GOLD ones."
+          ]
+        }
+      },
+      "comparison": {
+        "fingerprints": {
+          "planned_match": true,
+          "manifest_match": true,
+          "whole_suite_comparable": true
+        },
+        "pairing_identity": {
+          "comparable": true,
+          "corrupt_metadata": false,
+          "checked": [
+            "parent run",
+            "task",
+            "suite",
+            "model revision",
+            "model id",
+            "tokenizer revision",
+            "baseline identity",
+            "planned suite fingerprint",
+            "manifest hash",
+            "coverage map version",
+            "coverage map hash",
+            "request timeout",
+            "slow band",
+            "planned case order"
+          ],
+          "reasons": []
+        },
+        "coverage": {
+          "v1": {
+            "planned": 63,
+            "skipped": 0,
+            "limit_excluded": 0,
+            "deselected": 0,
+            "selected": 63,
+            "completed": 63,
+            "missing": 0,
+            "coverage_rate": 1.0
+          },
+          "v2": {
+            "planned": 63,
+            "skipped": 0,
+            "limit_excluded": 0,
+            "deselected": 0,
+            "selected": 63,
+            "completed": 63,
+            "missing": 0,
+            "coverage_rate": 1.0
+          },
+          "matched_count": 63,
+          "v1_only_count": 0,
+          "v2_only_count": 0,
+          "unavailable_count": 0,
+          "v1_only": [],
+          "v2_only": [],
+          "unavailable": []
+        },
+        "limitations": [
+          "Drift is measured against each endpoint's own clean prediction, never the dataset label a baseline sentence was written to represent. Where a baseline does not predict its intended label the comparison remains valid, and no model-accuracy claim in this analysis rests on those baselines.",
+          "V2's defenses are application-layer only; no retraining was done. V2 is therefore not expected to reduce model-level sensitivity to typos or other meaning-preserving perturbations. A perturbation finding that persists on V2 is an honest non-improvement, not a gap in the hardening.",
+          "A failed health check records observed unavailability only. It is not evidence that the operating-system process died, and no process-death claim is made anywhere here.",
+          "Validity tiers are preserved per finding. Most of the suite is SILVER -- mechanically justified but not hand-verified -- so findings resting on SILVER evidence carry weaker semantic assurance than GOLD ones."
+        ],
+        "operational": {
+          "v1": {
+            "unhandled_5xx": 0,
+            "timeouts": 0,
+            "connection_failures": 0,
+            "service_unavailable": 0,
+            "slow_responses": 0,
+            "info_leaks": 0,
+            "invalid_input_accepted": 0
+          },
+          "v2": {
+            "unhandled_5xx": 0,
+            "timeouts": 0,
+            "connection_failures": 0,
+            "service_unavailable": 0,
+            "slow_responses": 0,
+            "info_leaks": 0,
+            "invalid_input_accepted": 0
+          }
+        },
+        "drift": {
+          "v1_qualifying_flips": 0,
+          "v2_qualifying_flips": 0,
+          "v1_eligible_comparisons": 18,
+          "v2_eligible_comparisons": 18,
+          "v1_flip_rate": 0.0,
+          "v2_flip_rate": 0.0,
+          "v1_baseline_denominator": "18 of 21 baselines eligible for flip scoring",
+          "v2_baseline_denominator": "18 of 21 baselines eligible for flip scoring"
+        },
+        "category_failure_rates": {
+          "oces.paraphrase": {
+            "v1": {
+              "failed": 0,
+              "eligible": 8,
+              "rate": 0.0
+            },
+            "v2": {
+              "failed": 0,
+              "eligible": 8,
+              "rate": 0.0
+            }
+          },
+          "oces.distractor": {
+            "v1": {
+              "failed": 0,
+              "eligible": 14,
+              "rate": 0.0
+            },
+            "v2": {
+              "failed": 0,
+              "eligible": 14,
+              "rate": 0.0
+            }
+          }
+        },
+        "findings_resolved": [],
+        "findings_remaining": [],
+        "findings_unavailable": [],
+        "findings_newly_appearing": [],
+        "inconclusive_new_findings": [],
+        "finding_comparisons": [],
+        "new_finding_evidence": []
+      },
+      "coverage": null,
+      "oces": {
+        "families": [
+          "oces.paraphrase",
+          "oces.distractor"
+        ],
+        "summaries": {
+          "emotion_v1": {
+            "target_id": "emotion_v1",
+            "planned": 42,
+            "statuses": {
+              "meets_expectation": 18,
+              "violates_expectation": 0,
+              "excluded": 24,
+              "unevaluable": 0,
+              "not_executed": 0
+            },
+            "violation_rate": {
+              "numerator": 0,
+              "denominator": 18,
+              "rate": 0.0
+            },
+            "families": {
+              "oces.paraphrase": {
+                "planned": 21,
+                "statuses": {
+                  "meets_expectation": 6,
+                  "violates_expectation": 0,
+                  "excluded": 15,
+                  "unevaluable": 0,
+                  "not_executed": 0
+                },
+                "violation_rate": {
+                  "numerator": 0,
+                  "denominator": 6,
+                  "rate": 0.0
+                },
+                "violation_case_ids": [],
+                "induced_misclassification": {
+                  "count": 0,
+                  "case_ids": [],
+                  "note": "Counted only where the clean prediction matched its reference label; otherwise a change is a consistency failure and the correct label is not established."
+                }
+              },
+              "oces.distractor": {
+                "planned": 21,
+                "statuses": {
+                  "meets_expectation": 12,
+                  "violates_expectation": 0,
+                  "excluded": 9,
+                  "unevaluable": 0,
+                  "not_executed": 0
+                },
+                "violation_rate": {
+                  "numerator": 0,
+                  "denominator": 12,
+                  "rate": 0.0
+                },
+                "violation_case_ids": [],
+                "induced_misclassification": {
+                  "count": 0,
+                  "case_ids": [],
+                  "note": "Counted only where the clean prediction matched its reference label; otherwise a change is a consistency failure and the correct label is not established."
+                }
+              }
+            },
+            "author_exposure": "Additional evaluation authored after the evaluated defenses were frozen; the authors were aware of the defenses; not a blind holdout.",
+            "interpretation_limits": [
+              "Valid JSON, an accepted type, bounded tokens and an unchanged clean_text result establish only that those specific input gates accepted the text unchanged. They do not show the exception handler is irrelevant and they do not show semantic preservation.",
+              "A changed prediction is a consistency failure under an intended label-preserving change. It does not establish which prediction is correct."
+            ]
+          },
+          "emotion_v2": {
+            "target_id": "emotion_v2",
+            "planned": 42,
+            "statuses": {
+              "meets_expectation": 18,
+              "violates_expectation": 0,
+              "excluded": 24,
+              "unevaluable": 0,
+              "not_executed": 0
+            },
+            "violation_rate": {
+              "numerator": 0,
+              "denominator": 18,
+              "rate": 0.0
+            },
+            "families": {
+              "oces.paraphrase": {
+                "planned": 21,
+                "statuses": {
+                  "meets_expectation": 6,
+                  "violates_expectation": 0,
+                  "excluded": 15,
+                  "unevaluable": 0,
+                  "not_executed": 0
+                },
+                "violation_rate": {
+                  "numerator": 0,
+                  "denominator": 6,
+                  "rate": 0.0
+                },
+                "violation_case_ids": [],
+                "induced_misclassification": {
+                  "count": 0,
+                  "case_ids": [],
+                  "note": "Counted only where the clean prediction matched its reference label; otherwise a change is a consistency failure and the correct label is not established."
+                }
+              },
+              "oces.distractor": {
+                "planned": 21,
+                "statuses": {
+                  "meets_expectation": 12,
+                  "violates_expectation": 0,
+                  "excluded": 9,
+                  "unevaluable": 0,
+                  "not_executed": 0
+                },
+                "violation_rate": {
+                  "numerator": 0,
+                  "denominator": 12,
+                  "rate": 0.0
+                },
+                "violation_case_ids": [],
+                "induced_misclassification": {
+                  "count": 0,
+                  "case_ids": [],
+                  "note": "Counted only where the clean prediction matched its reference label; otherwise a change is a consistency failure and the correct label is not established."
+                }
+              }
+            },
+            "author_exposure": "Additional evaluation authored after the evaluated defenses were frozen; the authors were aware of the defenses; not a blind holdout.",
+            "interpretation_limits": [
+              "Valid JSON, an accepted type, bounded tokens and an unchanged clean_text result establish only that those specific input gates accepted the text unchanged. They do not show the exception handler is irrelevant and they do not show semantic preservation.",
+              "A changed prediction is a consistency failure under an intended label-preserving change. It does not establish which prediction is correct."
+            ]
+          }
+        },
+        "cases": {
+          "emotion_v1": [
+            {
+              "case_id": "dataset-anger-0.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "anger",
+              "clean_confidence": 0.991008460521698,
+              "observed_label": "anger",
+              "observed_confidence": 0.9870930314064026,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:dataset-anger-0.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "dataset-anger-0.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-anger-1.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "fear",
+              "clean_confidence": 0.6179084181785583,
+              "observed_label": "fear",
+              "observed_confidence": 0.5227217078208923,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:dataset-anger-1.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "dataset-anger-1.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-anger-2.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-anger-2.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-fear-0.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-fear-0.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-fear-1.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "surprise",
+              "clean_confidence": 0.930957019329071,
+              "observed_label": "surprise",
+              "observed_confidence": 0.9624040126800537,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:dataset-fear-1.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "dataset-fear-1.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-fear-2.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "fear",
+              "clean_confidence": 0.9956812858581543,
+              "observed_label": "fear",
+              "observed_confidence": 0.9957868456840515,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:dataset-fear-2.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "dataset-fear-2.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "fear",
+              "clean_confidence": 0.9956812858581543,
+              "observed_label": "fear",
+              "observed_confidence": 0.994608998298645,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:dataset-fear-2.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "dataset-joy-0.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-joy-0.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-joy-1.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "joy",
+              "clean_confidence": 0.9941797256469727,
+              "observed_label": "joy",
+              "observed_confidence": 0.9923588633537292,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:dataset-joy-1.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "dataset-joy-1.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-joy-2.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "joy",
+              "clean_confidence": 0.9936656355857849,
+              "observed_label": "joy",
+              "observed_confidence": 0.993818461894989,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:dataset-joy-2.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "dataset-joy-2.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "joy",
+              "clean_confidence": 0.9936656355857849,
+              "observed_label": "joy",
+              "observed_confidence": 0.991329550743103,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:dataset-joy-2.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "dataset-sadness-0.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-sadness-0.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-sadness-1.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-sadness-1.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-sadness-2.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "sadness",
+              "clean_confidence": 0.9920377731323242,
+              "observed_label": "sadness",
+              "observed_confidence": 0.990024209022522,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:dataset-sadness-2.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "dataset-sadness-2.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-surprise-0.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-surprise-0.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-surprise-1.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "surprise",
+              "clean_confidence": 0.983704149723053,
+              "observed_label": "surprise",
+              "observed_confidence": 0.9838927984237671,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:dataset-surprise-1.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "dataset-surprise-1.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-surprise-2.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-surprise-2.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "handwritten-disgust-0.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "disgust",
+              "clean_confidence": 0.9761650562286377,
+              "observed_label": "disgust",
+              "observed_confidence": 0.9499516487121582,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-disgust-0.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "handwritten-disgust-0.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "disgust",
+              "clean_confidence": 0.9761650562286377,
+              "observed_label": "disgust",
+              "observed_confidence": 0.9835987091064453,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-disgust-0.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "handwritten-disgust-1.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "disgust",
+              "clean_confidence": 0.9865666031837463,
+              "observed_label": "disgust",
+              "observed_confidence": 0.9827309250831604,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-disgust-1.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "handwritten-disgust-1.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "disgust",
+              "clean_confidence": 0.9865666031837463,
+              "observed_label": "disgust",
+              "observed_confidence": 0.986127495765686,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-disgust-1.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "handwritten-disgust-2.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "clean confidence 0.522786021232605 below the 0.6 threshold",
+              "validity_tier": "SILVER",
+              "clean_label": "disgust",
+              "clean_confidence": 0.522786021232605,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-disgust-2.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "handwritten-disgust-2.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "clean confidence 0.522786021232605 below the 0.6 threshold",
+              "validity_tier": "SILVER",
+              "clean_label": "disgust",
+              "clean_confidence": 0.522786021232605,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-disgust-2.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "handwritten-neutral-0.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "clean confidence 0.4687827229499817 below the 0.6 threshold",
+              "validity_tier": "SILVER",
+              "clean_label": "fear",
+              "clean_confidence": 0.4687827229499817,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-neutral-0.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "handwritten-neutral-0.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "clean confidence 0.4687827229499817 below the 0.6 threshold",
+              "validity_tier": "SILVER",
+              "clean_label": "fear",
+              "clean_confidence": 0.4687827229499817,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-neutral-0.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "handwritten-neutral-1.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "neutral",
+              "clean_confidence": 0.7553926110267639,
+              "observed_label": "neutral",
+              "observed_confidence": 0.88675457239151,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-neutral-1.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "handwritten-neutral-1.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "neutral",
+              "clean_confidence": 0.7553926110267639,
+              "observed_label": "neutral",
+              "observed_confidence": 0.902857780456543,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-neutral-1.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "handwritten-neutral-2.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "neutral",
+              "clean_confidence": 0.837884247303009,
+              "observed_label": "neutral",
+              "observed_confidence": 0.473461389541626,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-neutral-2.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "handwritten-neutral-2.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "neutral",
+              "clean_confidence": 0.837884247303009,
+              "observed_label": "neutral",
+              "observed_confidence": 0.869880735874176,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-neutral-2.oces.paraphrase"
+              ]
+            }
+          ],
+          "emotion_v2": [
+            {
+              "case_id": "dataset-anger-0.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "anger",
+              "clean_confidence": 0.991008460521698,
+              "observed_label": "anger",
+              "observed_confidence": 0.9870930314064026,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:dataset-anger-0.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "dataset-anger-0.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-anger-1.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "fear",
+              "clean_confidence": 0.6179084181785583,
+              "observed_label": "fear",
+              "observed_confidence": 0.5227217078208923,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:dataset-anger-1.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "dataset-anger-1.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-anger-2.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-anger-2.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-fear-0.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-fear-0.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-fear-1.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "surprise",
+              "clean_confidence": 0.930957019329071,
+              "observed_label": "surprise",
+              "observed_confidence": 0.9624040126800537,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:dataset-fear-1.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "dataset-fear-1.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-fear-2.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "fear",
+              "clean_confidence": 0.9956812858581543,
+              "observed_label": "fear",
+              "observed_confidence": 0.9957868456840515,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:dataset-fear-2.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "dataset-fear-2.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "fear",
+              "clean_confidence": 0.9956812858581543,
+              "observed_label": "fear",
+              "observed_confidence": 0.994608998298645,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:dataset-fear-2.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "dataset-joy-0.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-joy-0.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-joy-1.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "joy",
+              "clean_confidence": 0.9941797256469727,
+              "observed_label": "joy",
+              "observed_confidence": 0.9923588633537292,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:dataset-joy-1.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "dataset-joy-1.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-joy-2.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "joy",
+              "clean_confidence": 0.9936656355857849,
+              "observed_label": "joy",
+              "observed_confidence": 0.993818461894989,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:dataset-joy-2.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "dataset-joy-2.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "joy",
+              "clean_confidence": 0.9936656355857849,
+              "observed_label": "joy",
+              "observed_confidence": 0.991329550743103,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:dataset-joy-2.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "dataset-sadness-0.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-sadness-0.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-sadness-1.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-sadness-1.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-sadness-2.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "sadness",
+              "clean_confidence": 0.9920377731323242,
+              "observed_label": "sadness",
+              "observed_confidence": 0.990024209022522,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:dataset-sadness-2.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "dataset-sadness-2.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-surprise-0.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-surprise-0.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-surprise-1.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "surprise",
+              "clean_confidence": 0.983704149723053,
+              "observed_label": "surprise",
+              "observed_confidence": 0.9838927984237671,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:dataset-surprise-1.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "dataset-surprise-1.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-surprise-2.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "dataset-surprise-2.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "handwritten-disgust-0.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "disgust",
+              "clean_confidence": 0.9761650562286377,
+              "observed_label": "disgust",
+              "observed_confidence": 0.9499516487121582,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-disgust-0.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "handwritten-disgust-0.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "disgust",
+              "clean_confidence": 0.9761650562286377,
+              "observed_label": "disgust",
+              "observed_confidence": 0.9835987091064453,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-disgust-0.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "handwritten-disgust-1.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "disgust",
+              "clean_confidence": 0.9865666031837463,
+              "observed_label": "disgust",
+              "observed_confidence": 0.9827309250831604,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-disgust-1.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "handwritten-disgust-1.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "disgust",
+              "clean_confidence": 0.9865666031837463,
+              "observed_label": "disgust",
+              "observed_confidence": 0.986127495765686,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-disgust-1.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "handwritten-disgust-2.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "clean confidence 0.522786021232605 below the 0.6 threshold",
+              "validity_tier": "SILVER",
+              "clean_label": "disgust",
+              "clean_confidence": 0.522786021232605,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-disgust-2.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "handwritten-disgust-2.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "clean confidence 0.522786021232605 below the 0.6 threshold",
+              "validity_tier": "SILVER",
+              "clean_label": "disgust",
+              "clean_confidence": 0.522786021232605,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-disgust-2.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "handwritten-neutral-0.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "clean confidence 0.4687827229499817 below the 0.6 threshold",
+              "validity_tier": "SILVER",
+              "clean_label": "fear",
+              "clean_confidence": 0.4687827229499817,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-neutral-0.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "handwritten-neutral-0.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "clean confidence 0.4687827229499817 below the 0.6 threshold",
+              "validity_tier": "SILVER",
+              "clean_label": "fear",
+              "clean_confidence": 0.4687827229499817,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-neutral-0.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "handwritten-neutral-1.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "neutral",
+              "clean_confidence": 0.7553926110267639,
+              "observed_label": "neutral",
+              "observed_confidence": 0.88675457239151,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-neutral-1.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "handwritten-neutral-1.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "neutral",
+              "clean_confidence": 0.7553926110267639,
+              "observed_label": "neutral",
+              "observed_confidence": 0.902857780456543,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-neutral-1.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "handwritten-neutral-2.oces.distractor",
+              "family": "oces.distractor",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "neutral",
+              "clean_confidence": 0.837884247303009,
+              "observed_label": "neutral",
+              "observed_confidence": 0.473461389541626,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-neutral-2.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "handwritten-neutral-2.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "meets_expectation",
+              "reason": null,
+              "validity_tier": "SILVER",
+              "clean_label": "neutral",
+              "clean_confidence": 0.837884247303009,
+              "observed_label": "neutral",
+              "observed_confidence": 0.869880735874176,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:handwritten-neutral-2.oces.paraphrase"
+              ]
+            }
+          ]
+        },
+        "provenance": {
+          "path": "oces_freeze_content_hashes.json",
+          "sha256": "f39fd296a49e3f02076a2b50b6496b1934d9ed693be3c52fd2adddc8ab695f09",
+          "document": {
+            "artifact": "oces_freeze_content_hashes",
+            "generator_version": "1.2.1",
+            "coverage_map_version": "1.0.0",
+            "note": "SHA-256 of each finalized OCES freeze file (content identity for reproducibility). This file does not hash itself.",
+            "files": {
+              "baseline/oces/emotion_seeds.json": "d5cc6011848ad5800fdfbb2b006a2cc77e7f8de0bd0d6cef3e5d012565951af3",
+              "baseline/oces/sentiment_seeds.json": "a16e5c999c68fc20e685e793b7cfd3e6de38cf49cfc70ebf1e42a833390fd2c5",
+              "attacks/data/oces/emotion_cases.json": "f2e8e394f8cb90cf9dab6de225bb8033868f72ee273f7ea61516a5ff1af65863",
+              "attacks/data/oces/sentiment_cases.json": "053737c338ae0102807e7099963817de33c6d89c972d4e87d93226d504799e04",
+              "attacks/data/oces/provenance.json": "6131332e7988f0e56a9c53556bc09c702e785a64b02625caaec6ed2ec50e0c4d",
+              "baseline/oces/oces_content.py": "522f7f89c878ce7170a0dae9f913ae744e9e466ac904fde2d5e75264b7273ad2",
+              "baseline/oces/build_oces.py": "437664a5617005e6c58d6fa8e527707fa06b15cf222fcfc823f1498b45b0ab1e"
+            }
+          }
+        },
+        "author_exposure": "Additional evaluation authored after the evaluated defenses were frozen; the authors were aware of the defenses; not a blind holdout.",
+        "separation_note": "OCES findings and rates are reported separately from the original core suite and from other models. The suites test different things on different data."
+      },
+      "baseline_file": "baseline/oces/emotion_seeds.json",
+      "baseline_file_sha256": "d5cc6011848ad5800fdfbb2b006a2cc77e7f8de0bd0d6cef3e5d012565951af3"
+    }
+  ],
+  "limitations": [
+    "Drift is measured against each endpoint's own clean prediction, never the dataset label a baseline sentence was written to represent. Where a baseline does not predict its intended label the comparison remains valid, and no model-accuracy claim in this analysis rests on those baselines.",
+    "V2's defenses are application-layer only; no retraining was done. V2 is therefore not expected to reduce model-level sensitivity to typos or other meaning-preserving perturbations. A perturbation finding that persists on V2 is an honest non-improvement, not a gap in the hardening.",
+    "A failed health check records observed unavailability only. It is not evidence that the operating-system process died, and no process-death claim is made anywhere here.",
+    "Validity tiers are preserved per finding. Most of the suite is SILVER -- mechanically justified but not hand-verified -- so findings resting on SILVER evidence carry weaker semantic assurance than GOLD ones."
+  ]
+}

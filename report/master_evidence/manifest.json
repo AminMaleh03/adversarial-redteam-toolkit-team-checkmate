@@ -87,23 +87,23 @@
     },
     {
       "id": "emotion_oces_analysis",
-      "path": "artifacts/emotion_oces_v1/analysis/analysis.json",
-      "sha256": "cb6d9c3531d60b05a628ff2a5ca65ba5f74b203a4d4cd1990f484e265db55e57",
-      "bytes": 78331,
+      "path": "artifacts/oces_baseline_link_v1/emotion.analysis.json",
+      "sha256": "f6b8d370ec2da883ebf5becd29a3911b7f9c6e28656c30bd1d0992a30ceaff20",
+      "bytes": 78515,
       "classification": "real",
       "evaluation_id": "emotion.oces",
       "section": "F",
-      "description": "Real paired emotion.oces run analysis (schema v3)."
+      "description": "Corrected OCES baseline association, reanalysed from preserved real emotion responses (schema v3)."
     },
     {
       "id": "emotion_oces_provenance",
-      "path": "artifacts/emotion_oces_v1/PROVENANCE.md",
-      "sha256": "2da16725be7c0934bfda5216bd97ae3bb540dd0a64448a10af8bd6545393fc76",
-      "bytes": 5155,
+      "path": "artifacts/oces_baseline_link_v1/PROVENANCE.md",
+      "sha256": "759860b55bfbdfb809e34bb3488c1afea17cc33d91ef5442d4210221f29b9c1a",
+      "bytes": 2475,
       "classification": "real",
       "evaluation_id": "emotion.oces",
       "section": "F",
-      "description": "Provenance and verified counts for the emotion.oces run."
+      "description": "Provenance of the OCES scoring correction; original inference and evidence preserved."
     },
     {
       "id": "emotion_oces_freeze_hashes",
@@ -117,23 +117,23 @@
     },
     {
       "id": "sentiment_oces_analysis",
-      "path": "artifacts/sentiment_oces_v1/analysis/analysis.json",
-      "sha256": "18bc903eb63367bbd4a729ddfbce1b787f27a94b922f8235b41e714b55c2e4ce",
-      "bytes": 43161,
+      "path": "artifacts/oces_baseline_link_v1/sentiment.analysis.json",
+      "sha256": "a1bf469cead5afb39922f4b02f8b781d45907195e7ac7377edff887f87284086",
+      "bytes": 43526,
       "classification": "real",
       "evaluation_id": "sentiment.oces",
       "section": "F",
-      "description": "Real single-target sentiment.oces run analysis (schema v3)."
+      "description": "Corrected OCES baseline association, reanalysed from preserved real sentiment responses (schema v3)."
     },
     {
       "id": "sentiment_oces_provenance",
-      "path": "artifacts/sentiment_oces_v1/PROVENANCE.md",
-      "sha256": "f83cf273bc375d1ad2bf1ca6bf20ccf7aa13aae1f8aeafb51f350c27e35830ef",
-      "bytes": 4112,
+      "path": "artifacts/oces_baseline_link_v1/PROVENANCE.md",
+      "sha256": "759860b55bfbdfb809e34bb3488c1afea17cc33d91ef5442d4210221f29b9c1a",
+      "bytes": 2475,
       "classification": "real",
       "evaluation_id": "sentiment.oces",
       "section": "F",
-      "description": "Provenance and verified counts for the sentiment.oces run."
+      "description": "Provenance of the OCES scoring correction; original inference and evidence preserved."
     },
     {
       "id": "oces_review_sheet",

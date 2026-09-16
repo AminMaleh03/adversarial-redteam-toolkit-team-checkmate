@@ -192,9 +192,9 @@ def test_no_limitations_section_but_facts_survive_elsewhere(generated):
     assert "<h2>Limitations</h2>" not in html
     # OCES provenance (team-authored after defenses frozen) -- section F.
     assert "authored by this team after the evaluated defenses were already frozen" in html
-    # OCES 0/0 scored-outcome denominator -- section F (already covered in detail by
-    # test_oces_zero_scored_outcomes_are_not_rendered_as_a_rate; spot-checked here too).
-    assert "0 of 0 cases produced a scored expectation outcome" in html
+    # Corrected OCES results still disclose cases excluded from scoring -- section F.
+    assert "24 excluded, 0 unevaluable" in html
+    assert "12 excluded, 0 unevaluable" in html
     # Sentiment single-target identity -- sections E and F.
     assert "sentiment_v1 is the only sentiment target; there is no sentiment_v2" in html
     assert "Single-target evaluation of sentiment_v1 only; comparison is null" in html
@@ -232,9 +232,24 @@ def test_html_regeneration_is_byte_identical_across_runs(tmp_path):
     assert out1.read_bytes() == out2.read_bytes()
 
 
-def test_oces_zero_scored_outcomes_are_not_rendered_as_a_rate(generated):
+def test_oces_zero_scored_outcomes_are_not_rendered_as_a_rate(monkeypatch):
     """V6.4 review finding: a 0/0 violation_rate must never read as 0% or 100%."""
-    html, _ = generated
+    # Keep checking the empty-denominator behaviour even after correcting real evidence.
+    read_json = master_report._read_json
+
+    def empty_oces_outcomes(path):
+        data = read_json(path)
+        evaluations = data.get("evaluations", [])
+        for evaluation in evaluations if isinstance(evaluations, list) else []:
+            block = evaluation.get("oces")
+            if block:
+                for summary in block["summaries"].values():
+                    summary["violation_rate"] = {"numerator": 0, "denominator": 0, "rate": None}
+        return data
+
+    monkeypatch.setattr(master_report, "_read_json", empty_oces_outcomes)
+    verified = master_report.verify_manifest(master_report.load_manifest())
+    html = master_report.render(master_report.build_context(verified))
     assert "0 of 0 cases produced a scored expectation outcome" in html
     assert "no violation rate is available to report" in html
     # None of these misleading framings may appear anywhere near the OCES section.
@@ -243,6 +258,23 @@ def test_oces_zero_scored_outcomes_are_not_rendered_as_a_rate(generated):
     assert "0% failure" not in section
     assert "100% success" not in section
     assert "0.00%" not in section
+
+
+def test_oces_corrected_results_are_rendered_from_preserved_responses(generated):
+    html, _ = generated
+    section = html[html.index('id="oces"'):html.index('id="remediation"')]
+    assert "0 of 18" in section
+    assert "2 of 28" in section
+    assert "24 excluded, 0 unevaluable" in section
+    assert "12 excluded, 0 unevaluable" in section
+    assert "no violation rate is available" not in section
+    assert "baseline-association fix; no model requests or scoring rules changed" in html
+
+    for task in ("emotion", "sentiment"):
+        original = json.loads((ROOT / "artifacts" / f"{task}_oces_v1" / "analysis" / "analysis.json").read_bytes())
+        corrected = json.loads((ROOT / "artifacts" / "oces_baseline_link_v1" / f"{task}.analysis.json").read_bytes())
+        corrected["evaluations"][0]["oces"] = original["evaluations"][0]["oces"]
+        assert corrected == original
 
 
 def test_ci_gate_local_reproduction_is_distinguished_from_cited_run(generated):

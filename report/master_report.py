@@ -385,7 +385,10 @@ def build_context(verified: dict) -> dict:
                 "against live endpoints at application commit " + app_commit + ". This HTML "
                 "page was rendered afterward, from that already-recorded evidence, by "
                 "report.master_report; report generation reads and formats evidence, it never "
-                "re-scores or re-runs it."
+                "re-scores or re-runs it. OCES expectation statuses were separately corrected "
+                "on 17 September 2026 by reanalysing these preserved responses with the "
+                "baseline-association fix; no model requests or scoring rules changed. "
+                "See artifacts/oces_baseline_link_v1/PROVENANCE.md."
             ),
             "sources": [verified[s["id"]] for s in load_manifest()["sources"]],
             "external_citations": load_manifest()["external_citations"],

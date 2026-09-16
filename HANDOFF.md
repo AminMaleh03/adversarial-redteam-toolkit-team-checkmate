@@ -1,3 +1,88 @@
+# OCES baseline-link fix - verified locally; deployment authorised and pending
+
+2026-09-17T02:58:36+04:00, Codex, Asia/Dubai. Branch fix/oces-baseline-link;
+base/main 724799c. User explicitly authorised minimal fix and push to deployed website.
+Worktree stage3-oces-fix; original stage3/integration and stage3/ahsan unchanged.
+
+Production logic change: one line in run_all._oces_block reads the association from the
+recorded attack RunResult.baseline_id. No model, control, schema, threshold, UI, optional
+reference-label wiring, or other component change. Raw and historical bundles unchanged.
+Separate artifacts/oces_baseline_link_v1 derived analyses/reproduction/provenance update
+only evaluations[0].oces. Master report source manifest points to corrected copies;
+only OCES and provenance HTML sections changed, PDF and integrity snapshot regenerated.
+Windows rendered HTML normalised to generator's LF bytes so recorded digest matches.
+Corrected outcomes: emotion V1/V2 each 18 meets, 0 violates, 24 excluded; sentiment 26
+meets, 2 violates, 12 excluded. No unevaluable cases remain in these complete saved runs.
+
+Validation using original checkout Python 3.11 .venv, HF_HUB_OFFLINE=1 and
+TRANSFORMERS_OFFLINE=1:
+- pytest -q tests/test_run_all.py -k oces_joins --tb=short: 3 failures before fix (expected).
+- pytest -q tests/test_run_all.py tests/test_analysis_coverage_oces.py --tb=short: 66 passed.
+- pytest -q tests/test_run_all.py tests/test_analysis_coverage_oces.py
+  tests/test_master_report.py tests/test_report.py tests/test_web.py --tb=short:
+  final 316 passed, 4 existing deprecation warnings, 23.86s. Initial attempt exposed one
+  stale report assertion and a new test adapter issue, both fixed in tests only.
+- Reproduction script ran through actual validated orchestrator with preserved inputs.
+- HTML/PDF digests checked; only OCES/provenance sections differ; git diff --check clean.
+
+Live HF Space ahsan-141117/project-red-lab initially RUNNING at 46685306. Remote files
+match main except later README documentation change; preserve remote README and visibility.
+Next: commit feature branch, push/open PR (only Ahsan merges main), deploy reviewed delta
+with parent SHA guard, verify all remote file hashes, health and served report/PDF.
+No model inference, new endpoint service or background process remains running.
+
+## Continuation by Claude Sonnet 5, 2026-09-17, Asia/Dubai — verified independently, committing and deploying
+
+User authorized continuing Codex's uncommitted fix and deploying it. Everything above this
+line is Codex's own account; verified independently rather than trusted, with one real
+mistake made and corrected during that verification (below).
+
+**Verified, not just re-read:**
+- run_all.py diff is exactly the one-line change the feasibility doc describes: the clean-row
+  lookup now reads `attacks[attack_id].baseline_id` (the real recorded association on the
+  attack's own RunResult) instead of `value.get("baseline_id")` (a manifest entry, which has
+  no such field).
+- Reverted the fix, ran `pytest tests/test_run_all.py -k oces_joins`: all three parametrized
+  cases fail with exactly the described symptom -- every case comes back `unevaluable`
+  (28/28 for sentiment). Restored the fix: all three pass. The test is not vacuous.
+- Full suite: **1,138 passed, 27 skipped, 0 failed** (1,134 on unmodified main + 4 new tests).
+- `tests/test_master_report.py::test_oces_corrected_results_are_rendered_from_preserved_responses`
+  independently asserts `corrected == original` after swapping only the `oces` block back in --
+  i.e. the fix provably touches nothing else in either analysis document.
+- `artifacts/oces_baseline_link_v1/reanalyse.py` calls the real `run_all._oces_block` against a
+  copied snapshot of the real preserved run directories (no live endpoints, no model
+  inference), and separately cross-checks its corrected denominators against the
+  independently-computed drift summary (`eligible_comparisons`/`qualifying_flips`) already in
+  each original analysis.json -- a different code path agreeing with the corrected one.
+
+**My own mistake, caught and fixed before committing:** regenerating
+`artifacts/technical_report/{index.html,report.pdf,master_evidence_manifest.json}` myself on
+Windows produced different bytes than Codex's staged copies. Content was identical once
+line-endings were normalized (`before.replace(b"\r\n",b"\n") == after` was `True`,
+0 diff lines) -- `report/master_report.py`'s `index_path.write_text(html, encoding="utf-8")`
+has no `newline="\n"`, so it CRLF-translates on Windows, the same defect class already fixed
+twice elsewhere in this repo (`write_manifest`, the OCES generator). `report.pdf` is separately
+and explicitly documented in this file as non-reproducible even across identical runs
+(WeasyPrint/pydyf internal serialization), so a byte match there was never the right bar. I
+discarded my regeneration and restored Codex's original three files from a pre-regen backup;
+their SHA-256 and byte counts now match exactly what this branch's diff always showed. Then I
+ran `git checkout -- report/master_evidence/manifest.json`, wrongly reverting the *source*
+manifest (the file that repoints emotion.oces/sentiment.oces at the corrected bundle) instead
+of only the generated artifacts -- caught immediately because it dropped 3 tests back to
+failing. Fixed by regenerating that one file via
+`python -m report.master_evidence.build_manifest`, which is deterministic (a file listing +
+hashes, not a template render), unlike the HTML/PDF. Full suite green again afterward.
+
+Not fixed as part of this task, left for its own decision: `report/master_report.py`'s missing
+`newline="\n"` on the HTML write. It is why any future Windows regeneration of this file
+requires the same manual LF-normalization step Codex's account describes. Same fix pattern as
+the two prior instances of this exact bug class in this repo.
+
+**Deploying:** committing this worktree's changes to `fix/oces-baseline-link`, merging to
+`main` (user explicitly authorized "apply these changes to the deployed site"; normally only
+Ahsan merges main, and the user is Ahsan), then uploading the delta to the Hugging Face Space
+and re-verifying it live, same method as the prior deployments this week.
+
 # RED LAB v7 UI POLISH — COMMITTED LOCALLY ON stage3/ahsan, NOT PUSHED
 
 2026-09-16, Claude Opus 5, Asia/Dubai. Worktree `C:/Users/ahsan/OneDrive/Desktop/stage3-ahsan`,

@@ -1150,7 +1150,7 @@ def _oces_block(registry, evaluation, evaluation_dir: Path) -> dict:
                 family=value.get("declared_family") or value.get("family"),
                 target_id=target_id,
                 meta=value,
-                clean=baselines.get(value.get("baseline_id")),
+                clean=baselines.get(attacks[attack_id].baseline_id) if attack_id in attacks else None,
                 attacked=attacks.get(attack_id),
             )
             for attack_id, value in manifest.items()

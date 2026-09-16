@@ -863,7 +863,13 @@ main { padding-bottom: 36px; }
 }
 @media (max-width: 760px) {
   .hero { padding: 34px 4px 24px; }
-  #view-home::before { opacity: .7; }
+  /* v7: the swirl covers relatively more of a small viewport, so mobile dims both
+     layers further rather than the v6.5 rule's opacity: .7 (written for the old
+     low-alpha gradient texture, which made it fainter there -- against the new
+     conic swirl's higher base opacity, .7 would have made it MORE visible on
+     mobile, the opposite of the intent). */
+  #view-home::before { opacity: .22; }
+  #view-home::after { opacity: .16; }
   .rl-hero-brand { gap: 12px; }
   .rl-logo { width: 70px; height: 70px; }
   .rl-wordmark { font-size: 48px; letter-spacing: -2px; }

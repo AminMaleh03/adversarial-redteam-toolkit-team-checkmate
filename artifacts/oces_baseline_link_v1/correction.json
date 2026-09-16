@@ -1,0 +1,71 @@
+{
+  "correction": "Resolve the clean result from the recorded attack baseline_id, not attack metadata.",
+  "original_code_commit": "724799c",
+  "corrected_function_sha256": "702c4a07d67a062b09bb7d0e7e3b0c80e5e70f01ccf83531a25b007b075ade3d",
+  "reanalysis_script_sha256": "0e065e273832bfe69a7c25f1eab06fda305681d1ee770f4ffbaeedc9444225c9",
+  "scope": "Only evaluations[0].oces changed; run_identity still identifies original inference.",
+  "model_inference_repeated": false,
+  "evaluations": {
+    "emotion.oces": {
+      "original_analysis": "artifacts/emotion_oces_v1/analysis/analysis.json",
+      "original_analysis_sha256": "cb6d9c3531d60b05a628ff2a5ca65ba5f74b203a4d4cd1990f484e265db55e57",
+      "corrected_analysis": "artifacts/oces_baseline_link_v1/emotion.analysis.json",
+      "corrected_analysis_sha256": "f6b8d370ec2da883ebf5becd29a3911b7f9c6e28656c30bd1d0992a30ceaff20",
+      "preserved_inputs_sha256": {
+        "artifacts/emotion_oces_v1/run/emotion_v1/coverage_map.json": "93f706e64d5b46da89f91cbf7a33bb8bcf32e27149a4dbbffe0d62f489a8a90c",
+        "artifacts/emotion_oces_v1/run/emotion_v1/manifest.json": "c156816529964fc51829a9a91e00298c20599fd9dcddffbe8450b10a7e1533b1",
+        "artifacts/emotion_oces_v1/run/emotion_v1/results.jsonl": "70c06d99b6a80bfd8d4e15619b054482d9c7cc754259be1a26e6015a62f6b81c",
+        "artifacts/emotion_oces_v1/run/emotion_v1/run_meta.json": "c41804e915dddf2f03ebb3f4803560603c25c3f326f6010ab11ea4bad5da8162",
+        "artifacts/emotion_oces_v1/run/emotion_v2/coverage_map.json": "93f706e64d5b46da89f91cbf7a33bb8bcf32e27149a4dbbffe0d62f489a8a90c",
+        "artifacts/emotion_oces_v1/run/emotion_v2/manifest.json": "c156816529964fc51829a9a91e00298c20599fd9dcddffbe8450b10a7e1533b1",
+        "artifacts/emotion_oces_v1/run/emotion_v2/results.jsonl": "bf14b906eb4e51f954fe2cd80127b5cdd6d452781743085bc40706184965b017",
+        "artifacts/emotion_oces_v1/run/emotion_v2/run_meta.json": "19b4f4eee55bf225602d9fc46f3e50dc7af81be0382fee482473442f3da26892",
+        "artifacts/emotion_oces_v1/run/oces_freeze_content_hashes.json": "f39fd296a49e3f02076a2b50b6496b1934d9ed693be3c52fd2adddc8ab695f09",
+        "artifacts/emotion_oces_v1/run/registry.json": "3212f30cde643ba6e53e8ef514ecce870f212b1a88bfa208876136cc9b8a0136",
+        "artifacts/emotion_oces_v1/run/run.json": "ea7ffbd51ef078f94917fa2a119df42eeeaa8504d7968c30a8071bfef745eb5b",
+        "artifacts/emotion_oces_v1/run/verification_case_set.json": "5bbdeaa87dc20b97f2be733080ec826b98c5f75819cc45dc3af5ca2165e1b02b"
+      },
+      "statuses": {
+        "emotion_v1": {
+          "meets_expectation": 18,
+          "violates_expectation": 0,
+          "excluded": 24,
+          "unevaluable": 0,
+          "not_executed": 0
+        },
+        "emotion_v2": {
+          "meets_expectation": 18,
+          "violates_expectation": 0,
+          "excluded": 24,
+          "unevaluable": 0,
+          "not_executed": 0
+        }
+      }
+    },
+    "sentiment.oces": {
+      "original_analysis": "artifacts/sentiment_oces_v1/analysis/analysis.json",
+      "original_analysis_sha256": "18bc903eb63367bbd4a729ddfbce1b787f27a94b922f8235b41e714b55c2e4ce",
+      "corrected_analysis": "artifacts/oces_baseline_link_v1/sentiment.analysis.json",
+      "corrected_analysis_sha256": "a1bf469cead5afb39922f4b02f8b781d45907195e7ac7377edff887f87284086",
+      "preserved_inputs_sha256": {
+        "artifacts/sentiment_oces_v1/run/oces_freeze_content_hashes.json": "f39fd296a49e3f02076a2b50b6496b1934d9ed693be3c52fd2adddc8ab695f09",
+        "artifacts/sentiment_oces_v1/run/registry.json": "3212f30cde643ba6e53e8ef514ecce870f212b1a88bfa208876136cc9b8a0136",
+        "artifacts/sentiment_oces_v1/run/run.json": "f741faaae43de0d90303a88bea5c729f959504a5e1c403478c61ace3b0304bb9",
+        "artifacts/sentiment_oces_v1/run/sentiment_v1/coverage_map.json": "93f706e64d5b46da89f91cbf7a33bb8bcf32e27149a4dbbffe0d62f489a8a90c",
+        "artifacts/sentiment_oces_v1/run/sentiment_v1/manifest.json": "ef7f0150d561d1bd53bad326c5c024d764b3d6c2f342d027f796dec9602e0bcb",
+        "artifacts/sentiment_oces_v1/run/sentiment_v1/results.jsonl": "89fc140a268ab88081df1bdc9bcddc67de6fb0feb26065c1dc9866627c7cb87f",
+        "artifacts/sentiment_oces_v1/run/sentiment_v1/run_meta.json": "fce762823d702d1d3370b7077b51841fe96a39fac0b298e29b63be01423d393a",
+        "artifacts/sentiment_oces_v1/run/verification_case_set.json": "fa55e3300d8b07087caeee12a7b950699f40a83398e65f4c17587f39353839b6"
+      },
+      "statuses": {
+        "sentiment_v1": {
+          "meets_expectation": 26,
+          "violates_expectation": 2,
+          "excluded": 12,
+          "unevaluable": 0,
+          "not_executed": 0
+        }
+      }
+    }
+  }
+}

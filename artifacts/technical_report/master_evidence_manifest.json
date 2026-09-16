@@ -94,25 +94,25 @@
     },
     {
       "id": "emotion_oces_analysis",
-      "path": "artifacts/emotion_oces_v1/analysis/analysis.json",
-      "sha256": "cb6d9c3531d60b05a628ff2a5ca65ba5f74b203a4d4cd1990f484e265db55e57",
-      "bytes": 78331,
+      "path": "artifacts/oces_baseline_link_v1/emotion.analysis.json",
+      "sha256": "f6b8d370ec2da883ebf5becd29a3911b7f9c6e28656c30bd1d0992a30ceaff20",
+      "bytes": 78515,
       "classification": "real",
       "evaluation_id": "emotion.oces",
       "section": "F",
-      "description": "Real paired emotion.oces run analysis (schema v3).",
-      "verified_sha256": "cb6d9c3531d60b05a628ff2a5ca65ba5f74b203a4d4cd1990f484e265db55e57"
+      "description": "Corrected OCES baseline association, reanalysed from preserved real emotion responses (schema v3).",
+      "verified_sha256": "f6b8d370ec2da883ebf5becd29a3911b7f9c6e28656c30bd1d0992a30ceaff20"
     },
     {
       "id": "emotion_oces_provenance",
-      "path": "artifacts/emotion_oces_v1/PROVENANCE.md",
-      "sha256": "2da16725be7c0934bfda5216bd97ae3bb540dd0a64448a10af8bd6545393fc76",
-      "bytes": 5155,
+      "path": "artifacts/oces_baseline_link_v1/PROVENANCE.md",
+      "sha256": "759860b55bfbdfb809e34bb3488c1afea17cc33d91ef5442d4210221f29b9c1a",
+      "bytes": 2475,
       "classification": "real",
       "evaluation_id": "emotion.oces",
       "section": "F",
-      "description": "Provenance and verified counts for the emotion.oces run.",
-      "verified_sha256": "2da16725be7c0934bfda5216bd97ae3bb540dd0a64448a10af8bd6545393fc76"
+      "description": "Provenance of the OCES scoring correction; original inference and evidence preserved.",
+      "verified_sha256": "759860b55bfbdfb809e34bb3488c1afea17cc33d91ef5442d4210221f29b9c1a"
     },
     {
       "id": "emotion_oces_freeze_hashes",
@@ -127,25 +127,25 @@
     },
     {
       "id": "sentiment_oces_analysis",
-      "path": "artifacts/sentiment_oces_v1/analysis/analysis.json",
-      "sha256": "18bc903eb63367bbd4a729ddfbce1b787f27a94b922f8235b41e714b55c2e4ce",
-      "bytes": 43161,
+      "path": "artifacts/oces_baseline_link_v1/sentiment.analysis.json",
+      "sha256": "a1bf469cead5afb39922f4b02f8b781d45907195e7ac7377edff887f87284086",
+      "bytes": 43526,
       "classification": "real",
       "evaluation_id": "sentiment.oces",
       "section": "F",
-      "description": "Real single-target sentiment.oces run analysis (schema v3).",
-      "verified_sha256": "18bc903eb63367bbd4a729ddfbce1b787f27a94b922f8235b41e714b55c2e4ce"
+      "description": "Corrected OCES baseline association, reanalysed from preserved real sentiment responses (schema v3).",
+      "verified_sha256": "a1bf469cead5afb39922f4b02f8b781d45907195e7ac7377edff887f87284086"
     },
     {
       "id": "sentiment_oces_provenance",
-      "path": "artifacts/sentiment_oces_v1/PROVENANCE.md",
-      "sha256": "f83cf273bc375d1ad2bf1ca6bf20ccf7aa13aae1f8aeafb51f350c27e35830ef",
-      "bytes": 4112,
+      "path": "artifacts/oces_baseline_link_v1/PROVENANCE.md",
+      "sha256": "759860b55bfbdfb809e34bb3488c1afea17cc33d91ef5442d4210221f29b9c1a",
+      "bytes": 2475,
       "classification": "real",
       "evaluation_id": "sentiment.oces",
       "section": "F",
-      "description": "Provenance and verified counts for the sentiment.oces run.",
-      "verified_sha256": "f83cf273bc375d1ad2bf1ca6bf20ccf7aa13aae1f8aeafb51f350c27e35830ef"
+      "description": "Provenance of the OCES scoring correction; original inference and evidence preserved.",
+      "verified_sha256": "759860b55bfbdfb809e34bb3488c1afea17cc33d91ef5442d4210221f29b9c1a"
     },
     {
       "id": "oces_review_sheet",
@@ -238,8 +238,8 @@
       "reason": "attacks/data/oces/oces_review_sheet.csv proposed_tier column contains zero GOLD rows (0 GOLD / 50 SILVER / 32 REVIEW of 82)."
     }
   ],
-  "rendered_index_sha256": "ce236c22602073c3eb7181990a254658654b42e80291bc74b4cb4c7d345bd2c7",
-  "rendered_pdf_sha256": "416631e137c76f380b11a17936d269a08a3a33c9c096772662fc5fc16f5da03d",
+  "rendered_index_sha256": "42d6011d685c3d96c4af4e7b461dd9c91d5f7124521d159512f8037e9608b5ff",
+  "rendered_pdf_sha256": "c6ea2c214c4c36a1a213879c08ff8bda634ae652fb61389a228c3129fc44e17f",
   "pdf_reproducibility_limit": "Verified non-reproducible: rendering this same HTML twice (including across separate processes with PYTHONHASHSEED fixed) produces report.pdf files that differ in length and SHA-256. This build's PDFs carry no /CreationDate or /ModDate at all, so the divergence is not a timestamp; it appears inside a compressed content stream, consistent with non-deterministic internal serialization (e.g. font-subsetting order) in WeasyPrint/pydyf. The rendered HTML and the PDF's actual page content are reproducible from the same evidence; the PDF file bytes are not. The recorded hash below identifies this specific committed file, not a value a fresh regeneration reproduces.",
-  "generated_at_utc": "2026-09-16T16:29:08.876400+00:00"
+  "generated_at_utc": "2026-09-16T22:55:40.926622+00:00"
 }

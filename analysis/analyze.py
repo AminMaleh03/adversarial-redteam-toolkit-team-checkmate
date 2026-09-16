@@ -849,7 +849,30 @@ def _unique_object(pairs):
     return result
 
 
-def load_results(path) -> list[RunResult]:
+def labels_from_meta(meta: dict):
+    """Read a run's declared label space out of its own recorded model block.
+
+    This is the source ``validation.resolve_identity`` names: rows that carry a
+    ``target_id`` must be scored against the label space that run actually recorded, never
+    against a fallback. run_meta is already an artifact analysis reads, so this adds no
+    import edge -- in particular analysis still does not read the target registry.
+
+    Returns ``None`` for a historical artifact with no model block, which is what keeps
+    the legacy path (rows with no ``target_id``) behaving exactly as before.
+    """
+    model = meta.get("model") if isinstance(meta, dict) else None
+    if not isinstance(model, dict) or "labels" not in model:
+        return None
+    labels = model["labels"]
+    if (not isinstance(labels, list) or not labels
+            or not all(isinstance(label, str) and label for label in labels)):
+        raise ValueError("run metadata model.labels is not a non-empty list of label names")
+    if len(set(labels)) != len(labels):
+        raise ValueError("run metadata model.labels contains duplicates")
+    return labels
+
+
+def load_results(path, *, labels=None, identity=None) -> list[RunResult]:
     """Read one version's JSONL result rows.
 
     A malformed line is raised, never skipped. Silently dropping a row would quietly
@@ -858,6 +881,10 @@ def load_results(path) -> list[RunResult]:
     failure the comparison is built to prevent. The error names the file, the line and
     the offending text, because a bare JSONDecodeError gives the reader nothing to act on
     -- a truncated or half-written results file is the realistic cause.
+
+    ``labels``/``identity`` carry the run's declared label space through to the row check.
+    Rows that declare a ``target_id`` cannot be validated without one, so a caller that
+    has read the run's model block passes it here.
     """
     results = []
     with open(path, encoding="utf-8") as handle:
@@ -877,7 +904,7 @@ def load_results(path) -> list[RunResult]:
                 results.append(RunResult(**row))
             except TypeError as exc:
                 raise ValueError(f"{path} line {line_number} does not match RunResult: {exc}") from exc
-    validate_rows(results)
+    validate_rows(results, labels=labels, identity=identity)
     return results
 
 
@@ -979,7 +1006,9 @@ def run_single_target_analysis(
     validate_manifest(manifest)
     manifest_sha = hashlib.sha256(manifest_bytes).hexdigest()
 
-    results = load_results(results_path)
+    # Same ordering reason as run_analysis: the row check needs the label space first.
+    # Here the caller states it explicitly, so it is passed straight through.
+    results = load_results(results_path, labels=labels)
     meta = load_run_meta(meta_path)
     identity = validation.resolve_identity(results, labels=labels)
     validate_run(results, meta, manifest, identity.version, manifest_sha, identity=identity)
@@ -1034,13 +1063,30 @@ def run_analysis(
         manifest_v2_sha = hashlib.sha256(v2_bytes).hexdigest()
         if v2_bytes != manifest_bytes:
             raise ValueError("V1 and V2 manifest files differ; cannot score both with one oracle set")
-    results_v1 = load_results(results_v1_path)
-    results_v2 = load_results(results_v2_path)
+    # Metadata is read before the rows, because the rows cannot be validated without the
+    # label space each run recorded in its own model block. Every recorded run now stamps
+    # target_id on its rows, and resolve_identity refuses to guess a label space for those
+    # -- correctly, since guessing is how an emotion oracle ends up scoring a sentiment
+    # run. Historical artifacts have no model block; labels stay None and the legacy path
+    # is untouched.
     meta_v1 = load_run_meta(meta_v1_path)
     meta_v2 = load_run_meta(meta_v2_path)
+    labels_v1 = labels_from_meta(meta_v1)
+    labels_v2 = labels_from_meta(meta_v2)
+    if labels_v1 is not None and labels_v2 is not None and list(labels_v1) != list(labels_v2):
+        raise ValueError(
+            "paired runs recorded different label spaces "
+            f"(v1={list(labels_v1)}, v2={list(labels_v2)}); they cannot be compared"
+        )
 
-    validate_run(results_v1, meta_v1, manifest, "v1", manifest_sha)
-    validate_run(results_v2, meta_v2, manifest, "v2", manifest_v2_sha)
+    results_v1 = load_results(results_v1_path, labels=labels_v1)
+    results_v2 = load_results(results_v2_path, labels=labels_v2)
+
+    identity_v1 = validation.resolve_identity(results_v1, labels=labels_v1, expected_version="v1")
+    identity_v2 = validation.resolve_identity(results_v2, labels=labels_v2, expected_version="v2")
+
+    validate_run(results_v1, meta_v1, manifest, "v1", manifest_sha, identity=identity_v1)
+    validate_run(results_v2, meta_v2, manifest, "v2", manifest_v2_sha, identity=identity_v2)
     if (meta_v1["fingerprints"]["planned_suite_sha256"] == meta_v2["fingerprints"]["planned_suite_sha256"]
             and meta_v1["case_ids"]["planned"] != meta_v2["case_ids"]["planned"]):
         raise ValueError("matching planned fingerprints have inconsistent planned case IDs/order")
@@ -1050,11 +1096,8 @@ def run_analysis(
             if row.baseline_id != v1_attacks[row.attack_id].baseline_id:
                 raise ValueError(f"{row.attack_id}: baseline association differs across versions")
 
-    identity_v1 = validation.resolve_identity(results_v1, expected_version="v1")
-    identity_v2 = validation.resolve_identity(results_v2, expected_version="v2")
-
-    analysis_v1 = analyze_version(results_v1, manifest)
-    analysis_v2 = analyze_version(results_v2, manifest)
+    analysis_v1 = analyze_version(results_v1, manifest, labels=labels_v1, identity=identity_v1)
+    analysis_v2 = analyze_version(results_v2, manifest, labels=labels_v2, identity=identity_v2)
     analysis_v1.version = "v1"
     analysis_v2.version = "v2"
 

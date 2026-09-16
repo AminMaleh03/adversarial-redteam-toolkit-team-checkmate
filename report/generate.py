@@ -34,12 +34,14 @@ HERE = Path(__file__).resolve().parent
 # where the bundle is copied, with no relative asset path and no external fetch.
 LOGO_PATH = HERE.parent / "Team Checkmate Logo.png"
 
-# Single source of truth for product identity strings (System V5.1), shared with web/app.py
-# so "Red Lab v5.0" etc. never drifts between the web app and generated reports.
+# Single source of truth for product identity strings, shared with web/app.py so the active
+# product version label never drifts between the web app and generated reports. The archived
+# /verified-full/ artifact is a frozen, pre-generated snapshot and is never re-rendered from
+# this constant -- only active pages and freshly generated reports read through it.
 CREATOR_NAME = "Team Checkmate"
 PRODUCT_NAME = "RED LAB"
 PRODUCT_TAGLINE = "Adversarial Testing Redefined"
-PRODUCT_VERSION_LABEL = "Red Lab v5.0"
+PRODUCT_VERSION_LABEL = "Red Lab v6.1"
 
 V3_REQUIRED_SUMMARY_FIELDS = (
     "target_id", "version", "task_id", "suite_id", "identity", "coverage",
@@ -504,7 +506,7 @@ def render_html(data, *, source_sha256, include_pdf=True, mode="full"):
     env = _environment()
     if data["schema_version"] == 3:
         return env.get_template("template_v3.html").render(
-            data=data, source_sha256=source_sha256, include_pdf=include_pdf,
+            data=data, source_sha256=source_sha256, include_pdf=include_pdf, mode=mode,
             css=HERE.joinpath("style.css").read_text(encoding="utf-8"),
             logo_data_uri=_logo_data_uri(), creator_name=CREATOR_NAME,
             product_name=PRODUCT_NAME, product_tagline=PRODUCT_TAGLINE,

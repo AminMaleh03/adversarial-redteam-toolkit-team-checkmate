@@ -55,6 +55,7 @@
             </select>
             <p id="lab-model-description" class="caption">The same emotion model through two endpoint configurations.</p>
           </div>
+          <script id="lab-descriptors" type="application/json">{{ lab_descriptors | tojson }}</script>
           <label for="lab-text" class="lab-label">Your sentence</label>
           <textarea id="lab-text" name="text" rows="4" maxlength="{{ lab_max_chars }}"
                    placeholder="I feel excited about what we can build together." aria-describedby="lab-counter lab-error" required></textarea>
@@ -80,28 +81,11 @@
           </div>
           <p id="lab-exec-percent" class="exec-percent" aria-hidden="true">0%</p>
 
-
-
-          <p id="lab-comparison-label" class="same-model-label">Same model <span>Two endpoint configurations</span></p>
-          <div id="lab-endpoint-context" class="version-context">
-            <div class="version-card v1" data-lane="v1" data-state="not-started">
-              <span class="lane-status">Not started</span>
-              <p class="version-card-title">V1 &mdash; Unhardened Endpoint</p>
-              <p class="version-card-note">No application-layer hardening.</p>
-            </div>
-            <div class="version-card v2" data-lane="v2" data-state="not-started">
-              <span class="lane-status">Not started</span>
-              <p class="version-card-title">V2 &mdash; Hardened Endpoint</p>
-              <p class="version-card-note">Input validation, length controls, exception handling and normalization.</p>
-            </div>
-          </div>
+          <p id="lab-comparison-label" class="same-model-label" hidden>Same model <span id="lab-comparison-note"></span></p>
+          <div id="lab-endpoint-context" class="version-context"></div>
           <p class="tracker-label">Experiment stages</p>
-          <ol class="stage-list" id="lab-stage-list">
-            {% for stage in lab_stage_order %}
-            <li data-stage="{{ stage }}">{{ lab_stage_labels[stage] }}</li>
-            {% endfor %}
-          </ol>
-          <p id="lab-exec-model-note" class="exec-model-note">Same underlying AI model in both cases &mdash; only the endpoint hardening differs.</p>
+          <ol class="stage-list" id="lab-stage-list"></ol>
+          <p id="lab-exec-model-note" class="exec-model-note"></p>
         </div>
 
         <div class="exec-failure" id="lab-exec-failure" hidden>
@@ -129,7 +113,7 @@
       <div class="execution-inner">
         <p class="exec-identity">{{ creator_name }} / {{ product_version_label }}</p>
         <h1 class="lab-heading">Live Red-Team Lab Results</h1>
-        <p class="notice warning">Interactive result &mdash; not part of the verified 1,928-case benchmark.</p>
+        <p class="notice warning">Interactive result &mdash; not part of the frozen verified evaluation suite.</p>
         <p id="lab-results-model-note" class="caption lab-model-note">Same underlying AI model in both cases &mdash; only the endpoint hardening differs.</p>
 
         <div id="lab-summary" class="lab-summary" aria-live="polite"></div>

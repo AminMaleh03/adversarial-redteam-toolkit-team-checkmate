@@ -362,3 +362,130 @@ Next: review/stage the four explicit files, confirm the live GitHub head is stil
 commit `fix(ci): normalize gate output paths`, push normally, and observe only its PR run.
 The main integration checkout's intentional `HANDOFF.md` remains byte-identical at SHA-256
 `901bfd4e739f0e9b1ea2d8dad173df6663fa203e2e56716da8a99048e9337ae2`.
+
+# RED LAB v6.1 — truthful target-aware runtime UI and interactive-result corrections
+
+2026-09-16T10:33:50+04:00, Claude Sonnet 5, Asia/Dubai. Branch `stage3/ahsan`, worked in a
+fresh git worktree at `C:\Users\ahsan\OneDrive\Desktop\stage3-ahsan` (the prior stale local
+`stage3/ahsan` branch ref, at old commit `257e15f`, was reset to track
+`origin/stage3/ahsan`). Observed pre-work HEAD `2aa883ebac6c9a92812757380d2dabfeccde4c42`,
+matching the user-stated authoritative remote head; base `stage3/integration` confirmed at
+`40ceef06cfecd10fb34ab53c5e41de35cd694ae8`. PR #11 remains open, draft, unmerged, targeting
+`stage3/integration`. The main integration checkout's uncommitted `HANDOFF.md` was not
+touched; it was independently verified to still hash to
+`901bfd4e739f0e9b1ea2d8dad173df6663fa203e2e56716da8a99048e9337ae2`. User authorized this
+scope in the v6.1 milestone brief (2026-09-16); no other exception requested.
+
+Root cause found before fixing anything: `web/app.py`'s Live Demo route always calls
+`run_all.run_experiment(..., evaluation_ids=[evaluation_id])`, so it always goes through
+`_run_registry_experiment` (schema v3), which renders through `report/template_v3.html` --
+`report/demo_template.html` (schema v2) is legacy/CLI-only and was already correct (no PDF
+link). The real Phase 4 defect was in `template_v3.html`'s unconditional
+`{% if include_pdf %}` Download PDF button, reachable by every demo run regardless of
+evaluation.
+
+Implemented (Ahsan-owned files only: `report/`, `run_all.py`, `web/`, `tests/`):
+
+- **Phase 1** — `report/generate.py`'s `PRODUCT_VERSION_LABEL` bumped to `"Red Lab v6.1"`
+  (the one place every live page and freshly generated report reads from). The archived
+  `/verified-full/` artifact under `artifacts/verified_full_report/` is a static, pre-generated
+  snapshot never re-rendered from this constant -- confirmed byte-identical (not in `git
+  status`) and its own literal `"Red Lab v5.0"` text was left untouched.
+- **Phase 2/3** — new `web/progress.py` defines a shared "descriptor" shape (cards, same-model
+  note, footer note, real stage order/percent, display stage list with each row's `maps_to`
+  real stage). `web/app.py` (`_demo_descriptor`) and `web/lab.py` (`_lab_descriptor`) each build
+  a paired (emotion.core) and a single-target (sentiment.core) descriptor; `index.html`/
+  `lab.html` embed both as JSON, and `chrome.js`'s new `rlRenderProgress`/generalized
+  `rlUpdateLanes` build the endpoint cards and stage checklist DOM from whichever descriptor
+  matches the real `evaluation_id` -- never pre-rendered V1/V2 markup hidden with CSS. Demo's
+  single-target list uses one combined real "attacking_target" event (the registry orchestrator
+  only emits one send-suite transition per target); the interactive Lab's single-target list is
+  more granular because `run_custom_lab`'s sentiment branch already makes two real calls (clean
+  reference, then variants) -- renamed its emitted stage ids to `starting_target`/
+  `clean_reference`/`adversarial_variants` accordingly.
+- **Phase 4** — `report/template_v3.html`'s Download PDF anchor now also requires `mode ==
+  'full'`; `run_all.py`'s `_run_registry_experiment` and `run_analysis_and_report` both force
+  `html_only` (skip PDF rendering entirely) whenever `mode == "demo"`, and pass the real mode
+  through to `report.generate` instead of a hardcoded `"full"` (CI's `mode="ci"` is mapped to
+  the `"full"` report style, since `report.generate` only knows `"full"`/`"demo"` presentation
+  modes -- unchanged from before). No demo run of either evaluation produces a `report.pdf`
+  file at all now, closing the class of bug regardless of exact prior reproduction path.
+- **Phase 5** — `lab.html`'s interactive-result disclaimer changed from the emotion-specific
+  "not part of the verified 1,928-case benchmark" to "not part of the frozen verified
+  evaluation suite".
+- **Phase 6** — `web/lab.py`'s `diagnose()` no longer collapses every non-flip outcome into
+  `NO_MATERIAL_EFFECT`. New `_distribution_shifted()` (TV distance > 0, itself already rounded
+  to 6dp -- no new threshold) splits the old bucket into `STABLE_LABEL_DISTRIBUTION_SHIFT`
+  ("Label stable; distribution shift observed") and `NO_OBSERVED_CHANGE` ("No observed
+  prediction change"). Paired mitigated/persists/regression codes, which already require an
+  actual flip, are unchanged. The single-target sentiment path gained the same honest
+  A/B/C framing (`LABEL_CHANGED` / `STABLE_LABEL_DISTRIBUTION_SHIFT` / `NO_OBSERVED_CHANGE`),
+  replacing its previous flat `"OBSERVED"` diagnosis for every variant.
+- **Phase 7** — `select_lab_variants` now returns a 4th element, `is_diagnostic`, read directly
+  from `attacks.metadata.ORACLE_DIAGNOSTIC` on the matched case's own pre-registered metadata
+  (never re-derived). Both `_build_result_payload` (paired) and `_build_single_result_payload`
+  (single-target) give a diagnostic case its own `DIAGNOSTIC_OBSERVATION` verdict, keep its
+  label change out of the scored `v1_flips`/`v2_flips`/`label_flips` counters, and add it to a
+  new, separate `diagnostic_observations`/`diagnostic_label_changes` summary count instead.
+  `attacks/` itself was not touched.
+- **Phase 8** — `select_lab_variants` now skips a catalogue entry whose matched case's
+  `attacked_text == original_text` (a genuine no-op for that input), logging the omission at
+  debug level, rather than counting or sending an unchanged duplicate. This is the same rule
+  for every evaluation (the function takes no evaluation_id), so emotion and sentiment can
+  legitimately see different applicable-variant counts for different input text without any
+  evaluation-specific branching.
+- Small additive CSS (`app.css`) for the new diagnosis badge classes; no layout/visual redesign.
+
+Deliberately NOT done (frozen/out of scope, confirmed unchanged): `contract.py`,
+`CONTRACTS.md`, `analysis/` (incl. policies/case_sets), `attacks/`, `runner/`, `endpoint/`,
+`baseline/`, `artifacts/verified_full_report/`, model revisions, OCES generator version,
+Docker, Hugging Face deployment, `/verified-full/` report content, and no new master
+technical report.
+
+Validation by this Claude session (Python 3.11, `.venv` from the main checkout, invoked
+against this worktree):
+- `tests/test_lab.py`: 61 passed (18 new/rewritten: version-source, PDF-omission-adjacent,
+  diagnosis relabeling incl. new `test_diagnosis_stable_label_distribution_shift`, diagnostic
+  truncation exclusion for both emotion and sentiment, no-op variant filtering, Cyrillic+Greek
+  co-applicability, single-target descriptor content, target-neutral disclaimer).
+- `tests/test_web.py`: 56 passed (rewrote 2 stale-markup tests to read the new
+  `demo-descriptors` JSON instead of removed static HTML; added centralized-version-source,
+  sentiment-single-target-descriptor, and sentiment-stage-alias tests).
+- `tests/test_report.py`: 122 passed (4 version-string literals updated to v6.1; added 3 new
+  v3 demo/full PDF-exposure tests).
+- `tests/test_run_all.py`: 30 passed (unaffected by the demo/PDF orchestration change).
+- `tests/test_gate.py`: 41 passed (confirms the CI gate path, which forces its own
+  `html_only`, is unaffected by the new demo-mode PDF suppression).
+- Combined run of the five files above: **313 passed**, 1 pre-existing Starlette deprecation
+  warning, no failures.
+- `tests/test_ui_browser.py`: 27 skipped (Playwright/browser not available in this
+  environment -- unchanged from before this work; not a regression).
+- `git diff --check`: clean (only a pre-existing LF/CRLF autocrlf notice on `app.js`).
+- Local smoke test: started `uvicorn web.app:app` on a scratch port; `/healthz` returned 200;
+  `/` and `/lab` both rendered `"Red Lab v6.1"`; the embedded `demo-descriptors`/
+  `lab-descriptors` JSON verified programmatically to hold `emotion.core: kind=paired` (two
+  V1/V2 cards, `same_model_note="Two endpoint configurations"`) and
+  `sentiment.core: kind=single` (one "Sentiment — Configured Target" card,
+  `same_model_note=null`, no paired vocabulary anywhere in its JSON); confirmed directly via
+  `report.render_html(..., mode="demo")` on the real `expected_analysis_v3.json` fixture that
+  `"Download PDF"` is absent in `demo` mode and present in `full` mode; server process
+  force-stopped afterward and confirmed unreachable.
+- Did not run: the full 1076+ suite, full emotion/sentiment core, OCES, Docker, CI policy
+  regeneration, or detailed technical-report generation (all out of scope per the brief).
+
+Not yet done as of this checkpoint: the code above is validated and ready but **not yet
+staged, committed, or pushed** -- that is the immediate next action. Once committed, this
+entry should be treated as pre-commit; the actual final SHA will be visible in `git log` and
+the PR (a commit cannot record its own hash). Expect origin/stage3/ahsan to still be at
+`2aa883e` at push time; if it has advanced, stop and reconcile before pushing.
+
+Explicitly deferred to v6.2+ (per the brief -- do not start): application commit provenance
+fix; emotion common paired denominator; sentiment conditional report limitations; replacement
+of `/verified-full/`; multi-target master technical report; new technical-report PDF; OCES
+master-report sections; CI evidence report section; broad visual redesign; responsive/mobile
+polish; Docker rebuild; deployment; final Red Lab v7.0 branding.
+
+Next: stage the 15 files listed above explicitly (never `git add -A`/`.`), commit as
+`feat(v6.1): make runtime UI target-aware`, fetch origin and confirm `origin/stage3/ahsan`
+is still `2aa883e`, push normally (no force), observe the one triggered gate run, confirm
+deployment is skipped, and leave PR #11 draft and unmerged. Do not touch Hugging Face.

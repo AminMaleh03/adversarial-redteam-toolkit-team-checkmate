@@ -499,8 +499,11 @@ mark.demo-mark { background: #f6c453; color: #3a2c05; padding: 0 1px; border-rad
 .lab-diagnosis-mitigated_by_v2 { border-color: var(--rl-success); color: var(--rl-success); }
 .lab-diagnosis-persists_after_hardening { border-color: var(--rl-danger); color: var(--rl-danger); }
 .lab-diagnosis-v2_regression { border-color: var(--rl-warning); color: var(--rl-warning); }
-.lab-diagnosis-no_material_effect { border-color: var(--rl-muted); color: var(--rl-muted); }
+.lab-diagnosis-no_observed_change { border-color: var(--rl-muted); color: var(--rl-muted); }
 .lab-diagnosis-inconclusive { border-color: var(--rl-muted); color: var(--rl-muted); }
+.lab-diagnosis-label_changed { border-color: var(--rl-warning); color: var(--rl-warning); }
+.lab-diagnosis-stable_label_distribution_shift { border-color: var(--rl-warning); color: var(--rl-warning); }
+.lab-diagnosis-diagnostic_observation { border-color: var(--rl-muted); color: var(--rl-muted); }
 
 .lab-diff { margin: 14px 0; font-size: 14px; }
 .lab-diff-line { margin: 6px 0; line-height: 1.6; overflow-wrap: anywhere; }

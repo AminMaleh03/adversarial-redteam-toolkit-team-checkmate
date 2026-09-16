@@ -583,7 +583,7 @@ def test_demo_hero_uses_functional_identity_not_marketing_copy(demo_data):
     assert "in one minute" not in result
     assert "V1" in result and "Unhardened Endpoint" in result
     assert "V2" in result and "Hardened Endpoint" in result
-    assert "Red Lab v5.0" in result and "Team Checkmate" in result
+    assert "Red Lab v6.1" in result and "Team Checkmate" in result
 
 
 def test_demo_crash_note_is_a_small_caption_not_a_warning_box(demo_data):
@@ -648,7 +648,7 @@ def test_reports_credit_team_checkmate_and_show_red_lab_version(demo_data):
     for mode in ("demo", "full"):
         result = html(demo_data, mode=mode)
         assert "Team Checkmate" in result
-        assert "Red Lab v5.0" in result
+        assert "Red Lab v6.1" in result
 
 
 # ----------------------------------------------------------------------------------------
@@ -722,7 +722,7 @@ def test_reports_masthead_brand_shows_version_label(demo_data):
         header = result[result.index("<header"):result.index("</header>")]
         assert "Team Checkmate" in header
         assert 'class="brand-creator"' in header
-        assert "Red Lab v5.0" in header
+        assert "Red Lab v6.1" in header
 
 
 def test_reports_masthead_brand_uses_shared_class_names_with_web_app(demo_data):
@@ -1030,7 +1030,7 @@ def test_full_report_analysis_schema_not_a_hero_badge(data):
     assert "Analysis schema" not in hero  # moved out of the hero entirely
     provenance = result[result.index('id="provenance"'):result.index("</section>", result.index('id="provenance"'))]
     assert "Analysis schema v2" in provenance
-    assert "Red Lab v5.0" in provenance  # product version, a distinct concept, still present
+    assert "Red Lab v6.1" in provenance  # product version, a distinct concept, still present
 
 
 def test_full_report_remediation_architecture_preserved(data):
@@ -1172,3 +1172,31 @@ def test_v3_bundle_preserves_source_bytes_and_records_schema(tmp_path):
     meta = json.loads((output / "export_meta.json").read_text(encoding="utf-8"))
     assert meta["analysis_schema_version"] == 3
     assert meta["source_sha256"] == hashlib.sha256(raw).hexdigest()
+
+
+def test_v3_demo_report_never_exposes_a_download_pdf_button():
+    # v6.1 Phase 4: a v3 (target-aware) Live Demo report -- the shape both emotion.core and
+    # sentiment.core actually render through -- must never carry a PDF download link.
+    payload = _stage3_document()
+    demo_html = report.render_html(payload, source_sha256="c" * 64, include_pdf=True, mode="demo")
+    assert "Download PDF" not in demo_html
+    assert "Source JSON" in demo_html
+    assert "Back to Red Lab" in demo_html
+
+
+def test_v3_full_report_still_offers_a_download_pdf_button():
+    # The archived/verified and any future master technical report must keep the PDF button --
+    # this milestone only removes it from Live Demo reports.
+    payload = _stage3_document()
+    full_html = report.render_html(payload, source_sha256="c" * 64, include_pdf=True, mode="full")
+    assert "Download PDF" in full_html
+
+
+def test_v3_demo_report_pdf_omitted_regardless_of_evaluation_kind():
+    # v6.1 Phase 4: neither the paired (emotion) nor the single-target (sentiment) evaluation
+    # block in a v3 demo report can expose a PDF link -- this is a mode-wide gate, not per-kind.
+    payload = _stage3_document()
+    kinds = {evaluation["kind"] for evaluation in payload["evaluations"]}
+    assert {"paired", "single"} <= kinds  # sanity: fixture actually covers both kinds
+    demo_html = report.render_html(payload, source_sha256="c" * 64, include_pdf=True, mode="demo")
+    assert "Download PDF" not in demo_html

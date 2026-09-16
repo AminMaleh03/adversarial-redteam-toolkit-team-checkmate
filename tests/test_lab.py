@@ -105,6 +105,58 @@ def test_home_page_advertises_try_your_own_input(client):
     assert 'href="/lab"' in body
 
 
+def test_lab_paired_descriptor_has_v1_v2_cards_and_comparison_stages():
+    # v6.1 Phase 3: emotion.core keeps the paired progress structure -- two endpoint cards,
+    # a comparison note, and V1/V2 stage labels.
+    descriptor = lab_module.all_lab_descriptors()["emotion.core"]
+    assert descriptor["kind"] == "paired"
+    lanes = {c["lane"] for c in descriptor["cards"]}
+    assert lanes == {"v1", "v2"}
+    assert descriptor["same_model_note"] == "Two endpoint configurations"
+    labels = {s["id"]: s["label"] for s in descriptor["stages"]}
+    assert labels["starting_v1"] == "Starting V1"
+    assert labels["starting_v2"] == "Starting V2"
+
+
+def test_lab_single_target_descriptor_has_no_paired_content():
+    # v6.1 Phase 3: sentiment.core must render one configured-target card, no V1/V2 cards,
+    # no "Two endpoint configurations", and no hardened-comparison stage wording.
+    descriptor = lab_module.all_lab_descriptors()["sentiment.core"]
+    assert descriptor["kind"] == "single"
+    assert len(descriptor["cards"]) == 1
+    assert descriptor["cards"][0]["lane"] == "target"
+    assert descriptor["same_model_note"] is None
+    blob = str(descriptor)
+    for forbidden in (
+        "V1 — Unhardened Endpoint", "V2 — Hardened Endpoint",
+        "Two endpoint configurations", "Starting V1", "Starting V2",
+        "Running clean V1 reference", "Running clean V2 reference",
+        "Testing V1 adversarial variants", "Testing V2 adversarial variants",
+        "Analyzing differences",
+    ):
+        assert forbidden not in blob
+
+
+def test_switching_evaluation_removes_stale_paired_content(client):
+    # v6.1 Phase 9 item 5/6: the same page must be able to describe either evaluation
+    # correctly -- the sentiment descriptor and the emotion descriptor must never share
+    # paired-only vocabulary.
+    descriptors = lab_module.all_lab_descriptors()
+    emotion_titles = {c["title"] for c in descriptors["emotion.core"]["cards"]}
+    sentiment_titles = {c["title"] for c in descriptors["sentiment.core"]["cards"]}
+    assert emotion_titles.isdisjoint(sentiment_titles)
+    assert descriptors["emotion.core"]["kind"] != descriptors["sentiment.core"]["kind"]
+
+
+def test_lab_interactive_disclaimer_is_target_neutral(client):
+    # v6.1 Phase 5: the 1,928 figure is emotion-specific; sentiment.core has a different
+    # planned case count, so the interactive disclaimer must not hardcode either number.
+    body = client.get("/lab").text
+    assert "not part of the frozen verified evaluation suite" in body
+    assert "1,928" not in body
+    assert "1,931" not in body
+
+
 # ------------------------------------------------------------------------------------------
 # Server-side input validation
 # ------------------------------------------------------------------------------------------
@@ -291,8 +343,8 @@ _DISALLOWED_SUBFAMILY_MARKERS = ("type_confusion", "oversized", "deeply_nested",
 def test_custom_lab_attacks_selection_is_deterministic():
     baseline_a = lab_module.build_lab_baseline("I am so happy about this result today", "jobA")
     baseline_b = lab_module.build_lab_baseline("I am so happy about this result today", "jobA")
-    ids_a = [case.attack_id for case, _label, _desc in lab_module.select_lab_variants(baseline_a)]
-    ids_b = [case.attack_id for case, _label, _desc in lab_module.select_lab_variants(baseline_b)]
+    ids_a = [case.attack_id for case, _label, _desc, _diag in lab_module.select_lab_variants(baseline_a)]
+    ids_b = [case.attack_id for case, _label, _desc, _diag in lab_module.select_lab_variants(baseline_b)]
     assert ids_a == ids_b
     assert 6 <= len(ids_a) <= 10
 
@@ -310,7 +362,7 @@ def test_custom_lab_attacks_genuinely_derive_from_arbitrary_text():
     )
     variants = lab_module.select_lab_variants(baseline)
     assert variants
-    for case, _label, _desc in variants:
+    for case, _label, _desc, _diag in variants:
         assert case.original_text == baseline.text
         assert case.attacked_text != baseline.text
         assert case.baseline_id == baseline.baseline_id
@@ -320,6 +372,44 @@ def test_custom_lab_attacks_short_input_still_yields_variants():
     baseline = lab_module.build_lab_baseline("I am glad", "jobD")
     variants = lab_module.select_lab_variants(baseline)
     assert len(variants) >= 6  # truncation.signal_head_only needs >=4 words and may be absent
+
+
+def test_custom_lab_attacks_third_element_marks_truncation_as_diagnostic():
+    baseline = lab_module.build_lab_baseline(
+        "The customer service team was not very helpful today", "jobDiagFlag",
+    )
+    variants = lab_module.select_lab_variants(baseline)
+    by_label = {label: is_diagnostic for _case, label, _desc, is_diagnostic in variants}
+    assert by_label.get("Sentence truncation (head only)") is True
+    non_truncation = [v for k, v in by_label.items() if k != "Sentence truncation (head only)"]
+    assert all(v is False for v in non_truncation)
+
+
+def test_select_lab_variants_never_returns_a_no_op_transformation():
+    # v6.1 Phase 8: a catalogue entry whose one dose/position match doesn't actually change
+    # this input's text must be omitted, never counted as "tested" or sent unchanged.
+    baseline = lab_module.build_lab_baseline(
+        "The quick fox jumped over something unusual near the old bridge", "jobNoOp",
+    )
+    for case, _label, _desc, _diag in lab_module.select_lab_variants(baseline):
+        assert case.attacked_text != case.original_text
+
+
+def test_homoglyph_cyrillic_and_greek_both_apply_when_input_has_eligible_letters():
+    # v6.1 Phase 8: a text rich in Latin letters confusable under BOTH the curated Cyrillic and
+    # Greek tables (a, o, p all appear in both -- see attacks/data/uts39_confusables_curated.txt)
+    # must yield both homoglyph variants, applying the same applicability rule either flow uses.
+    baseline = lab_module.build_lab_baseline(
+        "A capable panel operates a popular apparatus among a dozen operators today", "jobHomo",
+    )
+    variants = lab_module.select_lab_variants(baseline)
+    by_label = {label: case for case, label, _desc, _diag in variants}
+    assert "Cyrillic homoglyph substitution" in by_label
+    assert "Greek homoglyph substitution" in by_label
+    assert by_label["Cyrillic homoglyph substitution"].attacked_text != baseline.text
+    assert by_label["Greek homoglyph substitution"].attacked_text != baseline.text
+    assert (by_label["Cyrillic homoglyph substitution"].attacked_text
+            != by_label["Greek homoglyph substitution"].attacked_text)
 
 
 # ------------------------------------------------------------------------------------------
@@ -385,13 +475,29 @@ def test_diagnosis_persists_after_hardening():
     assert code == "PERSISTS_AFTER_HARDENING"
 
 
-def test_diagnosis_no_material_effect():
+def test_diagnosis_no_observed_change():
+    # v6.1 Phase 6: no flip AND effectively zero recorded distribution change.
     v1_clean = _fake_run_result(version="v1", case=None, label="joy")
     v1_attacked = _fake_run_result(version="v1", case=_FIXTURE_CASE, label="joy")
     v2_clean = _fake_run_result(version="v2", case=None, label="joy")
     v2_attacked = _fake_run_result(version="v2", case=_FIXTURE_CASE, label="joy")
-    code, _ = lab_module.diagnose(v1_clean, v1_attacked, v2_clean, v2_attacked)
-    assert code == "NO_MATERIAL_EFFECT"
+    code, remediation = lab_module.diagnose(v1_clean, v1_attacked, v2_clean, v2_attacked)
+    assert code == "NO_OBSERVED_CHANGE"
+    assert remediation == lab_module.REMEDIATION["NO_OBSERVED_CHANGE"]
+    assert "no material effect" not in lab_module.DIAGNOSIS_LABELS[code].lower()
+
+
+def test_diagnosis_stable_label_distribution_shift():
+    # v6.1 Phase 6: label stable on both endpoints, but the distribution moved -- must not
+    # be reported as "no material effect"/"no observed change".
+    v1_clean = _fake_run_result(version="v1", case=None, label="joy", confidence=0.95)
+    v1_attacked = _fake_run_result(version="v1", case=_FIXTURE_CASE, label="joy", confidence=0.6)
+    v2_clean = _fake_run_result(version="v2", case=None, label="joy", confidence=0.95)
+    v2_attacked = _fake_run_result(version="v2", case=_FIXTURE_CASE, label="joy", confidence=0.6)
+    code, remediation = lab_module.diagnose(v1_clean, v1_attacked, v2_clean, v2_attacked)
+    assert code == "STABLE_LABEL_DISTRIBUTION_SHIFT"
+    assert remediation == lab_module.REMEDIATION["STABLE_LABEL_DISTRIBUTION_SHIFT"]
+    assert lab_module.total_variation_distance(v1_clean.all_scores, v1_attacked.all_scores) > 0.0
 
 
 def test_diagnosis_v2_regression():
@@ -410,6 +516,85 @@ def test_diagnosis_inconclusive_when_clean_reference_invalid():
     v2_attacked = _fake_run_result(version="v2", case=_FIXTURE_CASE, label="joy")
     code, _ = lab_module.diagnose(v1_clean, v1_attacked, v2_clean, v2_attacked)
     assert code == "INCONCLUSIVE"
+
+
+# ------------------------------------------------------------------------------------------
+# v6.1 Phase 7: diagnostic (no-fixed-oracle) truncation must never be auto-scored
+# ------------------------------------------------------------------------------------------
+
+
+def test_diagnostic_truncation_excluded_from_scored_flips_emotion(monkeypatch):
+    class FakeHandle:
+        def __init__(self, version):
+            self.version = version
+            self.url = f"http://127.0.0.1:0/{version}"
+
+        def stop(self):
+            pass
+
+    def fake_start_endpoint(version, out_dir):
+        out_dir.mkdir(parents=True, exist_ok=True)
+        return FakeHandle(version)
+
+    def fake_send_case(base_url, version, text, case, baseline_id):
+        if case is not None and case.category == "truncation":
+            # Removing the back half of the sentence changes what the model sees -- the
+            # label genuinely flips, but that reflects lost content, not a scored vulnerability.
+            return _fake_run_result(version=version, case=case, label="sadness", confidence=0.7)
+        return _fake_run_result(version=version, case=case, label="joy", confidence=0.9)
+
+    monkeypatch.setattr(run_all, "start_endpoint", fake_start_endpoint)
+    monkeypatch.setattr(lab_module, "send_case", fake_send_case)
+
+    payload = lab_module.run_custom_lab(
+        "job-diag-emotion", "The customer service team was not very helpful today at all",
+        lambda stage, message: None,
+    )
+    diagnostic_variants = [v for v in payload["variants"] if v["is_diagnostic"]]
+    assert diagnostic_variants, "expected the truncation catalogue entry to apply to this input"
+    variant = diagnostic_variants[0]
+    assert variant["diagnosis"] == "DIAGNOSTIC_OBSERVATION"
+    assert variant["diagnosis_label"] == lab_module.DIAGNOSIS_LABELS["DIAGNOSTIC_OBSERVATION"]
+    assert "meaning" in variant["remediation"].lower()
+    assert variant["v1"]["flip"] is True  # the label change is real and is reported
+    # ...but it must never be folded into the automatically-scored counters.
+    assert payload["summary"]["v1_flips"] == 0
+    assert payload["summary"]["diagnostic_label_changes"] >= 1
+    assert payload["summary"]["diagnostic_observations"] >= 1
+
+
+def test_diagnostic_truncation_excluded_from_scored_flips_sentiment(monkeypatch):
+    class FakeHandle:
+        url = "http://127.0.0.1:8002"
+
+        def stop(self):
+            pass
+
+    monkeypatch.setattr(run_all, "start_target", lambda *args: FakeHandle())
+
+    def fake_send(base_url, version, text, case, baseline_id, **identity):
+        if case is not None and case.category == "truncation":
+            return _fake_run_result(
+                version="v1", case=case, label="NEGATIVE", confidence=0.7,
+                all_scores={"NEGATIVE": 0.7, "POSITIVE": 0.3},
+            )
+        return _fake_run_result(
+            version="v1", case=case, label="POSITIVE", confidence=0.9,
+            all_scores={"NEGATIVE": 0.1, "POSITIVE": 0.9},
+        )
+
+    monkeypatch.setattr(lab_module, "send_case", fake_send)
+    payload = lab_module.run_custom_lab(
+        "job-diag-sentiment", "The customer service was not nice at all this afternoon",
+        lambda *_: None, evaluation_id="sentiment.core",
+    )
+    diagnostic_variants = [v for v in payload["variants"] if v["is_diagnostic"]]
+    assert diagnostic_variants, "expected the truncation catalogue entry to apply to this input"
+    variant = diagnostic_variants[0]
+    assert variant["diagnosis"] == "DIAGNOSTIC_OBSERVATION"
+    assert variant["target"]["flip"] is True
+    assert payload["summary"]["label_flips"] == 0
+    assert payload["summary"]["diagnostic_label_changes"] >= 1
 
 
 # ------------------------------------------------------------------------------------------
@@ -447,10 +632,12 @@ def test_run_custom_lab_pipeline_produces_real_counts(monkeypatch):
     )
     assert payload["summary"]["variants_tested"] == len(payload["variants"])
     assert payload["summary"]["variants_tested"] >= 6
-    # uniform "joy" everywhere -> no flips, no rejections/errors, everything no-material-effect
+    # uniform "joy" everywhere -> no flips, no rejections/errors, everything no-observed-change
+    # except any diagnostic (no-fixed-oracle) truncation variant, which is never auto-scored.
     assert payload["summary"]["v1_flips"] == 0
     assert payload["summary"]["v2_flips"] == 0
-    assert payload["summary"]["no_material_effect"] == payload["summary"]["variants_tested"]
+    non_diagnostic = payload["summary"]["variants_tested"] - payload["summary"]["diagnostic_observations"]
+    assert payload["summary"]["no_observed_change"] == non_diagnostic
     assert stages[0] == "starting_v1"
     assert stages[-1] == "complete"
     for variant in payload["variants"]:

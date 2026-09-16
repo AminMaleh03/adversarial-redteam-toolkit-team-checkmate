@@ -46,6 +46,7 @@ from attacks import library as attack_library  # noqa: E402
 from attacks import metadata as attack_metadata  # noqa: E402
 from contract import AttackCase, BaselineCase, RunResult  # noqa: E402
 from runner import run as runner_run  # noqa: E402
+from web import progress as progress_module  # noqa: E402
 
 logger = logging.getLogger("team_checkmate.web.lab")
 
@@ -57,11 +58,17 @@ logger = logging.getLogger("team_checkmate.web.lab")
 # the live counter and the server's own rejection never drift apart.
 MAX_INPUT_CHARS = 800
 
-LAB_STAGE_ORDER = (
+# v6.1 Phase 3: paired (emotion) vs single-target (sentiment) get distinct descriptors -- the
+# single-target flow genuinely runs one target, with its own real "clean reference" step
+# (run_custom_lab's sentiment branch calls send_case for the clean reference and then, in a
+# separate call, for the variants -- these are two real events here, unlike the Live Demo's
+# combined suite send), so it earns its own distinct stage list rather than reusing the paired
+# one or hiding cards with CSS.
+PAIRED_LAB_STAGE_ORDER = (
     "preparing", "starting_v1", "clean_v1", "attacking_v1",
     "starting_v2", "clean_v2", "attacking_v2", "analyzing", "complete",
 )
-LAB_STAGE_LABELS = {
+PAIRED_LAB_STAGE_LABELS = {
     "preparing": "Preparing custom test",
     "starting_v1": "Starting V1",
     "clean_v1": "Running clean V1 reference",
@@ -72,7 +79,71 @@ LAB_STAGE_LABELS = {
     "analyzing": "Analyzing differences",
     "complete": "Complete",
 }
-LAB_STAGE_PERCENT = dict(zip(LAB_STAGE_ORDER, (5, 15, 30, 45, 55, 70, 85, 95, 100)))
+PAIRED_LAB_STAGE_PERCENT = dict(zip(PAIRED_LAB_STAGE_ORDER, (5, 15, 30, 45, 55, 70, 85, 95, 100)))
+
+SINGLE_LAB_STAGE_ORDER = (
+    "preparing", "starting_target", "clean_reference", "adversarial_variants",
+    "analyzing", "complete",
+)
+SINGLE_LAB_STAGE_LABELS = {
+    "preparing": "Preparing custom test",
+    "starting_target": "Starting sentiment target",
+    "clean_reference": "Running clean reference",
+    "adversarial_variants": "Testing sentiment adversarial variants",
+    "analyzing": "Analyzing observations",
+    "complete": "Complete",
+}
+SINGLE_LAB_STAGE_PERCENT = dict(zip(SINGLE_LAB_STAGE_ORDER, (5, 20, 40, 60, 85, 100)))
+
+# Backward-compatible aliases (paired flow only) -- kept because several call sites below still
+# read these under their original names.
+LAB_STAGE_ORDER = PAIRED_LAB_STAGE_ORDER
+LAB_STAGE_LABELS = PAIRED_LAB_STAGE_LABELS
+LAB_STAGE_PERCENT = PAIRED_LAB_STAGE_PERCENT
+
+
+def _lab_descriptor(evaluation_id: str, target_ids: Optional[list] = None) -> dict:
+    if evaluation_id == "sentiment.core":
+        target_id = (target_ids or ["sentiment_v1"])[0]
+        return progress_module.descriptor(
+            evaluation_id=evaluation_id, kind="single", target_ids=target_ids or ["sentiment_v1"],
+            same_model_note=None,
+            footer_note="Single-target sentiment evaluation; no V1/V2 comparison is implied.",
+            cards=[progress_module.card(
+                "target", "Sentiment — Configured Target",
+                f"{target_id} · single-target evaluation; no V1/V2 comparison is implied.",
+                start_stage="starting_target", end_stage="adversarial_variants",
+            )],
+            stage_order=list(SINGLE_LAB_STAGE_ORDER), stage_percent=SINGLE_LAB_STAGE_PERCENT,
+            stages=[progress_module.stage(s, SINGLE_LAB_STAGE_LABELS[s])
+                    for s in SINGLE_LAB_STAGE_ORDER],
+        )
+    return progress_module.descriptor(
+        evaluation_id=evaluation_id, kind="paired",
+        target_ids=target_ids or ["emotion_v1", "emotion_v2"],
+        same_model_note="Two endpoint configurations",
+        footer_note="Same underlying AI model in both cases — only endpoint hardening differs.",
+        cards=[
+            progress_module.card(
+                "v1", "V1 — Unhardened Endpoint", "No application-layer hardening.",
+                start_stage="starting_v1", end_stage="attacking_v1",
+            ),
+            progress_module.card(
+                "v2", "V2 — Hardened Endpoint",
+                "Input validation, length controls, exception handling and normalization.",
+                start_stage="starting_v2", end_stage="attacking_v2",
+            ),
+        ],
+        stage_order=list(PAIRED_LAB_STAGE_ORDER), stage_percent=PAIRED_LAB_STAGE_PERCENT,
+        stages=[progress_module.stage(s, PAIRED_LAB_STAGE_LABELS[s]) for s in PAIRED_LAB_STAGE_ORDER],
+    )
+
+
+def all_lab_descriptors() -> dict:
+    return {
+        "emotion.core": _lab_descriptor("emotion.core"),
+        "sentiment.core": _lab_descriptor("sentiment.core"),
+    }
 
 # One authoritative, documented curated selection (brief section 13) -- matched against real
 # attacks.metadata fields after attacks.library.build_derived(baseline), never guessed from the
@@ -103,9 +174,12 @@ CUSTOM_LAB_ATTACKS: tuple[tuple[str, str, Optional[int], Optional[str], str, str
 DIAGNOSIS_LABELS = {
     "MITIGATED_BY_V2": "Mitigated by V2",
     "PERSISTS_AFTER_HARDENING": "Persists after hardening",
-    "NO_MATERIAL_EFFECT": "No material effect observed",
+    "LABEL_CHANGED": "Label changed",
+    "STABLE_LABEL_DISTRIBUTION_SHIFT": "Label stable; distribution shift observed",
+    "NO_OBSERVED_CHANGE": "No observed prediction change",
     "V2_REGRESSION": "V2 regression / investigate",
     "INCONCLUSIVE": "Inconclusive",
+    "DIAGNOSTIC_OBSERVATION": "Diagnostic observation (no fixed oracle)",
 }
 
 # Deterministic mapping only -- never generated by an LLM (brief section 19).
@@ -123,12 +197,30 @@ REMEDIATION = {
         "Investigate the V2 preprocessing/validation path before treating the hardened "
         "endpoint as improved for this case."
     ),
-    "NO_MATERIAL_EFFECT": (
-        "No action needed -- this variant showed no meaningful effect on either endpoint."
+    "LABEL_CHANGED": (
+        "This is a single-target exploratory result showing a label change. Reproduce it "
+        "against the same pinned target before drawing conclusions about model or endpoint "
+        "controls."
+    ),
+    "STABLE_LABEL_DISTRIBUTION_SHIFT": (
+        "The top label did not change, but the full probability distribution moved materially "
+        "on at least one endpoint. This is not a flip, but the shift is worth tracking -- do "
+        "not report it as 'no effect'."
+    ),
+    "NO_OBSERVED_CHANGE": (
+        "No action needed -- this variant produced no recorded change in the top label or the "
+        "probability distribution on the endpoint(s) tested."
     ),
     "INCONCLUSIVE": (
         "Required evidence is missing for this comparison; re-run the test or inspect the "
         "endpoint response before drawing a conclusion."
+    ),
+    "DIAGNOSTIC_OBSERVATION": (
+        "This transformation can remove the sentence content that carried the original label "
+        "(see attacks.metadata's diagnostic/no-fixed-oracle classification for this case), so "
+        "any label change here reflects lost meaning rather than a meaning-preserving model "
+        "vulnerability. Treat it as a diagnostic observation, not a scored finding, and do not "
+        "infer a hardening or model-remediation requirement from it alone."
     ),
 }
 
@@ -150,8 +242,22 @@ def build_lab_baseline(text: str, job_id: str) -> BaselineCase:
                         source="interactive_lab")
 
 
-def select_lab_variants(baseline: BaselineCase) -> list[tuple[AttackCase, str, str]]:
+def select_lab_variants(baseline: BaselineCase) -> list[tuple[AttackCase, str, str, bool]]:
     """Curated, deterministic subset of attacks.library.build_derived(baseline).
+
+    Returns ``(case, label, description, is_diagnostic)`` tuples. ``is_diagnostic`` is read
+    straight from the attack's own pre-registered metadata (``attacks.metadata.ORACLE_DIAGNOSTIC``
+    -- see attacks/truncation.py) -- never re-derived or guessed here -- and marks a case such as
+    signal-truncating truncation that has no fixed label oracle, so callers must not auto-score it
+    as a vulnerability (v6.1 Phase 7).
+
+    A catalogue entry is only included if its matched attack case actually changes the text
+    (``case.attacked_text != case.original_text``); an entry whose one dose/position match is a
+    no-op for this particular input is genuinely not applicable here and is silently omitted
+    (logged at debug level for diagnostics), never sent to the endpoint or counted as "tested"
+    (v6.1 Phase 8). This is the same applicability rule for every evaluation -- emotion and
+    sentiment both call this one function on the same catalogue, so neither can see an
+    evaluation-specific variant count; only the input text can make a transformation inapplicable.
 
     Wrapped in a save/restore of attacks.metadata's process-global registry (see
     _isolated_attack_registry below) -- this is the fix for a real cross-contamination bug
@@ -171,8 +277,9 @@ def select_lab_variants(baseline: BaselineCase) -> list[tuple[AttackCase, str, s
     """
     with _isolated_attack_registry():
         derived = attack_library.build_derived(baseline)
-        selected: list[tuple[AttackCase, str, str]] = []
+        selected: list[tuple[AttackCase, str, str, bool]] = []
         for family, subfamily, dose, position, label, desc in CUSTOM_LAB_ATTACKS:
+            match = None
             for case in derived:
                 meta = attack_metadata.metadata_for(case.attack_id)
                 if meta is None or meta.family != family or meta.subfamily != subfamily:
@@ -181,8 +288,17 @@ def select_lab_variants(baseline: BaselineCase) -> list[tuple[AttackCase, str, s
                     continue
                 if position is not None and meta.position != position:
                     continue
-                selected.append((case, label, desc))
+                match = (case, meta)
                 break
+            if match is None:
+                logger.debug("Lab variant %r not applicable: no matching derived case", label)
+                continue
+            case, meta = match
+            if case.attacked_text == case.original_text:
+                logger.debug("Lab variant %r omitted: transformation produced no change", label)
+                continue
+            is_diagnostic = meta.oracle == attack_metadata.ORACLE_DIAGNOSTIC
+            selected.append((case, label, desc, is_diagnostic))
     return selected
 
 
@@ -358,6 +474,15 @@ def _adverse(clean: RunResult, attacked: RunResult) -> Optional[bool]:
     return flip
 
 
+def _distribution_shifted(clean: RunResult, attacked: RunResult) -> bool:
+    """True if the recorded probability distribution moved at all (v6.1 Phase 6) -- a label
+    can stay stable while the full distribution still shifts materially, and that is a
+    genuinely different, honestly-reported outcome from "no effect". Missing scores (no
+    evidence either way) are treated as no recorded shift, never fabricated as one."""
+    tv = total_variation_distance(clean.all_scores, attacked.all_scores)
+    return bool(tv)
+
+
 def diagnose(v1_clean: RunResult, v1_attacked: RunResult,
             v2_clean: RunResult, v2_attacked: RunResult) -> tuple[str, str]:
     v1_adverse = _adverse(v1_clean, v1_attacked)
@@ -370,8 +495,12 @@ def diagnose(v1_clean: RunResult, v1_attacked: RunResult,
         code = "PERSISTS_AFTER_HARDENING"
     elif not v1_adverse and v2_adverse:
         code = "V2_REGRESSION"
+    elif _distribution_shifted(v1_clean, v1_attacked) or _distribution_shifted(v2_clean, v2_attacked):
+        # Neither endpoint's top label flipped, but v6.1 Phase 6: "no flip" must never be
+        # reported as "no effect" when the recorded distribution moved.
+        code = "STABLE_LABEL_DISTRIBUTION_SHIFT"
     else:
-        code = "NO_MATERIAL_EFFECT"
+        code = "NO_OBSERVED_CHANGE"
     return code, REMEDIATION[code]
 
 
@@ -386,30 +515,30 @@ def run_custom_lab(job_id: str, text: str, progress_callback: Callable[[str, str
     variants = select_lab_variants(baseline)
 
     if evaluation_id == "sentiment.core":
-        progress_callback("starting_v1", "Starting sentiment endpoint")
+        progress_callback("starting_target", "Starting sentiment target")
         tmp_dir = Path(tempfile.mkdtemp(prefix="redlab_lab_sentiment_v1_"))
         registry = run_all.target_registry.load_registry()
         handle = run_all.start_target("sentiment_v1", tmp_dir, registry)
         try:
-            progress_callback("clean_v1", "Running clean sentiment reference")
+            progress_callback("clean_reference", "Running clean sentiment reference")
             clean = send_case(
                 handle.url, "v1", text, None, baseline.baseline_id,
                 target_id="sentiment_v1", suite_id="core",
             )
-            progress_callback("attacking_v1", "Testing sentiment adversarial variants")
+            progress_callback("adversarial_variants", "Testing sentiment adversarial variants")
             attacked = [
                 send_case(
                     handle.url, "v1", case.attacked_text, case, baseline.baseline_id,
                     target_id="sentiment_v1", suite_id="core",
                 )
-                for case, _label, _desc in variants
+                for case, _label, _desc, _diag in variants
             ]
         finally:
             handle.stop()
             _cleanup_temp_dir(tmp_dir)
-        progress_callback("analyzing", LAB_STAGE_LABELS["analyzing"])
+        progress_callback("analyzing", SINGLE_LAB_STAGE_LABELS["analyzing"])
         payload = _build_single_result_payload(text, variants, clean, attacked)
-        progress_callback("complete", LAB_STAGE_LABELS["complete"])
+        progress_callback("complete", SINGLE_LAB_STAGE_LABELS["complete"])
         return payload
     if evaluation_id != "emotion.core":
         raise LabValidationError(f"Unsupported interactive evaluation {evaluation_id!r}.")
@@ -426,7 +555,7 @@ def run_custom_lab(job_id: str, text: str, progress_callback: Callable[[str, str
             progress_callback(f"attacking_{version}", LAB_STAGE_LABELS[f"attacking_{version}"])
             variant_results = [
                 send_case(handle.url, version, case.attacked_text, case, baseline.baseline_id)
-                for case, _label, _desc in variants
+                for case, _label, _desc, _diag in variants
             ]
             per_version[version] = {"clean": clean, "variants": variant_results}
         finally:
@@ -445,37 +574,58 @@ def _build_single_result_payload(text: str, variants, clean: RunResult,
                                  attacked_rows: list[RunResult]) -> dict:
     variants_payload = []
     flips = 0
+    diagnostic_observations = 0
+    diagnostic_label_changes = 0
     endpoint_errors = 0
-    for (case, label, desc), attacked in zip(variants, attacked_rows):
+    for (case, label, desc, is_diagnostic), attacked in zip(variants, attacked_rows):
         flip = label_flipped(clean, attacked)
-        flips += int(flip is True)
         endpoint_errors += int(attacked.status_code is None or attacked.status_code >= 500)
         diff_original_html, diff_attacked_html = run_all.highlight_diff_html(
             case.original_text, case.attacked_text,
         )
+        if is_diagnostic:
+            # v6.1 Phase 7: this case has no fixed label oracle (attacks.metadata.
+            # ORACLE_DIAGNOSTIC) -- report the observation but never auto-score it as a
+            # meaning-preserving vulnerability, and count it separately from scored flips.
+            diagnostic_observations += 1
+            diag_code = "DIAGNOSTIC_OBSERVATION"
+            if flip:
+                diagnostic_label_changes += 1
+        elif flip is None:
+            diag_code = "INCONCLUSIVE"
+        elif flip:
+            flips += 1
+            diag_code = "LABEL_CHANGED"
+        elif _distribution_shifted(clean, attacked):
+            diag_code = "STABLE_LABEL_DISTRIBUTION_SHIFT"
+        else:
+            diag_code = "NO_OBSERVED_CHANGE"
         variants_payload.append({
             "attack_id": case.attack_id, "label": label, "description": desc,
             "category": case.category, "attacked_text": case.attacked_text,
             "diff_original_html": diff_original_html,
             "diff_attacked_html": diff_attacked_html,
+            "is_diagnostic": is_diagnostic,
             "target": {
                 "result": _result_dict(attacked), "flip": flip,
                 "tv_distance": total_variation_distance(clean.all_scores, attacked.all_scores),
                 "confidence_change": confidence_change(clean, attacked),
             },
-            "diagnosis": "OBSERVED",
-            "diagnosis_label": "Single-target observation",
-            "remediation": (
-                "This is a single-target exploratory result. Reproduce it against the same "
-                "pinned sentiment target before changing model or endpoint controls."
-            ),
+            "diagnosis": diag_code,
+            "diagnosis_label": DIAGNOSIS_LABELS[diag_code],
+            "remediation": REMEDIATION[diag_code],
         })
     return {
         "evaluation_id": "sentiment.core", "target_ids": ["sentiment_v1"],
         "single_target": True, "original_text": text, "clean": _result_dict(clean),
         "variants": variants_payload,
         "summary": {
-            "variants_tested": len(variants_payload), "label_flips": flips,
+            "variants_tested": len(variants_payload),
+            # Automatically scored label flips are kept separate from diagnostic label changes
+            # (v6.1 Phase 7) -- a diagnostic case's label change is never folded into "label_flips".
+            "label_flips": flips,
+            "diagnostic_observations": diagnostic_observations,
+            "diagnostic_label_changes": diagnostic_label_changes,
             "safe_rejections": sum(
                 1 for row in attacked_rows
                 if row.status_code is not None and 400 <= row.status_code < 500
@@ -485,17 +635,19 @@ def _build_single_result_payload(text: str, variants, clean: RunResult,
     }
 
 
-def _build_result_payload(text: str, variants: list[tuple[AttackCase, str, str]],
+def _build_result_payload(text: str, variants: list[tuple[AttackCase, str, str, bool]],
                           per_version: dict) -> dict:
     v1_clean, v2_clean = per_version["v1"]["clean"], per_version["v2"]["clean"]
     variant_rows = []
     counters = {
         "v1_flips": 0, "v2_flips": 0, "safe_rejections": 0, "endpoint_errors": 0,
-        "MITIGATED_BY_V2": 0, "PERSISTS_AFTER_HARDENING": 0, "NO_MATERIAL_EFFECT": 0,
+        "MITIGATED_BY_V2": 0, "PERSISTS_AFTER_HARDENING": 0,
+        "STABLE_LABEL_DISTRIBUTION_SHIFT": 0, "NO_OBSERVED_CHANGE": 0,
         "V2_REGRESSION": 0, "INCONCLUSIVE": 0,
+        "diagnostic_observations": 0, "diagnostic_label_changes": 0,
     }
 
-    for i, (case, label, desc) in enumerate(variants):
+    for i, (case, label, desc, is_diagnostic) in enumerate(variants):
         v1_attacked = per_version["v1"]["variants"][i]
         v2_attacked = per_version["v2"]["variants"][i]
 
@@ -507,13 +659,23 @@ def _build_result_payload(text: str, variants: list[tuple[AttackCase, str, str]]
 
         v1_flip = label_flipped(v1_clean, v1_attacked)
         v2_flip = label_flipped(v2_clean, v2_attacked)
-        if v1_flip:
-            counters["v1_flips"] += 1
-        if v2_flip:
-            counters["v2_flips"] += 1
 
-        diag_code, remediation = diagnose(v1_clean, v1_attacked, v2_clean, v2_attacked)
-        counters[diag_code] += 1
+        if is_diagnostic:
+            # v6.1 Phase 7: never auto-score a no-fixed-oracle case through the normal
+            # mitigated/persists/shift/no-change ladder; a flip here reflects removed
+            # meaning, not a scored finding, and is tracked separately from v1/v2_flips.
+            diag_code = "DIAGNOSTIC_OBSERVATION"
+            remediation = REMEDIATION[diag_code]
+            counters["diagnostic_observations"] += 1
+            if v1_flip or v2_flip:
+                counters["diagnostic_label_changes"] += 1
+        else:
+            if v1_flip:
+                counters["v1_flips"] += 1
+            if v2_flip:
+                counters["v2_flips"] += 1
+            diag_code, remediation = diagnose(v1_clean, v1_attacked, v2_clean, v2_attacked)
+            counters[diag_code] += 1
 
         diff_original_html, diff_attacked_html = run_all.highlight_diff_html(
             case.original_text, case.attacked_text,
@@ -527,6 +689,7 @@ def _build_result_payload(text: str, variants: list[tuple[AttackCase, str, str]]
             "attacked_text": case.attacked_text,
             "diff_original_html": diff_original_html,
             "diff_attacked_html": diff_attacked_html,
+            "is_diagnostic": is_diagnostic,
             "v1": {
                 "result": _result_dict(v1_attacked),
                 "flip": v1_flip,
@@ -546,11 +709,16 @@ def _build_result_payload(text: str, variants: list[tuple[AttackCase, str, str]]
 
     summary = {
         "variants_tested": len(variants),
+        # Automatically scored label flips are kept separate from diagnostic label changes
+        # (v6.1 Phase 7).
         "v1_flips": counters["v1_flips"],
         "v2_flips": counters["v2_flips"],
+        "diagnostic_observations": counters["diagnostic_observations"],
+        "diagnostic_label_changes": counters["diagnostic_label_changes"],
         "mitigated_by_v2": counters["MITIGATED_BY_V2"],
         "persisting_after_hardening": counters["PERSISTS_AFTER_HARDENING"],
-        "no_material_effect": counters["NO_MATERIAL_EFFECT"],
+        "stable_label_distribution_shift": counters["STABLE_LABEL_DISTRIBUTION_SHIFT"],
+        "no_observed_change": counters["NO_OBSERVED_CHANGE"],
         "v2_regression": counters["V2_REGRESSION"],
         "inconclusive": counters["INCONCLUSIVE"],
         "safe_rejections": counters["safe_rejections"],
@@ -619,10 +787,12 @@ def start_lab_job(text: str, demo_is_running: Callable[[], bool],
         if _lab_state["status"] == "running" or demo_is_running():
             return {"status": "busy"}
         job_id = secrets.token_urlsafe(24)  # cryptographically random, never sequential
+        descriptor = _lab_descriptor(evaluation_id, target_ids)
         _lab_state.update(
             status="running", job_id=job_id, stage="preparing", stage_index=0,
             evaluation_id=evaluation_id, target_ids=target_ids,
-            percent=LAB_STAGE_PERCENT["preparing"], message=LAB_STAGE_LABELS["preparing"],
+            percent=descriptor["stage_percent"]["preparing"],
+            message=descriptor["stages"][0]["label"],
             started_at=_now_iso(), completed_at=None, result=None, error=None,
         )
         snapshot = dict(_lab_state)
@@ -653,21 +823,26 @@ def lab_status(job_id: str) -> Optional[dict]:
         return dict(_lab_state)
 
 
-def _make_progress_callback(job_id: str) -> Callable[[str, str], None]:
+def _make_progress_callback(job_id: str, evaluation_id: str) -> Callable[[str, str], None]:
+    descriptor = _lab_descriptor(evaluation_id)
+    stage_order = descriptor["stage_order"]
+    stage_percent = descriptor["stage_percent"]
+
     def callback(stage: str, message: str) -> None:
         with JOB_LOCK:
             # A stale callback from a superseded job must never clobber a newer one's state.
             if _lab_state.get("job_id") != job_id or _lab_state["status"] != "running":
                 return
             _lab_state["stage"] = stage
-            _lab_state["stage_index"] = LAB_STAGE_ORDER.index(stage)
-            _lab_state["percent"] = LAB_STAGE_PERCENT[stage]
+            _lab_state["stage_index"] = stage_order.index(stage)
+            _lab_state["percent"] = stage_percent[stage]
             _lab_state["message"] = message
     return callback
 
 
 def _run_lab_job(job_id: str, text: str, evaluation_id: str = "emotion.core") -> None:
-    callback = _make_progress_callback(job_id)
+    callback = _make_progress_callback(job_id, evaluation_id)
+    descriptor = _lab_descriptor(evaluation_id)
     try:
         if evaluation_id == "emotion.core":
             result = run_custom_lab(job_id, text, callback)
@@ -678,8 +853,8 @@ def _run_lab_job(job_id: str, text: str, evaluation_id: str = "emotion.core") ->
                 return
             _lab_state.update(
                 status="complete", completed_at=_now_iso(), result=result,
-                stage="complete", stage_index=len(LAB_STAGE_ORDER) - 1, percent=100,
-                message=LAB_STAGE_LABELS["complete"],
+                stage="complete", stage_index=len(descriptor["stage_order"]) - 1, percent=100,
+                message=descriptor["stages"][-1]["label"],
             )
     except Exception:  # noqa: BLE001 -- orchestration failure; never let it kill the thread silently
         logger.exception("Live Red-Team Lab run failed for job_id=%s", job_id)

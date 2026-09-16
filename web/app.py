@@ -36,6 +36,7 @@ from report.generate import (  # noqa: E402
     CREATOR_NAME, PRODUCT_NAME, PRODUCT_TAGLINE, PRODUCT_VERSION_LABEL,
 )
 from web import lab as lab_module  # noqa: E402
+from web import progress as progress_module  # noqa: E402
 
 logger = logging.getLogger("team_checkmate.web")
 
@@ -49,11 +50,14 @@ VERIFIED_MOUNT = "/verified-full"
 
 # Real orchestration transitions only -- see run_all.py's _emit_progress call sites for
 # what each stage actually means. Order here must match the order run_experiment() emits.
-STAGE_ORDER = (
+# v6.1 Phase 2: paired (emotion) vs single-target (sentiment) get distinct descriptors --
+# the single-target flow has no V2 phase at all, so it must never share the paired stage list.
+_PAIRED_DEMO_STAGE_ORDER = (
     "initializing", "starting_v1", "attacking_v1", "starting_v2", "attacking_v2",
     "analyzing", "generating_results", "complete",
 )
-STAGE_LABELS = {
+_PAIRED_DEMO_STAGE_PERCENT = dict(zip(_PAIRED_DEMO_STAGE_ORDER, (5, 15, 30, 50, 65, 82, 92, 100)))
+_PAIRED_DEMO_LABELS = {
     "initializing": "Initializing toolkit",
     "starting_v1": "Starting V1",
     "attacking_v1": "Attacking unhardened endpoint",
@@ -63,9 +67,79 @@ STAGE_LABELS = {
     "generating_results": "Generating results",
     "complete": "Complete",
 }
-# Stage-boundary percentages, per the V4 brief -- movement happens only on real stage
-# transitions (see _progress_callback), never a fake continuous animation.
-STAGE_PERCENT = dict(zip(STAGE_ORDER, (5, 15, 30, 50, 65, 82, 92, 100)))
+
+# The registry orchestration for a single target only ever emits one combined
+# starting_{target}/attacking_{target} pair (see run_all.py's _run_registry_experiment) --
+# there is no separate backend signal for "clean reference" vs "adversarial variants", so
+# those two display rows below both map onto the one real "attacking_target" transition
+# rather than inventing a fake intermediate progress step.
+_SINGLE_DEMO_STAGE_ORDER = (
+    "initializing", "starting_target", "attacking_target",
+    "analyzing", "generating_results", "complete",
+)
+_SINGLE_DEMO_STAGE_PERCENT = dict(zip(_SINGLE_DEMO_STAGE_ORDER, (5, 20, 55, 80, 92, 100)))
+
+
+def _demo_descriptor(evaluation_id: str, target_ids: list) -> dict:
+    if evaluation_id == "sentiment.core":
+        target_id = target_ids[0] if target_ids else "sentiment_v1"
+        return progress_module.descriptor(
+            evaluation_id=evaluation_id, kind="single", target_ids=target_ids,
+            same_model_note=None,
+            footer_note="Single-target sentiment evaluation; no V1/V2 comparison is implied.",
+            cards=[progress_module.card(
+                "target", "Sentiment — Configured Target",
+                f"{target_id} · single-target evaluation",
+                start_stage="starting_target", end_stage="attacking_target",
+            )],
+            stage_order=list(_SINGLE_DEMO_STAGE_ORDER), stage_percent=_SINGLE_DEMO_STAGE_PERCENT,
+            stages=[
+                progress_module.stage("initializing", "Initializing toolkit"),
+                progress_module.stage("starting_target", "Starting sentiment target"),
+                progress_module.stage("clean_reference", "Running clean reference",
+                                       maps_to="attacking_target"),
+                progress_module.stage("adversarial_variants", "Testing sentiment adversarial variants",
+                                       maps_to="attacking_target"),
+                progress_module.stage("analyzing", "Analyzing observations"),
+                progress_module.stage("generating_results", "Generating results"),
+                progress_module.stage("complete", "Complete"),
+            ],
+        )
+    return progress_module.descriptor(
+        evaluation_id=evaluation_id, kind="paired", target_ids=target_ids,
+        same_model_note="Two endpoint configurations",
+        footer_note="Same underlying AI model in both cases — only the endpoint hardening differs.",
+        cards=[
+            progress_module.card(
+                "v1", "V1 — Unhardened Endpoint", "No application-layer hardening.",
+                start_stage="starting_v1", end_stage="attacking_v1",
+            ),
+            progress_module.card(
+                "v2", "V2 — Hardened Endpoint",
+                "Input validation, length controls, exception handling and normalization.",
+                start_stage="starting_v2", end_stage="attacking_v2",
+            ),
+        ],
+        stage_order=list(_PAIRED_DEMO_STAGE_ORDER), stage_percent=_PAIRED_DEMO_STAGE_PERCENT,
+        stages=[progress_module.stage(s, _PAIRED_DEMO_LABELS[s]) for s in _PAIRED_DEMO_STAGE_ORDER],
+    )
+
+
+def _real_stage_alias(evaluation_id: str, raw_stage: str) -> str:
+    """Map a raw orchestration stage (run_all.py's f"starting_{target_id}" etc.) onto this
+    evaluation's descriptor stage id. Kept in one place so the display stage list and the
+    percent/index computed from it can never disagree about what a raw stage means."""
+    if evaluation_id == "sentiment.core":
+        aliases = {
+            "starting_sentiment_v1": "starting_target",
+            "attacking_sentiment_v1": "attacking_target",
+        }
+    else:
+        aliases = {
+            "starting_emotion_v1": "starting_v1", "attacking_emotion_v1": "attacking_v1",
+            "starting_emotion_v2": "starting_v2", "attacking_emotion_v2": "attacking_v2",
+        }
+    return aliases.get(raw_stage, raw_stage)
 
 
 def _data_uri(path: Path, label: str) -> str:
@@ -120,29 +194,30 @@ def _generate_run_name() -> str:
     return f"hf_demo_{stamp}_{secrets.token_hex(3)}"
 
 
-def _make_progress_callback(run_id: str):
+def _make_progress_callback(run_id: str, evaluation_id: str):
+    descriptor = _demo_descriptor(evaluation_id, [])
+    stage_order = descriptor["stage_order"]
+    stage_percent = descriptor["stage_percent"]
+
     def callback(stage: str, message: str) -> None:
-        aliases = {
-            "starting_emotion_v1": "starting_v1", "attacking_emotion_v1": "attacking_v1",
-            "starting_emotion_v2": "starting_v2", "attacking_emotion_v2": "attacking_v2",
-            "starting_sentiment_v1": "starting_v1", "attacking_sentiment_v1": "attacking_v1",
-        }
-        display_stage = aliases.get(stage, stage)
+        display_stage = _real_stage_alias(evaluation_id, stage)
         with _job_lock:
             if _job_state.get("run_id") != run_id or _job_state["status"] != "running":
                 return
-            _job_state["stage"] = stage
-            if display_stage in STAGE_ORDER:
-                _job_state["stage_index"] = STAGE_ORDER.index(display_stage)
-                _job_state["percent"] = STAGE_PERCENT[display_stage]
+            _job_state["stage"] = display_stage
+            if display_stage in stage_order:
+                _job_state["stage_index"] = stage_order.index(display_stage)
+                _job_state["percent"] = stage_percent[display_stage]
             _job_state["message"] = message
     return callback
 
 
 def _run_job(run_name: str, run_id: str, evaluation_id: str, mode: str) -> None:
+    descriptor = _demo_descriptor(evaluation_id, [])
     try:
         result = run_all.run_experiment(
-            mode=mode, run_name=run_name, progress_callback=_make_progress_callback(run_id),
+            mode=mode, run_name=run_name,
+            progress_callback=_make_progress_callback(run_id, evaluation_id),
             evaluation_ids=[evaluation_id],
         )
         report_html = Path(result["report_html"]).resolve()
@@ -159,7 +234,7 @@ def _run_job(run_name: str, run_id: str, evaluation_id: str, mode: str) -> None:
                 analysis_url = f"{RESULTS_MOUNT}/{analysis_rel.as_posix()}"
             _job_state["status"] = _job_state["state"] = "complete"
             _job_state["stage"] = "done"
-            _job_state["stage_index"] = len(STAGE_ORDER) - 1
+            _job_state["stage_index"] = len(descriptor["stage_order"]) - 1
             _job_state["percent"] = 100
             _job_state["message"] = "Run complete."
             _job_state["completed_at"] = datetime.now(timezone.utc).isoformat()
@@ -229,8 +304,7 @@ def index(request: Request) -> HTMLResponse:
         "product_version_label": PRODUCT_VERSION_LABEL,
         "verified_full_available": run_all.VERIFIED_FULL_REPORT_DIR.exists(),
         "verified_full_href": f"{VERIFIED_MOUNT}/report.html",
-        "stage_labels": STAGE_LABELS,
-        "stage_order": list(STAGE_ORDER),
+        "demo_descriptors": _all_demo_descriptors(),
     }
     return templates.TemplateResponse(request, "index.html", context)
 
@@ -246,8 +320,7 @@ def lab_page(request: Request) -> HTMLResponse:
         "product_version_label": PRODUCT_VERSION_LABEL,
         "verified_full_available": run_all.VERIFIED_FULL_REPORT_DIR.exists(),
         "verified_full_href": f"{VERIFIED_MOUNT}/report.html",
-        "lab_stage_order": list(lab_module.LAB_STAGE_ORDER),
-        "lab_stage_labels": lab_module.LAB_STAGE_LABELS,
+        "lab_descriptors": lab_module.all_lab_descriptors(),
         "lab_max_chars": lab_module.MAX_INPUT_CHARS,
     }
     return templates.TemplateResponse(request, "lab.html", context)
@@ -257,6 +330,14 @@ def lab_page(request: Request) -> HTMLResponse:
 def healthz() -> dict:
     # Confirms only that the public web app itself is alive -- never starts V1/V2.
     return {"status": "ok", "service": "team-checkmate-web"}
+
+
+def _all_demo_descriptors() -> dict:
+    registry = run_all.target_registry.load_registry()
+    return {
+        evaluation_id: _demo_descriptor(evaluation_id, list(registry.evaluation(evaluation_id).target_ids))
+        for evaluation_id in ("emotion.core", "sentiment.core")
+    }
 
 
 def _target_choices() -> dict:
@@ -363,11 +444,13 @@ async def start_run(request: Request) -> JSONResponse:
             )
         run_name = _generate_run_name()
         run_id = secrets.token_hex(8)
+        descriptor = _demo_descriptor(evaluation_id, list(evaluation.target_ids))
         _job_state.update(
             status="running", state="running", run_id=run_id,
             evaluation_id=evaluation_id, target_ids=list(evaluation.target_ids),
             stage="initializing", stage_index=0,
-            percent=STAGE_PERCENT["initializing"], message=STAGE_LABELS["initializing"],
+            percent=descriptor["stage_percent"]["initializing"],
+            message=descriptor["stages"][0]["label"],
             run_name=run_name, started_at=datetime.now(timezone.utc).isoformat(),
             completed_at=None, results=None, result_url=None, report_url=None, error=None,
         )

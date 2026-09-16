@@ -14,7 +14,7 @@
   <a class="rl-back-btn" href="/" aria-label="Back" title="Back">&larr;</a>
   <div class="masthead-inner">
     <a class="brand" href="#overview"><img src="{{ logo_data_uri }}" alt="{{ creator_name }}" class="brand-logo"><span class="brand-text"><span class="brand-creator">{{ creator_name }}</span><span class="brand-product">{{ product_version_label }}</span></span></a>
-    <div class="downloads"><a class="home-link" href="/">Back to Red Lab</a><a href="analysis.json" target="_blank" rel="noopener">Source JSON</a>{% if include_pdf %}<a class="button" href="report.pdf" download>Download PDF <span aria-hidden="true">&darr;</span></a>{% endif %}</div>
+    <div class="downloads"><a class="home-link" href="/">Back to Red Lab</a><a href="analysis.json" target="_blank" rel="noopener">Source JSON</a>{% if include_pdf and mode == 'full' %}<a class="button" href="report.pdf" download>Download PDF <span aria-hidden="true">&darr;</span></a>{% endif %}</div>
   </div>
 </header>
 

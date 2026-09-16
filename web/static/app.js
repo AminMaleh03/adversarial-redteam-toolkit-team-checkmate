@@ -10,14 +10,39 @@
   var evaluationSelect = document.getElementById("demo-evaluation");
   var modelDescription = document.getElementById("model-description");
   var modelIdentity = document.getElementById("model-identity");
-  var stageItems = document.querySelectorAll(".stage-list li");
+  var sameModelLabelEl = document.getElementById("same-model-label");
+  var sameModelNoteEl = document.getElementById("same-model-note");
+  var cardsEl = document.getElementById("version-context");
+  var stageListEl = document.getElementById("stage-list");
+  var footerNoteEl = document.getElementById("exec-model-note");
   var timer = null;
   var launching = false;
   var checking = false;
   var generation = 0;
   var activeRunId = null;
   var activeEvaluationId = null;
+  var renderedEvaluationId = null;
   var POLL_MS = 1500;
+
+  // v6.1 Phase 2: one descriptor per registry evaluation (emotion.core paired, sentiment.core
+  // single-target) -- the progress DOM is generated from whichever one matches the run's real
+  // evaluation_id, never a fixed V1/V2 template shown for every evaluation.
+  var descriptorsEl = document.getElementById("demo-descriptors");
+  var DESCRIPTORS = descriptorsEl ? JSON.parse(descriptorsEl.textContent) : {};
+
+  function descriptorFor(evaluationId) {
+    return DESCRIPTORS[evaluationId] || DESCRIPTORS["emotion.core"];
+  }
+
+  function renderProgressFor(evaluationId) {
+    if (renderedEvaluationId === evaluationId) return;
+    renderedEvaluationId = evaluationId;
+    window.rlRenderProgress(descriptorFor(evaluationId), {
+      cardsEl: cardsEl, sameModelLabelEl: sameModelLabelEl, sameModelNoteEl: sameModelNoteEl,
+      stageListEl: stageListEl, footerNoteEl: footerNoteEl,
+    });
+  }
+
   function executionRoute() { return window.location.hash === "#demo"; }
   function showHome() {
     generation++;
@@ -67,6 +92,7 @@
     if (state.status !== "running") {
       showFailure("There is no active demo to rejoin. Start a new live demo."); return;
     }
+    renderProgressFor(state.evaluation_id || "emotion.core");
     execHeading.textContent = state.stage === "complete" ? "Opening your results…" : state.message || "Running…";
     var pct = state.percent || 0;
     document.getElementById("progress-fill").style.width = pct + "%";
@@ -74,11 +100,14 @@
     bar.setAttribute("aria-valuenow", String(pct));
     bar.setAttribute("aria-valuetext", pct + "%, " + execHeading.textContent);
     document.getElementById("exec-percent").textContent = pct + "%";
-    stageItems.forEach(function (item, index) {
-      item.classList.toggle("done", index < state.stage_index);
-      item.classList.toggle("active", index === state.stage_index);
+    var descriptor = descriptorFor(state.evaluation_id || "emotion.core");
+    var stageItems = stageListEl.querySelectorAll("li");
+    stageItems.forEach(function (item) {
+      var mappedIndex = descriptor.stage_order.indexOf(item.dataset.stage);
+      item.classList.toggle("done", mappedIndex < state.stage_index);
+      item.classList.toggle("active", mappedIndex === state.stage_index);
     });
-    window.rlUpdateLanes(state.stage, stageItems, viewExecution);
+    window.rlUpdateLanes(state.stage, descriptor.stage_order, viewExecution);
     ensurePolling();
   }
   function poll() {
@@ -97,6 +126,7 @@
     launching = true; activateExecutionView();
     execHeading.textContent = "Launching adversarial test…";
     activeEvaluationId = evaluationSelect ? evaluationSelect.value : "emotion.core";
+    renderProgressFor(activeEvaluationId);
     fetch("/api/run", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ evaluation_id: activeEvaluationId, mode: "demo" })

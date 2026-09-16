@@ -697,17 +697,22 @@ def run_analysis_and_report(run_dir: Path, attack_index: dict, *, html_only: boo
     # same analysis JSON -- only presentation differs, per report.generate.render_html.
     _emit_progress(progress_callback, "generating_results", "Generating the report")
     report_dir = run_dir / "report"
-    pdf_ok = True
+    # Live Demo reports never expose a PDF (v6.1) -- demo_template.html has no download link
+    # for it, so generating one had no consumer. Only "full" mode ever attempts PDF rendering.
+    effective_html_only = html_only or mode == "demo"
+    pdf_ok = not effective_html_only
     try:
-        report_mod.generate_report(raw, report_dir, html_only=html_only, mode=mode)
+        report_mod.generate_report(raw, report_dir, html_only=effective_html_only, mode=mode)
     except RuntimeError as exc:
-        if html_only:
+        if effective_html_only:
             raise
         # PDF renderer unavailable on this machine (missing GTK, etc. -- see AGENTS.md).
         # Fall back to HTML-only rather than failing the whole run over presentation.
         pdf_ok = False
         report_mod.generate_report(raw, report_dir, html_only=True, mode=mode)
         print(f"(PDF rendering unavailable, wrote HTML-only report: {exc})", file=sys.stderr)
+    # (mode here is always "demo" or "full" -- run_analysis_and_report is only ever reached
+    # from the legacy paired-emotion path, which never carries "ci".)
 
     if detailed_available:
         shutil.copytree(VERIFIED_FULL_REPORT_DIR, report_dir / "detailed")
@@ -1371,14 +1376,21 @@ def _run_registry_experiment(mode: str, run_name: Optional[str], results_root: O
         raw = (json.dumps(analysis_document, indent=2, ensure_ascii=False, allow_nan=False) + "\n").encode("utf-8")
         _emit_progress(progress_callback, "generating_results", "Generating the report")
         report_dir = run_dir / "report"
-        pdf_ok = True
+        # Live Demo reports never expose a PDF -- v6.1: a Download PDF button only belongs on
+        # the full/verified technical report, and generating a file with no linked consumer for
+        # every demo run was pure waste. Only "full" mode ever attempts PDF rendering. "ci" is
+        # not a report presentation mode (report.generate only knows "full"/"demo"); CI runs
+        # get the "full" report style, same as before this fix.
+        report_mode = "demo" if mode == "demo" else "full"
+        effective_html_only = html_only or mode == "demo"
+        pdf_ok = not effective_html_only
         try:
-            report_mod.generate_report(raw, report_dir, html_only=html_only, mode="full")
+            report_mod.generate_report(raw, report_dir, html_only=effective_html_only, mode=report_mode)
         except RuntimeError as exc:
-            if html_only:
+            if effective_html_only:
                 raise
             pdf_ok = False
-            report_mod.generate_report(raw, report_dir, html_only=True, mode="full")
+            report_mod.generate_report(raw, report_dir, html_only=True, mode=report_mode)
             print(f"(PDF rendering unavailable, wrote HTML-only report: {exc})", file=sys.stderr)
 
         status = "COMPLETE" if all(value == 0 for value in terminations.values()) else "PARTIAL"

@@ -64,7 +64,21 @@ def test_index_returns_branded_welcome_page(client):
 
 def test_home_shows_red_lab_version_label(client):
     body = client.get("/").text
-    assert "Red Lab v5.0" in body
+    assert "Red Lab v6.1" in body
+
+
+def test_active_pages_use_centralized_version_source_not_a_hardcoded_string(client):
+    # v6.1: home, lab and generated report pages must all read the same PRODUCT_VERSION_LABEL
+    # constant rather than each carrying its own copy of the string.
+    from report.generate import PRODUCT_VERSION_LABEL
+    assert PRODUCT_VERSION_LABEL == "Red Lab v6.1"
+    home_body = client.get("/").text
+    lab_body = client.get("/lab").text
+    assert PRODUCT_VERSION_LABEL in home_body
+    assert PRODUCT_VERSION_LABEL in lab_body
+    # The archived, byte-frozen v5 report must not be affected by the active version bump.
+    assert "Red Lab v5.0" not in home_body
+    assert "Red Lab v5.0" not in lab_body
 
 
 def test_home_navigation_has_required_links(client):
@@ -122,12 +136,26 @@ def test_home_initially_shows_landing_view_only(client):
     assert "hidden" in exec_tag
 
 
-def test_execution_view_uses_real_stage_labels(client):
+def _extract_json_script(body, element_id):
+    start = body.index(f'id="{element_id}"')
+    open_tag_end = body.index(">", start) + 1
+    close = body.index("</script>", open_tag_end)
+    return json.loads(body[open_tag_end:close])
+
+
+def test_execution_view_descriptor_has_real_stage_labels(client):
+    # v6.1 Phase 2: the stage list is generated client-side from demo-descriptors, not
+    # server-rendered <li data-stage> markup -- assert against the embedded descriptor instead.
     body = client.get("/").text
-    exec_section = body[body.index('id="view-execution"'):body.index("</section>", body.index('id="view-execution"'))]
-    for stage in web_app.STAGE_ORDER:
-        assert f'data-stage="{stage}"' in exec_section
-        assert web_app.STAGE_LABELS[stage] in exec_section
+    emotion = _extract_json_script(body, "demo-descriptors")["emotion.core"]
+    assert emotion["kind"] == "paired"
+    labels = {s["id"]: s["label"] for s in emotion["stages"]}
+    assert labels["starting_v1"] == "Starting V1"
+    assert labels["attacking_v1"] == "Attacking unhardened endpoint"
+    assert labels["starting_v2"] == "Starting V2"
+    assert labels["attacking_v2"] == "Testing hardened endpoint"
+    for entry in emotion["stages"]:
+        assert entry["maps_to"] in emotion["stage_order"]
 
 
 def test_execution_view_has_progressbar_accessibility_semantics(client):
@@ -142,10 +170,33 @@ def test_execution_view_has_progressbar_accessibility_semantics(client):
 
 def test_execution_view_has_v1_v2_context_and_same_model_note(client):
     body = client.get("/").text
-    exec_section = body[body.index('id="view-execution"'):body.index("</section>", body.index('id="view-execution"'))]
-    assert "V1" in exec_section and "Unhardened Endpoint" in exec_section
-    assert "V2" in exec_section and "Hardened Endpoint" in exec_section
-    assert "Same underlying AI model" in exec_section
+    emotion = _extract_json_script(body, "demo-descriptors")["emotion.core"]
+    titles = " ".join(c["title"] for c in emotion["cards"])
+    assert "V1" in titles and "Unhardened Endpoint" in titles
+    assert "V2" in titles and "Hardened Endpoint" in titles
+    assert emotion["same_model_note"] == "Two endpoint configurations"
+    assert "Same underlying AI model" in emotion["footer_note"]
+
+
+def test_sentiment_demo_descriptor_is_single_target_with_no_paired_content(client):
+    # v6.1 Phase 2: sentiment.core must render a single configured-target card, no V1/V2
+    # cards, no "Two endpoint configurations", and no hardening-improvement language.
+    body = client.get("/").text
+    sentiment = _extract_json_script(body, "demo-descriptors")["sentiment.core"]
+    assert sentiment["kind"] == "single"
+    assert len(sentiment["cards"]) == 1
+    card = sentiment["cards"][0]
+    assert card["lane"] == "target"
+    assert "Sentiment" in card["title"] and "Configured Target" in card["title"]
+    assert "sentiment_v1" in card["note"]
+    assert sentiment["same_model_note"] is None
+    blob = json.dumps(sentiment)
+    for forbidden in (
+        "V1 — Unhardened Endpoint", "V2 — Hardened Endpoint",
+        "Two endpoint configurations", "Starting V1", "Attacking unhardened endpoint",
+        "Starting V2", "Testing hardened endpoint", "Analyzing differences",
+    ):
+        assert forbidden not in blob
 
 
 def test_execution_view_has_no_fake_cancel_button(client):
@@ -409,7 +460,36 @@ def test_status_reflects_real_progress_callback_stages(monkeypatch, client, tmp_
         time.sleep(0.02)
         state = client.get("/api/status").json()
     assert state["stage"] == "starting_v1"
-    assert state["stage_index"] == web_app.STAGE_ORDER.index("starting_v1")
+    paired_stage_order = web_app._demo_descriptor("emotion.core", [])["stage_order"]
+    assert state["stage_index"] == paired_stage_order.index("starting_v1")
+    release.set()
+    _wait_until_not_running(client)
+
+
+def test_sentiment_status_uses_single_target_stage_alias_not_paired(monkeypatch, client, tmp_path):
+    # v6.1 Phase 2: the raw orchestration stage for a single-target run ("starting_sentiment_v1")
+    # must resolve into the single-target descriptor's own stage id, never the paired "starting_v1".
+    monkeypatch.setattr(run_all, "RESULTS_ROOT", tmp_path)
+    release = threading.Event()
+
+    def fake_run_experiment(mode, run_name=None, progress_callback=None, **_):
+        progress_callback("starting_sentiment_v1", "Starting sentiment endpoint")
+        release.wait(timeout=5)
+        report_html = tmp_path / run_name / "report" / "report.html"
+        report_html.parent.mkdir(parents=True)
+        report_html.write_text("<html></html>", encoding="utf-8")
+        return {"report_html": report_html}
+
+    monkeypatch.setattr(run_all, "run_experiment", fake_run_experiment)
+    client.post("/api/run", json={"evaluation_id": "sentiment.core"})
+    deadline = time.monotonic() + 2.0
+    state = client.get("/api/status").json()
+    while state.get("stage") != "starting_target" and time.monotonic() < deadline:
+        time.sleep(0.02)
+        state = client.get("/api/status").json()
+    assert state["stage"] == "starting_target"
+    single_stage_order = web_app._demo_descriptor("sentiment.core", ["sentiment_v1"])["stage_order"]
+    assert state["stage_index"] == single_stage_order.index("starting_target")
     release.set()
     _wait_until_not_running(client)
 
@@ -593,9 +673,12 @@ def test_app_css_rl_back_btn_is_circular_and_focus_visible():
 
 
 def test_version_card_v1_v2_are_distinguished_by_text_and_color_not_color_alone():
-    body_text = (ROOT / "web" / "templates" / "index.html").read_text(encoding="utf-8")
-    assert "Unhardened Endpoint" in body_text
-    assert "Hardened Endpoint" in body_text
+    # v6.1 Phase 2: the V1/V2 card titles now come from the paired descriptor (web/app.py),
+    # not static template text -- the template only carries an empty skeleton container.
+    emotion = web_app._demo_descriptor("emotion.core", ["emotion_v1", "emotion_v2"])
+    titles = " ".join(c["title"] for c in emotion["cards"])
+    assert "Unhardened Endpoint" in titles
+    assert "Hardened Endpoint" in titles
     css = (ROOT / "web" / "static" / "app.css").read_text(encoding="utf-8")
     assert ".version-card.v1 { border-left-color: var(--rl-danger)" in css
     assert ".version-card.v2 { border-left-color: var(--rl-success)" in css

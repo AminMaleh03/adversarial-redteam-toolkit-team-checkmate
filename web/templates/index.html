@@ -59,6 +59,7 @@
           </select>
           <p id="model-description" class="caption">Paired, seven-label emotion robustness comparison.</p>
         </div>
+        <script id="demo-descriptors" type="application/json">{{ demo_descriptors | tojson }}</script>
         <div class="cta-row hero-actions" id="run">
           <div class="hero-path"><button id="run-btn" class="button primary" type="button">Run Live Demo</button><p class="caption">Explore a curated attack suite</p></div>
           <div class="hero-path"><a class="button secondary" href="/lab">Try Your Own Input</a><p class="caption">Put your own sentence to the test</p></div>
@@ -84,28 +85,11 @@
           </div>
           <p id="exec-percent" class="exec-percent" aria-hidden="true">0%</p>
 
-
-
-          <p class="same-model-label">Same model <span>Two endpoint configurations</span></p>
-          <div class="version-context">
-            <div class="version-card v1" data-lane="v1" data-state="not-started">
-              <span class="lane-status">Not started</span>
-              <p class="version-card-title">V1 &mdash; Unhardened Endpoint</p>
-              <p class="version-card-note">No application-layer hardening.</p>
-            </div>
-            <div class="version-card v2" data-lane="v2" data-state="not-started">
-              <span class="lane-status">Not started</span>
-              <p class="version-card-title">V2 &mdash; Hardened Endpoint</p>
-              <p class="version-card-note">Input validation, length controls, exception handling and normalization.</p>
-            </div>
-          </div>
+          <p id="same-model-label" class="same-model-label" hidden>Same model <span id="same-model-note"></span></p>
+          <div class="version-context" id="version-context"></div>
           <p class="tracker-label">Experiment stages</p>
-          <ol class="stage-list" id="stage-list">
-            {% for stage in stage_order %}
-            <li data-stage="{{ stage }}">{{ stage_labels[stage] }}</li>
-            {% endfor %}
-          </ol>
-          <p class="exec-model-note">Same underlying AI model in both cases &mdash; only the endpoint hardening differs.</p>
+          <ol class="stage-list" id="stage-list"></ol>
+          <p class="exec-model-note" id="exec-model-note"></p>
         </div>
 
         <div class="exec-failure" id="exec-failure" hidden>

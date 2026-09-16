@@ -268,6 +268,10 @@ def test_app_commit_unavailable_reason_never_invents_a_commit_from_empty_string(
 _PAIRED_ONLY_NOTE = "V2's defenses are application-layer only; no retraining was done."
 
 
+def _real_registry():
+    return run_all.target_registry.load_registry()
+
+
 def test_applicable_limitations_excludes_paired_only_note_for_sentiment_only_run():
     assert any(_PAIRED_ONLY_NOTE in note for note in run_all.analysis_mod.LIMITATION_NOTES)
     blocks = [{
@@ -275,7 +279,7 @@ def test_applicable_limitations_excludes_paired_only_note_for_sentiment_only_run
         "targets": ["sentiment_v1"],
         "summaries": {"sentiment_v1": {"limitations": list(run_all.analysis_mod.LIMITATION_NOTES)}},
     }]
-    notes = run_all._applicable_limitations(blocks)
+    notes = run_all._applicable_limitations(blocks, _real_registry())
     assert not any("V2's defenses are application-layer only" in note for note in notes)
     assert not any("hardening" in note.lower() for note in notes)
     assert len(notes) == len(run_all.analysis_mod.LIMITATION_NOTES) - 1
@@ -291,9 +295,24 @@ def test_applicable_limitations_keeps_paired_only_note_when_a_paired_evaluation_
         {"kind": "single", "targets": ["sentiment_v1"],
          "summaries": {"sentiment_v1": {"limitations": list(run_all.analysis_mod.LIMITATION_NOTES)}}},
     ]
-    notes = run_all._applicable_limitations(blocks)
+    notes = run_all._applicable_limitations(blocks, _real_registry())
     assert any("V2's defenses are application-layer only" in note for note in notes)
     # Deduplicated across both evaluations, not doubled.
+    assert len(notes) == len(run_all.analysis_mod.LIMITATION_NOTES)
+
+
+def test_applicable_limitations_keeps_paired_only_note_for_single_kind_hardened_target():
+    # Regression guard: the CI gate's own ci.emotion evaluation is "single" kind (it tests
+    # emotion_v2 alone against an approved clean-output reference, never a live V1 -- see
+    # endpoint/targets.json) but is still genuinely about a hardened target. Gating on
+    # evaluation "kind" alone (rather than registry.target(...).hardened) would wrongly strip
+    # this note from every CI gate report and broke the real CI run once during development.
+    blocks = [{
+        "kind": "single", "targets": ["emotion_v2"],
+        "summaries": {"emotion_v2": {"limitations": list(run_all.analysis_mod.LIMITATION_NOTES)}},
+    }]
+    notes = run_all._applicable_limitations(blocks, _real_registry())
+    assert any("V2's defenses are application-layer only" in note for note in notes)
     assert len(notes) == len(run_all.analysis_mod.LIMITATION_NOTES)
 
 
@@ -305,7 +324,7 @@ def test_applicable_limitations_preserves_order_and_dedupes():
             "emotion_v2": {"limitations": ["b", "c"]},
         },
     }]
-    assert run_all._applicable_limitations(blocks) == ["a", "b", "c"]
+    assert run_all._applicable_limitations(blocks, _real_registry()) == ["a", "b", "c"]
 
 
 def test_release_workflow_prepares_results_and_preserves_gate_exit_code():

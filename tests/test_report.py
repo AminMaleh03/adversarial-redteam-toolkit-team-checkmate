@@ -1263,6 +1263,56 @@ def test_v3_render_html_module_never_imports_subprocess_or_shells_out_to_git():
 
 
 # ------------------------------------------------------------------------------------------
+# v6.2: model/tokenizer identity must be read from the REAL analysis.analyze.
+# build_identity_block shape (identity.model.{model_id,revision,tokenizer_id,
+# tokenizer_revision}) -- not the unrelated identity.declared block (target_id/task_id/
+# suite_id only). A mismatch here crashes report rendering under Jinja's StrictUndefined on
+# any real analysis document, since tests/fixtures/stage3/expected_analysis_v3.json's
+# identity shape does not match analyze.build_identity_block's real output and must never be
+# trusted as a stand-in for it when adding new identity-reading template code.
+# ------------------------------------------------------------------------------------------
+
+
+def test_v3_model_identity_template_reads_the_real_build_identity_block_shape():
+    from analysis import analyze as analysis_mod
+    block = analysis_mod.build_identity_block(
+        {"target_id": "emotion_v1", "task_id": "emotion_7", "suite_id": "core",
+         "model": {"model_id": "m", "revision": "r",
+                   "tokenizer_id": "t", "tokenizer_revision": "tr"}},
+        None,
+    )
+    # This is exactly the path report/template_v3.html reads: identity.model.*, a sibling
+    # of "declared", never nested inside it.
+    assert block["model"] == {"model_id": "m", "revision": "r",
+                               "tokenizer_id": "t", "tokenizer_revision": "tr"}
+    assert "model_id" not in block["declared"]
+    assert "revision" not in block["declared"]
+
+
+def test_v3_report_shows_model_and_tokenizer_revision_from_real_identity_shape():
+    payload = _stage3_document()
+    target_summary = payload["evaluations"][0]["summaries"]["emotion_v1"]
+    target_summary["identity"]["model"] = {
+        "model_id": "j-hartmann/emotion-english-distilroberta-base",
+        "revision": "0e1cd914e3d46199ed785853e12b57304e04178b",
+        "tokenizer_id": "j-hartmann/emotion-english-distilroberta-base",
+        "tokenizer_revision": "0e1cd914e3d46199ed785853e12b57304e04178b",
+    }
+    html = report.render_html(payload, source_sha256="9" * 64, include_pdf=False)
+    assert "0e1cd914e3d46199ed785853e12b57304e04178b" in html
+    assert "j-hartmann/emotion-english-distilroberta-base" in html
+
+
+def test_v3_report_renders_without_crashing_when_identity_model_block_is_absent():
+    # The shared test fixture's identity shape has no "model" key at all -- this must
+    # render gracefully under StrictUndefined, never crash.
+    payload = _stage3_document()
+    assert "model" not in payload["evaluations"][0]["summaries"]["emotion_v1"]["identity"]
+    html = report.render_html(payload, source_sha256="a" * 64, include_pdf=False)
+    assert "<html" in html.lower()
+
+
+# ------------------------------------------------------------------------------------------
 # v6.2: paired common-eligible-denominator and single-target "not applicable" wording
 # ------------------------------------------------------------------------------------------
 

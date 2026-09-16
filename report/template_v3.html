@@ -91,9 +91,9 @@
     <article class="panel endpoint-card v3-target" id="target-{{ loop.index }}-{{ target_id }}">
       <p class="eyebrow">{{ target_id }} &middot; {{ summary.version|upper }}</p>
       <h3>{{ target_id|replace('_', ' ')|title }}</h3>
-      {% set ident = (summary.get('identity', {}).get('declared') or summary.get('identity', {}).get('inferred')) %}
-      {% if ident %}
-      <p class="v3-model-identity">Model <code>{{ ident.model_id }}</code>@<code>{{ ident.model_revision }}</code> &middot; Tokenizer <code>{{ ident.tokenizer_id }}</code>@<code>{{ ident.tokenizer_revision }}</code> <span class="caption">({{ summary.identity.get('provenance', 'provenance not recorded') }})</span></p>
+      {% set model_ident = summary.get('identity', {}).get('model') %}
+      {% if model_ident %}
+      <p class="v3-model-identity">Model <code>{{ model_ident.get('model_id', 'not recorded') }}</code>@<code>{{ model_ident.get('revision', 'not recorded') }}</code> &middot; Tokenizer <code>{{ model_ident.get('tokenizer_id', 'not recorded') }}</code>@<code>{{ model_ident.get('tokenizer_revision', 'not recorded') }}</code> <span class="caption">({{ summary.get('identity', {}).get('provenance', 'provenance not recorded') }})</span></p>
       {% endif %}
       <p>{{ summary.coverage.completed }}/{{ summary.coverage.planned }} requests completed ({{ summary.coverage.coverage_rate|percent }}).</p>
       <div class="v3-card-grid">

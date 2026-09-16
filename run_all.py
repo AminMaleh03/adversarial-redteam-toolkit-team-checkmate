@@ -1218,22 +1218,30 @@ def _analyze_evaluation(registry, evaluation, evaluation_dir: Path) -> dict:
 # analysis.analyze.LIMITATION_NOTES is emitted unconditionally onto every target's summary
 # (per-target, regardless of whether that target has a paired counterpart) -- this one note
 # is written in V1/V2 hardening terms and is not applicable to a run that never touches a
-# paired evaluation (v6.2: a sentiment-only report must never say "V2" or "hardening").
-# Matched by content, not by tuple index, so a reordering of the frozen tuple upstream can't
-# silently break the filter.
+# hardened target at all (v6.2: a sentiment-only report must never say "V2" or "hardening").
+# Gated on registry.target(...).hardened, not on evaluation "kind" -- the CI gate's own
+# ci.emotion evaluation is "single" kind (it tests emotion_v2 alone, using an approved
+# clean-output reference instead of a second live V1 service; see endpoint/targets.json) but
+# genuinely is about a hardened target, so the note must still apply there. Matched by
+# content, not by tuple index, so a reordering of the frozen tuple upstream can't silently
+# break the filter.
 _PAIRED_ONLY_LIMITATION_MARKER = "V2's defenses are application-layer only"
 
 
-def _applicable_limitations(analysis_blocks: list) -> list:
-    """The run-wide, deduplicated limitations list, minus any paired-only (V1/V2 hardening)
-    note when this run contains no paired evaluation at all. Never rewrites or reorders the
-    notes that do apply -- only omits ones that describe a comparison this run cannot have."""
-    has_paired = any(block["kind"] == "paired" for block in analysis_blocks)
+def _applicable_limitations(analysis_blocks: list, registry) -> list:
+    """The run-wide, deduplicated limitations list, minus any hardening-specific note when
+    this run touches no hardened target at all. Never rewrites or reorders the notes that do
+    apply -- only omits ones that describe a defense this run's targets don't have."""
+    has_hardened_target = any(
+        registry.target(target_id).hardened
+        for block in analysis_blocks
+        for target_id in block["targets"]
+    )
     notes = (
         note for block in analysis_blocks
         for target_id in block["targets"]
         for note in block["summaries"][target_id].get("limitations", [])
-        if has_paired or _PAIRED_ONLY_LIMITATION_MARKER not in note
+        if has_hardened_target or _PAIRED_ONLY_LIMITATION_MARKER not in note
     )
     return list(dict.fromkeys(notes))
 
@@ -1407,7 +1415,7 @@ def _run_registry_experiment(mode: str, run_name: Optional[str], results_root: O
                 "dirty": provenance["dirty"], "registry_sha256": registry.source_sha256,
             },
             "evaluations": analysis_blocks,
-            "limitations": _applicable_limitations(analysis_blocks),
+            "limitations": _applicable_limitations(analysis_blocks, registry),
         }
         raw = (json.dumps(analysis_document, indent=2, ensure_ascii=False, allow_nan=False) + "\n").encode("utf-8")
         _emit_progress(progress_callback, "generating_results", "Generating the report")

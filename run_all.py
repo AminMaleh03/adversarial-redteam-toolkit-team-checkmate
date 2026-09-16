@@ -19,12 +19,15 @@ from __future__ import annotations
 import argparse
 import difflib
 import html
+import hashlib
 import json
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import unicodedata
+import uuid
 import webbrowser
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -37,9 +40,13 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 from analysis import analyze as analysis_mod  # noqa: E402
+from analysis import coverage as analysis_coverage  # noqa: E402
+from analysis import oces as analysis_oces  # noqa: E402
+from analysis import remediation as analysis_remediation  # noqa: E402
 from attacks import library as attack_library  # noqa: E402
 from baseline.load import load_baseline  # noqa: E402
-from contract import AttackCase, RunResult  # noqa: E402
+from contract import AttackCase, CORE_FAMILIES, RunResult  # noqa: E402
+from endpoint import targets as target_registry  # noqa: E402
 from report import generate as report_mod  # noqa: E402
 from runner import run as runner_mod  # noqa: E402
 
@@ -48,6 +55,10 @@ RESULTS_ROOT = ROOT / "results"
 # (provenance recorded in HANDOFF.md). Demo reports link to a copy of this, never to a
 # transient results/<run>/ path or an absolute filesystem path.
 VERIFIED_FULL_REPORT_DIR = ROOT / "artifacts" / "verified_full_report"
+# V6.3: stable, project-relative location for the generated multi-target master technical
+# report (see report/master_report.py). Pre-generated and committed, the same pattern as
+# VERIFIED_FULL_REPORT_DIR above -- never regenerated on request, never a transient path.
+TECHNICAL_REPORT_DIR = ROOT / "artifacts" / "technical_report"
 
 ENDPOINT_SPECS = {
     "v1": {"app": "endpoint.v1:app", "port": 8000},
@@ -99,12 +110,15 @@ class EndpointHandle:
     process: subprocess.Popen
     log_path: Path
     _log_handle: object
+    target_id: str = ""
+    peak_memory_bytes: Optional[int] = None
 
     @property
     def url(self) -> str:
         return f"http://127.0.0.1:{self.port}"
 
     def stop(self) -> None:
+        self.peak_memory_bytes = _peak_process_tree_memory(self.process.pid)
         if self.process.poll() is None:
             self.process.terminate()
             try:
@@ -144,25 +158,140 @@ def _wait_ready(handle: EndpointHandle, timeout: float) -> None:
     )
 
 
-def start_endpoint(version: str, out_dir: Path) -> EndpointHandle:
-    """Start one uvicorn endpoint (no --reload) and block until /health answers."""
-    spec = ENDPOINT_SPECS[version]
-    log_path = out_dir / f"{version}_server.log"
+def _peak_process_memory(pid: int) -> Optional[int]:
+    """Best-effort peak RSS/working-set reading without adding a runtime dependency."""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            class Counters(ctypes.Structure):
+                _fields_ = [
+                    ("cb", wintypes.DWORD), ("PageFaultCount", wintypes.DWORD),
+                    ("PeakWorkingSetSize", ctypes.c_size_t),
+                    ("WorkingSetSize", ctypes.c_size_t),
+                    ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                    ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                    ("PagefileUsage", ctypes.c_size_t),
+                    ("PeakPagefileUsage", ctypes.c_size_t),
+                ]
+            counters = Counters()
+            counters.cb = ctypes.sizeof(counters)
+            kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+            psapi = ctypes.WinDLL("psapi", use_last_error=True)
+            kernel.OpenProcess.restype = wintypes.HANDLE
+            kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+            psapi.GetProcessMemoryInfo.argtypes = [
+                wintypes.HANDLE, ctypes.POINTER(Counters), wintypes.DWORD,
+            ]
+            handle = kernel.OpenProcess(0x0400 | 0x0010, False, pid)
+            if not handle:
+                return None
+            try:
+                if psapi.GetProcessMemoryInfo(
+                    handle, ctypes.byref(counters), counters.cb
+                ):
+                    return int(counters.PeakWorkingSetSize)
+            finally:
+                kernel.CloseHandle(handle)
+        except (AttributeError, OSError, ValueError):
+            return None
+    else:
+        try:
+            for line in Path(f"/proc/{pid}/status").read_text(encoding="utf-8").splitlines():
+                if line.startswith("VmHWM:"):
+                    return int(line.split()[1]) * 1024
+        except (OSError, ValueError, IndexError):
+            return None
+    return None
+
+
+def _descendant_process_ids(parent_pid: int) -> list[int]:
+    """Best-effort Windows process-tree discovery for venv launcher children."""
+    if sys.platform != "win32":
+        return []
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class ProcessEntry(ctypes.Structure):
+            _fields_ = [
+                ("dwSize", wintypes.DWORD), ("cntUsage", wintypes.DWORD),
+                ("th32ProcessID", wintypes.DWORD), ("th32DefaultHeapID", ctypes.c_size_t),
+                ("th32ModuleID", wintypes.DWORD), ("cntThreads", wintypes.DWORD),
+                ("th32ParentProcessID", wintypes.DWORD), ("pcPriClassBase", wintypes.LONG),
+                ("dwFlags", wintypes.DWORD), ("szExeFile", wintypes.WCHAR * 260),
+            ]
+
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+        kernel.Process32FirstW.argtypes = [wintypes.HANDLE, ctypes.POINTER(ProcessEntry)]
+        kernel.Process32NextW.argtypes = [wintypes.HANDLE, ctypes.POINTER(ProcessEntry)]
+        snapshot = kernel.CreateToolhelp32Snapshot(0x00000002, 0)
+        if snapshot == wintypes.HANDLE(-1).value:
+            return []
+        parents = {}
+        try:
+            entry = ProcessEntry()
+            entry.dwSize = ctypes.sizeof(entry)
+            more = kernel.Process32FirstW(snapshot, ctypes.byref(entry))
+            while more:
+                parents[int(entry.th32ProcessID)] = int(entry.th32ParentProcessID)
+                more = kernel.Process32NextW(snapshot, ctypes.byref(entry))
+        finally:
+            kernel.CloseHandle(snapshot)
+        found = []
+        frontier = {parent_pid}
+        while frontier:
+            children = {pid for pid, parent in parents.items() if parent in frontier}
+            children -= set(found)
+            if not children:
+                break
+            found.extend(sorted(children))
+            frontier = children
+        return found
+    except (AttributeError, OSError, ValueError):
+        return []
+
+
+def _peak_process_tree_memory(pid: int) -> Optional[int]:
+    measurements = [
+        value for value in (_peak_process_memory(item) for item in [pid, *_descendant_process_ids(pid)])
+        if value is not None
+    ]
+    return sum(measurements) if measurements else None
+
+
+def start_target(target_id: str, out_dir: Path, registry=None) -> EndpointHandle:
+    """Start one trusted registry target and wait for its health endpoint."""
+    registry = registry or target_registry.load_registry()
+    target = registry.target(target_id)
+    log_path = out_dir / f"{target_id}_server.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    log_handle = log_path.open("w", encoding="utf-8")
+    log_handle = log_path.open("w", encoding="utf-8", newline="\n")
     process = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", spec["app"],
-         "--host", "127.0.0.1", "--port", str(spec["port"])],
+        [sys.executable, "-m", "uvicorn", target.app_path,
+         "--host", "127.0.0.1", "--port", str(target.port)],
         cwd=str(ROOT), stdout=log_handle, stderr=subprocess.STDOUT,
     )
-    handle = EndpointHandle(version=version, port=spec["port"], process=process,
-                            log_path=log_path, _log_handle=log_handle)
+    handle = EndpointHandle(version=target.version, port=target.port, process=process,
+                            log_path=log_path, _log_handle=log_handle, target_id=target_id)
     try:
         _wait_ready(handle, READY_TIMEOUT_S)
     except Exception:
         handle.stop()
         raise
     return handle
+
+
+def start_endpoint(version: str, out_dir: Path) -> EndpointHandle:
+    """Backward-compatible emotion endpoint lifecycle helper."""
+    if version not in ENDPOINT_SPECS:
+        raise ValueError(f"unknown emotion endpoint version {version!r}")
+    return start_target(f"emotion_{version}", out_dir)
 
 
 # --------------------------------------------------------------------------------------
@@ -580,17 +709,22 @@ def run_analysis_and_report(run_dir: Path, attack_index: dict, *, html_only: boo
     # same analysis JSON -- only presentation differs, per report.generate.render_html.
     _emit_progress(progress_callback, "generating_results", "Generating the report")
     report_dir = run_dir / "report"
-    pdf_ok = True
+    # Live Demo reports never expose a PDF (v6.1) -- demo_template.html has no download link
+    # for it, so generating one had no consumer. Only "full" mode ever attempts PDF rendering.
+    effective_html_only = html_only or mode == "demo"
+    pdf_ok = not effective_html_only
     try:
-        report_mod.generate_report(raw, report_dir, html_only=html_only, mode=mode)
+        report_mod.generate_report(raw, report_dir, html_only=effective_html_only, mode=mode)
     except RuntimeError as exc:
-        if html_only:
+        if effective_html_only:
             raise
         # PDF renderer unavailable on this machine (missing GTK, etc. -- see AGENTS.md).
         # Fall back to HTML-only rather than failing the whole run over presentation.
         pdf_ok = False
         report_mod.generate_report(raw, report_dir, html_only=True, mode=mode)
         print(f"(PDF rendering unavailable, wrote HTML-only report: {exc})", file=sys.stderr)
+    # (mode here is always "demo" or "full" -- run_analysis_and_report is only ever reached
+    # from the legacy paired-emotion path, which never carries "ci".)
 
     if detailed_available:
         shutil.copytree(VERIFIED_FULL_REPORT_DIR, report_dir / "detailed")
@@ -683,9 +817,9 @@ def print_demo_summary(run_name: str, demo_evidence: dict, report_dir: Path) -> 
 # --------------------------------------------------------------------------------------
 
 
-def run_experiment(mode: str, run_name: Optional[str] = None,
-                   results_root: Optional[Path] = None,
-                   progress_callback=None) -> dict:
+def _run_legacy_experiment(mode: str, run_name: Optional[str] = None,
+                           results_root: Optional[Path] = None,
+                           progress_callback=None, *, html_only: bool = False) -> dict:
     """Run one full experiment. Callable from Python; no interactive prompts.
 
     Returns a structured dict describing what happened -- never raises for a
@@ -731,7 +865,7 @@ def run_experiment(mode: str, run_name: Optional[str] = None,
         finally:
             handle.stop()
 
-    report_result = run_analysis_and_report(run_dir, attack_index, html_only=False, mode=mode,
+    report_result = run_analysis_and_report(run_dir, attack_index, html_only=html_only, mode=mode,
                                             progress_callback=progress_callback)
     analysis = report_result["analysis"]
 
@@ -762,6 +896,615 @@ def run_experiment(mode: str, run_name: Optional[str] = None,
 
 
 # --------------------------------------------------------------------------------------
+# Stage 3 registry-driven orchestration
+# --------------------------------------------------------------------------------------
+
+
+def _write_json(path: Path, value: dict) -> None:
+    """Write canonical UTF-8/LF JSON so artifact hashes are platform-independent."""
+    payload = (json.dumps(value, indent=2, ensure_ascii=False, allow_nan=False) + "\n").encode("utf-8")
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_bytes(payload)
+    temporary.replace(path)
+
+
+def _write_verification_case_set(path: Path, evaluation, plan) -> None:
+    """Persist the exact selected order as a directly replayable case set."""
+    baseline_ids = [key.split(":", 1)[1] for key in plan.selected_keys
+                    if key.startswith("baseline:")]
+    attack_ids = [key.split(":", 1)[1] for key in plan.selected_keys
+                  if key.startswith("attack:")]
+    _write_json(path, {
+        "case_set_id": f"run_{evaluation.evaluation_id.replace('.', '_')}",
+        "selection_version": 1,
+        "suite_id": evaluation.suite_id,
+        "baseline_ids": baseline_ids,
+        "attack_ids": attack_ids,
+        "order": list(plan.selected_keys),
+        "exclusions": [
+            {"case_key": key, "reason": "not selected by this run mode"}
+            for key in [*plan.skipped_keys, *plan.limit_excluded, *plan.deselected]
+        ],
+    })
+
+
+def _safe_run_name(value: Optional[str], mode: str) -> str:
+    if value is None:
+        return f"{mode}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+    if not value or value in {".", ".."} or any(c in value for c in "/\\"):
+        raise ValueError("run_name must be a nonempty name, not a path")
+    return value
+
+
+def _case_set_path(case_set_id: Optional[str]) -> Optional[Path]:
+    if case_set_id is None:
+        return None
+    path = ROOT / "analysis" / "case_sets" / f"{case_set_id}.json"
+    if not path.is_file():
+        raise RuntimeError(f"case set {case_set_id!r} is not available at {path.relative_to(ROOT)}")
+    return path
+
+
+def _runner_argv(*, target_id: str, target_url: str, evaluation, out_dir: Path,
+                 run_id: str, mode: str, case_set_path: Optional[Path],
+                 attack_limit: Optional[int]) -> list[str]:
+    argv = [
+        "--target", target_url, "--target-id", target_id,
+        "--suite", evaluation.suite_id, "--evaluation-id", evaluation.evaluation_id,
+        "--parent-run-id", run_id, "--out", str(out_dir),
+    ]
+    if case_set_path is not None:
+        argv += ["--case-set", str(case_set_path)]
+    elif attack_limit is not None:
+        argv += ["--limit", str(attack_limit)]
+        for attack_id in DEMO_EXCLUDED_ATTACK_IDS:
+            argv += ["--skip", attack_id]
+    return argv
+
+
+def _plan_evaluation(registry, evaluation, evaluation_dir: Path, run_id: str,
+                     mode: str, case_set_path: Optional[Path],
+                     attack_limit: Optional[int] = None):
+    target_id = evaluation.target_ids[0]
+    target = registry.target(target_id)
+    argv = _runner_argv(
+        target_id=target_id,
+        target_url=f"http://127.0.0.1:{target.port}",
+        evaluation=evaluation,
+        out_dir=evaluation_dir / target_id,
+        run_id=run_id,
+        mode=mode,
+        case_set_path=case_set_path,
+        attack_limit=attack_limit,
+    )
+    args = runner_mod.build_parser().parse_args(argv)
+    with tempfile.TemporaryDirectory(prefix=".plan-", dir=evaluation_dir) as staging_name:
+        return runner_mod.plan_run(args, evaluation_dir, Path(staging_name))
+
+
+def _strip_runtime_objects(document: dict) -> dict:
+    return {key: value for key, value in document.items() if key != "findings_by_target"}
+
+
+def _load_declared_results(path: Path, labels: Sequence[str]) -> tuple[list[RunResult], object]:
+    """Load Stage 3 rows with their registry label space.
+
+    ``analysis.load_results`` deliberately supports historical artifacts and therefore
+    validates before it knows a declared target's labels. The registry orchestrator has
+    that identity already, so it parses the same strict JSONL shape and supplies the
+    label space at the validation boundary instead of falling back to emotion labels.
+    """
+    rows = []
+    with path.open(encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, start=1):
+            text = line.strip()
+            if not text:
+                continue
+            try:
+                raw = json.loads(text, object_pairs_hook=analysis_mod._unique_object)
+                rows.append(RunResult(**raw))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"{path} line {line_number} is not a valid RunResult: {exc}") from exc
+    identity = analysis_mod.validation.resolve_identity(rows, labels=labels)
+    analysis_mod.validation.validate_rows(rows, labels=labels, identity=identity)
+    return rows, identity
+
+
+def _target_analysis_inputs(registry, evaluation, target_dir: Path):
+    manifest_bytes = (target_dir / "manifest.json").read_bytes()
+    manifest = json.loads(
+        manifest_bytes.decode("utf-8"), object_pairs_hook=analysis_mod._unique_object
+    )
+    analysis_mod.validation.validate_manifest(manifest)
+    meta = analysis_mod.load_run_meta(target_dir / "run_meta.json")
+    labels = registry.model_for(meta["target_id"]).labels
+    rows, identity = _load_declared_results(target_dir / "results.jsonl", labels)
+    analysis_mod.validation.validate_run(
+        rows, meta, manifest, identity.version, hashlib.sha256(manifest_bytes).hexdigest(),
+        labels=labels, identity=identity,
+    )
+    drift_summary = analysis_mod.drift.compute_drift(rows, manifest, labels=labels, identity=identity)
+    drift_by_attack = {record.attack_id: record for record in drift_summary.records}
+    evaluations = [
+        analysis_mod.evaluate_case(row, manifest[row.attack_id], drift_by_attack.get(row.attack_id))
+        for row in rows if row.case_type == "attack"
+    ]
+    return manifest_bytes, manifest, rows, meta, evaluations
+
+
+def _verification_case_set_path(evaluation, evaluation_dir: Path) -> str:
+    if evaluation.case_set_id:
+        return f"analysis/case_sets/{evaluation.case_set_id}.json"
+    path = evaluation_dir / "verification_case_set.json"
+    try:
+        return path.relative_to(ROOT).as_posix()
+    except ValueError:
+        return str(path.resolve())
+
+
+def _analyze_target(registry, evaluation, target_dir: Path, evaluation_dir: Path):
+    manifest_bytes, manifest, rows, meta, _evaluations = _target_analysis_inputs(
+        registry, evaluation, target_dir
+    )
+    labels = registry.model_for(meta["target_id"]).labels
+    identity = analysis_mod.validation.resolve_identity(rows, labels=labels)
+    target_analysis = analysis_mod.analyze_version(
+        rows, manifest, labels=labels, identity=identity
+    )
+    target_analysis.version = identity.version
+    summary = analysis_mod.build_version_summary(target_analysis, meta, identity)
+    case_set_file = _verification_case_set_path(evaluation, evaluation_dir)
+    by_id = {item["finding"]["finding_id"]: item for item in summary["findings"]}
+    rules = analysis_remediation.load_rules()
+    for finding in target_analysis.findings:
+        finding_meta = target_analysis.finding_meta[finding.finding_id]
+        detail = analysis_remediation.build_remediation_detail(
+            finding=finding,
+            failure_mode=finding_meta["failure_mode"],
+            subfamily=finding_meta["subfamily"],
+            rows=rows,
+            target_id=meta["target_id"],
+            case_set_file=case_set_file,
+            rules=rules,
+        )
+        concise_remediation = analysis_remediation.build_finding_remediation_string(
+            detail, finding
+        )
+        observed = detail["observed"]
+        if isinstance(observed, dict):
+            statuses = ", ".join(
+                f"HTTP {status}: {count}" if status != "no response" else f"no response: {count}"
+                for status, count in observed.get("status_distribution", {}).items()
+            ) or "no cited response rows"
+            detail["observed"] = (
+                f"{observed.get('rows_available', 0)} of "
+                f"{observed.get('affected_case_count', 0)} cited case row(s) were available; "
+                f"recorded outcomes: {statuses}; post-request health-check failures: "
+                f"{len(observed.get('health_check_failures_after_request', []))}."
+            )
+        item = by_id[finding.finding_id]
+        item["remediation_detail"] = detail
+        item["finding"]["remediation"] = concise_remediation
+    return {
+        "manifest_bytes": manifest_bytes,
+        "manifest": manifest,
+        "rows": rows,
+        "meta": meta,
+        "identity": identity,
+        "analysis": target_analysis,
+        "summary": summary,
+    }
+
+
+def _core_coverage(registry, evaluation, target_dir: Path) -> dict:
+    manifest_bytes, manifest, _rows, meta, evaluations = _target_analysis_inputs(
+        registry, evaluation, target_dir
+    )
+    entries = {}
+    versions = set()
+    for attack_id, value in manifest.items():
+        version = value.get("coverage_map_version")
+        if version:
+            versions.add(version)
+        entries[attack_id] = {
+            "family": value.get("family", ""),
+            "subfamily": value.get("subfamily", ""),
+            "coverage_class": value.get("coverage_class"),
+            "controls_targeted": value.get("controls_targeted", []),
+            "coverage_rationale": value.get("coverage_rationale"),
+            "coverage_map_version": version,
+        }
+    if len(versions) != 1:
+        raise ValueError(f"{evaluation.evaluation_id}: manifest must declare one coverage-map version")
+    source_sha = hashlib.sha256(manifest_bytes).hexdigest()
+    coverage_map = analysis_coverage.load_coverage_map(
+        {"coverage_map_version": next(iter(versions)), "entries": entries,
+         "is_overlay": False},
+        sha256=source_sha,
+        source=str(target_dir / "manifest.json"),
+    )
+    case_ids = meta["case_ids"]
+    attacks_only = lambda values: [value.split(":", 1)[1] for value in values if value.startswith("attack:")]
+    return analysis_coverage.build_coverage(
+        planned_attack_ids=attacks_only(case_ids["planned"]),
+        selected_attack_ids=attacks_only(case_ids["selected"]),
+        completed_attack_ids=attacks_only(case_ids["completed"]),
+        evaluations=evaluations,
+        coverage_map=coverage_map,
+        require_declaration=True,
+    )
+
+
+def _oces_block(registry, evaluation, evaluation_dir: Path) -> dict:
+    outcomes_by_target = {}
+    for target_id in evaluation.target_ids:
+        target_dir = evaluation_dir / target_id
+        _manifest_bytes, manifest, rows, _meta, _evaluations = _target_analysis_inputs(
+            registry, evaluation, target_dir
+        )
+        baselines = {row.baseline_id: row for row in rows if row.case_type == "baseline"}
+        attacks = {row.attack_id: row for row in rows if row.case_type == "attack"}
+        outcomes_by_target[target_id] = [
+            analysis_oces.classify_case(
+                case_id=attack_id,
+                family=value.get("declared_family") or value.get("family"),
+                target_id=target_id,
+                meta=value,
+                clean=baselines.get(value.get("baseline_id")),
+                attacked=attacks.get(attack_id),
+            )
+            for attack_id, value in manifest.items()
+        ]
+    provenance = ROOT / "attacks" / "data" / "oces" / "freeze_content_hashes.json"
+    provenance_bytes = provenance.read_bytes()
+    snapshot = evaluation_dir / "oces_freeze_content_hashes.json"
+    snapshot.write_bytes(provenance_bytes)
+    return analysis_oces.build_oces_block(
+        outcomes_by_target=outcomes_by_target,
+        seed_hashes={
+            "path": snapshot.name,
+            "sha256": hashlib.sha256(provenance_bytes).hexdigest(),
+            "document": json.loads(provenance_bytes.decode("utf-8")),
+        },
+    )
+
+
+def _analyze_evaluation(registry, evaluation, evaluation_dir: Path) -> dict:
+    targets = list(evaluation.target_ids)
+    analyzed = {
+        target_id: _analyze_target(
+            registry, evaluation, evaluation_dir / target_id, evaluation_dir
+        )
+        for target_id in targets
+    }
+    if evaluation.kind == "paired":
+        left, right = targets
+        if analyzed[left]["manifest_bytes"] != analyzed[right]["manifest_bytes"]:
+            raise ValueError("paired target manifest files differ; one oracle set cannot score both")
+        left_attacks = {
+            row.attack_id: row for row in analyzed[left]["rows"] if row.case_type == "attack"
+        }
+        for row in analyzed[right]["rows"]:
+            if (row.case_type == "attack" and row.attack_id in left_attacks
+                    and row.baseline_id != left_attacks[row.attack_id].baseline_id):
+                raise ValueError(f"{row.attack_id}: baseline association differs across targets")
+        comparison = analysis_mod.build_comparison_summary(
+            analyzed[left]["analysis"], analyzed[right]["analysis"],
+            analyzed[left]["meta"], analyzed[right]["meta"],
+        )
+    else:
+        comparison = None
+    block = analysis_mod.build_evaluation_block(
+        evaluation_id=evaluation.evaluation_id,
+        kind=evaluation.kind,
+        task_id=evaluation.task_id,
+        suite_id=evaluation.suite_id,
+        targets=targets,
+        summaries={target_id: analyzed[target_id]["summary"] for target_id in targets},
+        comparison=comparison,
+        coverage=None,
+        oces=None,
+    )
+    baseline_path = ROOT / registry.baseline_file_for(evaluation.evaluation_id)
+    block["baseline_file"] = registry.baseline_file_for(evaluation.evaluation_id)
+    block["baseline_file_sha256"] = hashlib.sha256(baseline_path.read_bytes()).hexdigest()
+    if evaluation.suite_id == "core":
+        per_target = {
+            target_id: _core_coverage(registry, evaluation, evaluation_dir / target_id)
+            for target_id in evaluation.target_ids
+        }
+        if evaluation.kind == "single":
+            block["coverage"] = per_target[evaluation.target_ids[0]]
+        else:
+            first = per_target[evaluation.target_ids[0]]
+            block["coverage"] = {
+                "coverage_map": first["coverage_map"],
+                "by_target": per_target,
+                "interpretation": first["interpretation"],
+            }
+    else:
+        block["oces"] = _oces_block(registry, evaluation, evaluation_dir)
+    return block
+
+
+# analysis.analyze.LIMITATION_NOTES is emitted unconditionally onto every target's summary
+# (per-target, regardless of whether that target has a paired counterpart) -- this one note
+# is written in V1/V2 hardening terms and is not applicable to a run that never touches a
+# hardened target at all (v6.2: a sentiment-only report must never say "V2" or "hardening").
+# Gated on registry.target(...).hardened, not on evaluation "kind" -- the CI gate's own
+# ci.emotion evaluation is "single" kind (it tests emotion_v2 alone, using an approved
+# clean-output reference instead of a second live V1 service; see endpoint/targets.json) but
+# genuinely is about a hardened target, so the note must still apply there. Matched by
+# content, not by tuple index, so a reordering of the frozen tuple upstream can't silently
+# break the filter.
+_PAIRED_ONLY_LIMITATION_MARKER = "V2's defenses are application-layer only"
+
+
+def _applicable_limitations(analysis_blocks: list, registry) -> list:
+    """The run-wide, deduplicated limitations list, minus any hardening-specific note when
+    this run touches no hardened target at all. Never rewrites or reorders the notes that do
+    apply -- only omits ones that describe a defense this run's targets don't have."""
+    has_hardened_target = any(
+        registry.target(target_id).hardened
+        for block in analysis_blocks
+        for target_id in block["targets"]
+    )
+    notes = (
+        note for block in analysis_blocks
+        for target_id in block["targets"]
+        for note in block["summaries"][target_id].get("limitations", [])
+        if has_hardened_target or _PAIRED_ONLY_LIMITATION_MARKER not in note
+    )
+    return list(dict.fromkeys(notes))
+
+
+def _app_commit_unavailable_reason(provenance: dict) -> Optional[str]:
+    """An explicit reason for a missing application commit (v6.2) -- never a silent
+    "unknown", a branch name, or the remote head standing in for the real commit."""
+    if provenance.get("app_commit"):
+        return None
+    return (
+        "Git metadata was unavailable in this environment when the run started "
+        "(no .git directory, git not on PATH, or the git command failed); no application "
+        "commit could be recorded for this run."
+    )
+
+
+def _registry_snapshot(registry) -> dict:
+    return {
+        "registry_version": registry.registry_version,
+        "source_path": str(Path(registry.source_path).relative_to(ROOT).as_posix()),
+        "source_sha256": registry.source_sha256,
+    }
+
+
+def _public_evaluation_entry(registry, evaluation, evaluation_dir: Path) -> dict:
+    return {
+        "evaluation_id": evaluation.evaluation_id,
+        "kind": evaluation.kind,
+        "task_id": evaluation.task_id,
+        "suite_id": evaluation.suite_id,
+        "declared_families": list(evaluation.declared_families),
+        "case_set_id": evaluation.case_set_id,
+        "baseline_file": registry.baseline_file_for(evaluation.evaluation_id),
+        "target_dirs": {
+            target_id: str((evaluation_dir / target_id).resolve())
+            for target_id in evaluation.target_ids
+        },
+    }
+
+
+def _run_registry_experiment(mode: str, run_name: Optional[str], results_root: Optional[Path],
+                             progress_callback, evaluation_ids: Sequence[str],
+                             html_only: bool) -> dict:
+    if mode not in ("full", "demo", "ci"):
+        raise ValueError(f"unknown mode {mode!r}; expected 'full', 'demo', or 'ci'")
+    if not evaluation_ids or len(set(evaluation_ids)) != len(evaluation_ids):
+        raise ValueError("evaluation_ids must be a nonempty list without duplicates")
+
+    registry = target_registry.load_registry()
+    evaluations = [registry.evaluation(evaluation_id) for evaluation_id in evaluation_ids]
+    for evaluation in evaluations:
+        if mode == "ci" and evaluation.mode != "ci":
+            raise ValueError(f"{evaluation.evaluation_id!r} is not an internal CI evaluation")
+        if mode != "ci" and evaluation.mode == "ci":
+            raise ValueError(f"{evaluation.evaluation_id!r} may run only in ci mode")
+        if mode == "demo" and evaluation.suite_id != "core":
+            raise ValueError("public demos support the core suites; additional evaluations are report-only")
+        target_registry.require_runnable(registry, evaluation.evaluation_id)
+
+    run_id = uuid.uuid4().hex[:16]
+    display_name = _safe_run_name(run_name, mode)
+    root = (Path(results_root) if results_root is not None else RESULTS_ROOT).resolve()
+    run_dir = root / f"{display_name}_{run_id}"
+    run_dir.mkdir(parents=True, exist_ok=False)
+    (run_dir / "runs").mkdir()
+    registry_bytes = Path(registry.source_path).read_bytes()
+    require_hash = hashlib.sha256(registry_bytes).hexdigest()
+    if require_hash != registry.source_sha256:
+        raise RuntimeError("target registry changed while the run was being created")
+    (run_dir / "registry.json").write_bytes(registry_bytes)
+
+    # Obtained once, here, and reused for every evaluation in this orchestration call (never
+    # re-derived per evaluation or asked of the report renderer) so multiple evaluations in one
+    # run always agree on the same application commit (v6.2 requirement).
+    provenance = runner_mod.code_provenance(ROOT)
+    app_commit_unavailable_reason = _app_commit_unavailable_reason(provenance)
+    created = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    index_entries = []
+    for evaluation in evaluations:
+        evaluation_dir = run_dir / "runs" / evaluation.evaluation_id.replace(".", "_")
+        evaluation_dir.mkdir()
+        index_entries.append(_public_evaluation_entry(registry, evaluation, evaluation_dir))
+    persisted_entries = json.loads(json.dumps(index_entries))
+    for entry in persisted_entries:
+        entry["target_dirs"] = {
+            target_id: Path(directory).relative_to(run_dir).as_posix()
+            for target_id, directory in entry["target_dirs"].items()
+        }
+    run_index = {
+        "run_id": run_id,
+        "run_name": display_name,
+        "created_at_utc": created,
+        "app_commit": provenance["app_commit"],
+        "dirty": provenance["dirty"],
+        "mode": mode,
+        "status": "running",
+        "registry": _registry_snapshot(registry),
+        "evaluations": persisted_entries,
+    }
+    _write_json(run_dir / "run.json", run_index)
+
+    _emit_progress(progress_callback, "initializing", "Preparing the selected evaluation")
+    analysis_blocks = []
+    terminations = {}
+    memory = {}
+    try:
+        for evaluation, public_entry in zip(evaluations, index_entries):
+            evaluation_dir = Path(next(iter(public_entry["target_dirs"].values()))).parent
+            case_path = _case_set_path(evaluation.case_set_id)
+            if case_path is not None:
+                selection_bytes = case_path.read_bytes()
+                (evaluation_dir / "case_selection.json").write_bytes(selection_bytes)
+                public_entry["case_selection_sha256"] = hashlib.sha256(selection_bytes).hexdigest()
+                next(item for item in persisted_entries
+                     if item["evaluation_id"] == evaluation.evaluation_id)["case_selection_sha256"] = public_entry["case_selection_sha256"]
+            plan = _plan_evaluation(registry, evaluation, evaluation_dir, run_id, mode, case_path)
+            attack_limit = (
+                compute_demo_attack_limit(plan.baselines, plan.attacks)
+                if mode == "demo" else None
+            )
+            if attack_limit is not None:
+                # The reusable plan must already contain the exact demo selection. The
+                # first build above discovers the content-derived limit; the second is
+                # the one and only plan reused by every target in the evaluation.
+                plan = _plan_evaluation(
+                    registry, evaluation, evaluation_dir, run_id, mode, case_path,
+                    attack_limit=attack_limit,
+                )
+            if case_path is None:
+                _write_verification_case_set(
+                    evaluation_dir / "verification_case_set.json", evaluation, plan
+                )
+            for target_id in evaluation.target_ids:
+                target = registry.target(target_id)
+                target_dir = Path(public_entry["target_dirs"][target_id])
+                stage = f"starting_{target_id}"
+                _emit_progress(progress_callback, stage, f"Starting {target_id.replace('_', ' ')}")
+                handle = start_target(target_id, evaluation_dir, registry)
+                started = time.monotonic()
+                try:
+                    _emit_progress(progress_callback, f"attacking_{target_id}",
+                                   f"Sending the {evaluation.suite_id} suite to {target_id.replace('_', ' ')}")
+                    argv = _runner_argv(
+                        target_id=target_id, target_url=handle.url, evaluation=evaluation,
+                        out_dir=target_dir, run_id=run_id, mode=mode,
+                        case_set_path=case_path, attack_limit=attack_limit,
+                    )
+                    exit_code = runner_mod.main(argv, reuse_plan=plan)
+                    if exit_code not in (0, 1):
+                        raise RuntimeError(
+                            f"runner for {target_id} exited with configuration/execution code {exit_code}"
+                        )
+                    terminations[target_id] = exit_code
+                finally:
+                    handle.stop()
+                    memory[target_id] = {
+                        "peak_process_memory_bytes": handle.peak_memory_bytes,
+                        "elapsed_seconds": round(time.monotonic() - started, 3),
+                        "measurement_scope": "uvicorn endpoint process; sequential startup does not prove only one model was resident",
+                    }
+            _emit_progress(progress_callback, "analyzing", f"Analyzing {evaluation.evaluation_id}")
+            analysis_blocks.append(_analyze_evaluation(registry, evaluation, evaluation_dir))
+
+        analysis_document = {
+            "schema_version": 3,
+            "contracts_version": "3.0.0",
+            "run_identity": {
+                "run_id": run_id, "run_name": display_name,
+                "created_at_utc": created, "app_commit": provenance["app_commit"],
+                "app_commit_unavailable_reason": app_commit_unavailable_reason,
+                "dirty": provenance["dirty"], "registry_sha256": registry.source_sha256,
+            },
+            "evaluations": analysis_blocks,
+            "limitations": _applicable_limitations(analysis_blocks, registry),
+        }
+        raw = (json.dumps(analysis_document, indent=2, ensure_ascii=False, allow_nan=False) + "\n").encode("utf-8")
+        _emit_progress(progress_callback, "generating_results", "Generating the report")
+        report_dir = run_dir / "report"
+        # Live Demo reports never expose a PDF -- v6.1: a Download PDF button only belongs on
+        # the full/verified technical report, and generating a file with no linked consumer for
+        # every demo run was pure waste. Only "full" mode ever attempts PDF rendering. "ci" is
+        # not a report presentation mode (report.generate only knows "full"/"demo"); CI runs
+        # get the "full" report style, same as before this fix.
+        report_mode = "demo" if mode == "demo" else "full"
+        effective_html_only = html_only or mode == "demo"
+        pdf_ok = not effective_html_only
+        try:
+            report_mod.generate_report(raw, report_dir, html_only=effective_html_only, mode=report_mode)
+        except RuntimeError as exc:
+            if effective_html_only:
+                raise
+            pdf_ok = False
+            report_mod.generate_report(raw, report_dir, html_only=True, mode=report_mode)
+            print(f"(PDF rendering unavailable, wrote HTML-only report: {exc})", file=sys.stderr)
+
+        status = "COMPLETE" if all(value == 0 for value in terminations.values()) else "PARTIAL"
+        run_index.update(status=status.lower(), completed_at_utc=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                         resources=memory,
+                         artifacts={"analysis_json": "report/analysis.json", "report_html": "report/report.html",
+                                    "report_pdf": "report/report.pdf" if pdf_ok else None})
+        _write_json(run_dir / "run.json", run_index)
+        result = {
+            "mode": mode, "run_id": run_id, "run_name": display_name,
+            "run_dir": run_dir, "evaluations": index_entries,
+            "terminations": terminations, "status": status,
+            "analysis": analysis_document, "analysis_json": report_dir / "analysis.json",
+            "report_dir": report_dir, "report_html": report_dir / "report.html",
+            "report_pdf": report_dir / "report.pdf" if pdf_ok else None,
+            "pdf_generated": pdf_ok, "resources": memory,
+        }
+        _emit_progress(progress_callback, "complete", "Experiment complete")
+        return result
+    except Exception as exc:
+        run_index.update(status="execution_error", completed_at_utc=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                         error={"type": type(exc).__name__, "message": str(exc)}, resources=memory)
+        _write_json(run_dir / "run.json", run_index)
+        raise
+
+
+def run_experiment(mode: str, run_name: Optional[str] = None,
+                   results_root: Optional[Path] = None, progress_callback=None,
+                   *, evaluation_ids: Optional[Sequence[str]] = None,
+                   html_only: bool = False) -> dict:
+    """Run an experiment without opening a browser.
+
+    ``evaluation_ids=None`` retains the original paired-emotion call path. Explicit
+    identities use the Stage 3 registry, including the single-target sentiment and
+    internal CI journeys. Browser opening remains exclusively in :func:`main`.
+    """
+    if evaluation_ids is None:
+        legacy = _run_legacy_experiment(
+            mode, run_name=run_name, results_root=results_root,
+            progress_callback=progress_callback, html_only=html_only,
+        )
+        legacy["run_id"] = legacy.get("run_id") or uuid.uuid4().hex[:16]
+        legacy["evaluations"] = [{
+            "evaluation_id": "emotion.core", "kind": "paired", "task_id": "emotion_7",
+            "suite_id": "core", "declared_families": list(CORE_FAMILIES),
+            "case_set_id": None, "baseline_file": "baseline/baseline.json",
+            "target_dirs": {
+                "emotion_v1": str((legacy["run_dir"] / "v1").resolve()),
+                "emotion_v2": str((legacy["run_dir"] / "v2").resolve()),
+            },
+        }]
+        return legacy
+    return _run_registry_experiment(
+        mode, run_name, results_root, progress_callback, list(evaluation_ids), html_only,
+    )
+
+
+# --------------------------------------------------------------------------------------
 # cli
 # --------------------------------------------------------------------------------------
 
@@ -770,20 +1513,26 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="run_all", description="Run the full Team Checkmate experiment end to end."
     )
-    parser.add_argument("--mode", required=True, choices=("full", "demo"))
+    parser.add_argument("--mode", required=True, choices=("full", "demo", "ci"))
     parser.add_argument("--run-name", default=None,
                         help="output subdirectory under results/; default is a timestamped name")
     parser.add_argument("--no-open", action="store_true",
                         help="do not open the generated report in the default browser "
                              "(CI/Docker/servers/automated tests)")
+    parser.add_argument("--evaluation", action="append", dest="evaluation_ids",
+                        help="trusted registry evaluation id; repeat to run sequentially")
+    parser.add_argument("--html-only", action="store_true",
+                        help="generate HTML/JSON without loading the PDF renderer")
     return parser
 
 
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        result = run_experiment(mode=args.mode, run_name=args.run_name)
-    except RuntimeError as exc:
+        result = run_experiment(mode=args.mode, run_name=args.run_name,
+                                evaluation_ids=args.evaluation_ids,
+                                html_only=args.html_only)
+    except (RuntimeError, ValueError) as exc:
         print(f"\nrun_all failed: {exc}", file=sys.stderr)
         return 1
 

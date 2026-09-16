@@ -36,6 +36,7 @@ from report.generate import (  # noqa: E402
     CREATOR_NAME, PRODUCT_NAME, PRODUCT_TAGLINE, PRODUCT_VERSION_LABEL,
 )
 from web import lab as lab_module  # noqa: E402
+from web import progress as progress_module  # noqa: E402
 
 logger = logging.getLogger("team_checkmate.web")
 
@@ -46,14 +47,18 @@ RED_LAB_LOGO_PATH = ROOT / "Red Lab Adversarial Testing Redefined.png"
 
 RESULTS_MOUNT = "/results"
 VERIFIED_MOUNT = "/verified-full"
+TECHNICAL_REPORT_MOUNT = "/technical-report"
 
 # Real orchestration transitions only -- see run_all.py's _emit_progress call sites for
 # what each stage actually means. Order here must match the order run_experiment() emits.
-STAGE_ORDER = (
+# v6.1 Phase 2: paired (emotion) vs single-target (sentiment) get distinct descriptors --
+# the single-target flow has no V2 phase at all, so it must never share the paired stage list.
+_PAIRED_DEMO_STAGE_ORDER = (
     "initializing", "starting_v1", "attacking_v1", "starting_v2", "attacking_v2",
     "analyzing", "generating_results", "complete",
 )
-STAGE_LABELS = {
+_PAIRED_DEMO_STAGE_PERCENT = dict(zip(_PAIRED_DEMO_STAGE_ORDER, (5, 15, 30, 50, 65, 82, 92, 100)))
+_PAIRED_DEMO_LABELS = {
     "initializing": "Initializing toolkit",
     "starting_v1": "Starting V1",
     "attacking_v1": "Attacking unhardened endpoint",
@@ -63,9 +68,79 @@ STAGE_LABELS = {
     "generating_results": "Generating results",
     "complete": "Complete",
 }
-# Stage-boundary percentages, per the V4 brief -- movement happens only on real stage
-# transitions (see _progress_callback), never a fake continuous animation.
-STAGE_PERCENT = dict(zip(STAGE_ORDER, (5, 15, 30, 50, 65, 82, 92, 100)))
+
+# The registry orchestration for a single target only ever emits one combined
+# starting_{target}/attacking_{target} pair (see run_all.py's _run_registry_experiment) --
+# there is no separate backend signal for "clean reference" vs "adversarial variants", so
+# those two display rows below both map onto the one real "attacking_target" transition
+# rather than inventing a fake intermediate progress step.
+_SINGLE_DEMO_STAGE_ORDER = (
+    "initializing", "starting_target", "attacking_target",
+    "analyzing", "generating_results", "complete",
+)
+_SINGLE_DEMO_STAGE_PERCENT = dict(zip(_SINGLE_DEMO_STAGE_ORDER, (5, 20, 55, 80, 92, 100)))
+
+
+def _demo_descriptor(evaluation_id: str, target_ids: list) -> dict:
+    if evaluation_id == "sentiment.core":
+        target_id = target_ids[0] if target_ids else "sentiment_v1"
+        return progress_module.descriptor(
+            evaluation_id=evaluation_id, kind="single", target_ids=target_ids,
+            same_model_note=None,
+            footer_note="Single-target sentiment evaluation; no V1/V2 comparison is implied.",
+            cards=[progress_module.card(
+                "target", "Sentiment — Configured Target",
+                f"{target_id} · single-target evaluation",
+                start_stage="starting_target", end_stage="attacking_target",
+            )],
+            stage_order=list(_SINGLE_DEMO_STAGE_ORDER), stage_percent=_SINGLE_DEMO_STAGE_PERCENT,
+            stages=[
+                progress_module.stage("initializing", "Initializing toolkit"),
+                progress_module.stage("starting_target", "Starting sentiment target"),
+                progress_module.stage("clean_reference", "Running clean reference",
+                                       maps_to="attacking_target"),
+                progress_module.stage("adversarial_variants", "Testing sentiment adversarial variants",
+                                       maps_to="attacking_target"),
+                progress_module.stage("analyzing", "Analyzing observations"),
+                progress_module.stage("generating_results", "Generating results"),
+                progress_module.stage("complete", "Complete"),
+            ],
+        )
+    return progress_module.descriptor(
+        evaluation_id=evaluation_id, kind="paired", target_ids=target_ids,
+        same_model_note="Two endpoint configurations",
+        footer_note="Same underlying AI model in both cases — only the endpoint hardening differs.",
+        cards=[
+            progress_module.card(
+                "v1", "V1 — Unhardened Endpoint", "No application-layer hardening.",
+                start_stage="starting_v1", end_stage="attacking_v1",
+            ),
+            progress_module.card(
+                "v2", "V2 — Hardened Endpoint",
+                "Input validation, length controls, exception handling and normalization.",
+                start_stage="starting_v2", end_stage="attacking_v2",
+            ),
+        ],
+        stage_order=list(_PAIRED_DEMO_STAGE_ORDER), stage_percent=_PAIRED_DEMO_STAGE_PERCENT,
+        stages=[progress_module.stage(s, _PAIRED_DEMO_LABELS[s]) for s in _PAIRED_DEMO_STAGE_ORDER],
+    )
+
+
+def _real_stage_alias(evaluation_id: str, raw_stage: str) -> str:
+    """Map a raw orchestration stage (run_all.py's f"starting_{target_id}" etc.) onto this
+    evaluation's descriptor stage id. Kept in one place so the display stage list and the
+    percent/index computed from it can never disagree about what a raw stage means."""
+    if evaluation_id == "sentiment.core":
+        aliases = {
+            "starting_sentiment_v1": "starting_target",
+            "attacking_sentiment_v1": "attacking_target",
+        }
+    else:
+        aliases = {
+            "starting_emotion_v1": "starting_v1", "attacking_emotion_v1": "attacking_v1",
+            "starting_emotion_v2": "starting_v2", "attacking_emotion_v2": "attacking_v2",
+        }
+    return aliases.get(raw_stage, raw_stage)
 
 
 def _data_uri(path: Path, label: str) -> str:
@@ -84,9 +159,11 @@ def _red_lab_logo_data_uri() -> str:
 
 def _idle_state() -> dict:
     return {
-        "status": "idle", "stage": None, "stage_index": -1, "percent": 0, "message": "",
+        "status": "idle", "state": "idle", "stage": None, "stage_index": -1,
+        "percent": 0, "message": "",
+        "run_id": None, "evaluation_id": None, "target_ids": [], "results": None,
         "run_name": None, "started_at": None, "completed_at": None,
-        "result_url": None, "error": None,
+        "result_url": None, "report_url": None, "error": None,
     }
 
 
@@ -118,32 +195,58 @@ def _generate_run_name() -> str:
     return f"hf_demo_{stamp}_{secrets.token_hex(3)}"
 
 
-def _progress_callback(stage: str, message: str) -> None:
-    with _job_lock:
-        if _job_state["status"] != "running":
-            return
-        _job_state["stage"] = stage
-        _job_state["stage_index"] = STAGE_ORDER.index(stage)
-        _job_state["percent"] = STAGE_PERCENT[stage]
-        _job_state["message"] = message
+def _make_progress_callback(run_id: str, evaluation_id: str):
+    descriptor = _demo_descriptor(evaluation_id, [])
+    stage_order = descriptor["stage_order"]
+    stage_percent = descriptor["stage_percent"]
+
+    def callback(stage: str, message: str) -> None:
+        display_stage = _real_stage_alias(evaluation_id, stage)
+        with _job_lock:
+            if _job_state.get("run_id") != run_id or _job_state["status"] != "running":
+                return
+            _job_state["stage"] = display_stage
+            if display_stage in stage_order:
+                _job_state["stage_index"] = stage_order.index(display_stage)
+                _job_state["percent"] = stage_percent[display_stage]
+            _job_state["message"] = message
+    return callback
 
 
-def _run_job(run_name: str) -> None:
+def _run_job(run_name: str, run_id: str, evaluation_id: str, mode: str) -> None:
+    descriptor = _demo_descriptor(evaluation_id, [])
     try:
         result = run_all.run_experiment(
-            mode="demo", run_name=run_name, progress_callback=_progress_callback,
+            mode=mode, run_name=run_name,
+            progress_callback=_make_progress_callback(run_id, evaluation_id),
+            evaluation_ids=[evaluation_id],
         )
         report_html = Path(result["report_html"]).resolve()
         rel = report_html.relative_to(Path(run_all.RESULTS_ROOT).resolve())
         result_url = f"{RESULTS_MOUNT}/{rel.as_posix()}"
         with _job_lock:
-            _job_state["status"] = "complete"
+            if _job_state.get("run_id") != run_id:
+                return
+            analysis_path = result.get("analysis_json")
+            analysis_url = None
+            if analysis_path is not None:
+                analysis_json = Path(analysis_path).resolve()
+                analysis_rel = analysis_json.relative_to(Path(run_all.RESULTS_ROOT).resolve())
+                analysis_url = f"{RESULTS_MOUNT}/{analysis_rel.as_posix()}"
+            _job_state["status"] = _job_state["state"] = "complete"
+            _job_state["stage"] = "done"
+            _job_state["stage_index"] = len(descriptor["stage_order"]) - 1
+            _job_state["percent"] = 100
+            _job_state["message"] = "Run complete."
             _job_state["completed_at"] = datetime.now(timezone.utc).isoformat()
-            _job_state["result_url"] = result_url
+            _job_state["result_url"] = _job_state["report_url"] = result_url
+            _job_state["results"] = {"analysis_json": analysis_url} if analysis_url else None
     except Exception:  # noqa: BLE001 -- orchestration failure; never let it kill the thread silently
         logger.exception("Live demo run failed for run_name=%s", run_name)
         with _job_lock:
-            _job_state["status"] = "failed"
+            if _job_state.get("run_id") != run_id:
+                return
+            _job_state["status"] = _job_state["state"] = "failed"
             _job_state["completed_at"] = datetime.now(timezone.utc).isoformat()
             _job_state["error"] = "The live attack run failed. Please try again in a moment."
 
@@ -183,6 +286,10 @@ app.mount(RESULTS_MOUNT, StaticFiles(directory=str(run_all.RESULTS_ROOT)), name=
 if run_all.VERIFIED_FULL_REPORT_DIR.exists():
     app.mount(VERIFIED_MOUNT, StaticFiles(directory=str(run_all.VERIFIED_FULL_REPORT_DIR)), name="verified_full")
 
+if run_all.TECHNICAL_REPORT_DIR.exists():
+    app.mount(TECHNICAL_REPORT_MOUNT, StaticFiles(directory=str(run_all.TECHNICAL_REPORT_DIR), html=True),
+              name="technical_report")
+
 app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
 
 templates = Jinja2Templates(directory=str(HERE / "templates"))
@@ -202,8 +309,9 @@ def index(request: Request) -> HTMLResponse:
         "product_version_label": PRODUCT_VERSION_LABEL,
         "verified_full_available": run_all.VERIFIED_FULL_REPORT_DIR.exists(),
         "verified_full_href": f"{VERIFIED_MOUNT}/report.html",
-        "stage_labels": STAGE_LABELS,
-        "stage_order": list(STAGE_ORDER),
+        "technical_report_available": run_all.TECHNICAL_REPORT_DIR.exists(),
+        "technical_report_href": f"{TECHNICAL_REPORT_MOUNT}/",
+        "demo_descriptors": _all_demo_descriptors(),
     }
     return templates.TemplateResponse(request, "index.html", context)
 
@@ -219,8 +327,9 @@ def lab_page(request: Request) -> HTMLResponse:
         "product_version_label": PRODUCT_VERSION_LABEL,
         "verified_full_available": run_all.VERIFIED_FULL_REPORT_DIR.exists(),
         "verified_full_href": f"{VERIFIED_MOUNT}/report.html",
-        "lab_stage_order": list(lab_module.LAB_STAGE_ORDER),
-        "lab_stage_labels": lab_module.LAB_STAGE_LABELS,
+        "technical_report_available": run_all.TECHNICAL_REPORT_DIR.exists(),
+        "technical_report_href": f"{TECHNICAL_REPORT_MOUNT}/",
+        "lab_descriptors": lab_module.all_lab_descriptors(),
         "lab_max_chars": lab_module.MAX_INPUT_CHARS,
     }
     return templates.TemplateResponse(request, "lab.html", context)
@@ -232,25 +341,132 @@ def healthz() -> dict:
     return {"status": "ok", "service": "team-checkmate-web"}
 
 
+def _all_demo_descriptors() -> dict:
+    registry = run_all.target_registry.load_registry()
+    return {
+        evaluation_id: _demo_descriptor(evaluation_id, list(registry.evaluation(evaluation_id).target_ids))
+        for evaluation_id in ("emotion.core", "sentiment.core")
+    }
+
+
+def _target_choices() -> dict:
+    registry = run_all.target_registry.load_registry()
+    labels = {
+        "emotion_v1": "Emotion (unhardened)",
+        "emotion_v2": "Emotion (hardened)",
+        "sentiment_v1": "Sentiment",
+    }
+    return {
+        "targets": [
+            {
+                "target_id": target_id,
+                "task_id": target.task_id,
+                "label": labels[target_id],
+                "hardened": target.hardened,
+            }
+            for target_id, target in registry.targets.items()
+        ],
+        "evaluations": [
+            {
+                "evaluation_id": evaluation_id,
+                "kind": registry.evaluation(evaluation_id).kind,
+                "suite_id": registry.evaluation(evaluation_id).suite_id,
+            }
+            for evaluation_id in ("emotion.core", "sentiment.core")
+        ],
+        "note": "Only trusted configured choices are offered. There is no free-form URL entry.",
+    }
+
+
+@app.get("/api/targets")
+def targets() -> dict:
+    return _target_choices()
+
+
+def _validation_error(field: str, message: str, error_type: str) -> JSONResponse:
+    return JSONResponse({"detail": [{
+        "loc": ["body", field], "msg": message, "type": error_type,
+    }]}, status_code=422)
+
+
+def _resolve_public_evaluation(body) -> tuple[str, str] | JSONResponse:
+    if body is None:
+        body = {}
+    if not isinstance(body, dict):
+        return _validation_error("body", "request body must be an object", "type_error.object")
+    mode = body.get("mode", "demo")
+    if mode not in ("demo", "full"):
+        return _validation_error(
+            "mode", f"unknown mode {mode!r}; configured: ['demo', 'full']",
+            "value_error.unknown_mode",
+        )
+    registry = run_all.target_registry.load_registry()
+    target_id = body.get("target_id")
+    evaluation_id = body.get("evaluation_id")
+    if target_id is not None:
+        if target_id not in registry.targets:
+            return _validation_error(
+                "target_id",
+                f"unknown target_id {target_id!r}; configured: {sorted(registry.targets)}",
+                "value_error.unknown_target",
+            )
+        target_evaluation = "sentiment.core" if target_id == "sentiment_v1" else "emotion.core"
+        if evaluation_id is not None and evaluation_id != target_evaluation:
+            return _validation_error(
+                "evaluation_id", "target_id and evaluation_id identify different tasks",
+                "value_error.incompatible_selection",
+            )
+        evaluation_id = target_evaluation
+    evaluation_id = evaluation_id or "emotion.core"
+    if evaluation_id not in ("emotion.core", "sentiment.core"):
+        configured = ["emotion.core", "sentiment.core"]
+        return _validation_error(
+            "evaluation_id",
+            f"unknown evaluation_id {evaluation_id!r}; configured: {configured}",
+            "value_error.unknown_evaluation",
+        )
+    return evaluation_id, mode
+
+
 @app.post("/api/run")
-def start_run() -> JSONResponse:
+async def start_run(request: Request) -> JSONResponse:
+    raw = await request.body()
+    if raw:
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001 - normalized to the public 422 contract
+            return _validation_error("body", "request body is not valid JSON", "value_error.json")
+    else:
+        body = {}
+    resolved = _resolve_public_evaluation(body)
+    if isinstance(resolved, JSONResponse):
+        return resolved
+    evaluation_id, mode = resolved
+    registry = run_all.target_registry.load_registry()
+    evaluation = registry.evaluation(evaluation_id)
     with _job_lock:
-        if _job_state["status"] == "running":
-            return JSONResponse(dict(_job_state), status_code=202)
-        if lab_module.is_running_unlocked():
-            # A Live Red-Team Lab job holds the shared slot -- distinct from the branch above
-            # (which reattaches to demo's own already-running job): this is a real "try again"
-            # busy signal, in the same shape as Lab's own busy response (brief section 9).
-            return JSONResponse({"status": "busy"}, status_code=409)
+        if _job_state["status"] == "running" or lab_module.is_running_unlocked():
+            active_id = _job_state.get("run_id") or lab_module.active_job_id_unlocked()
+            return JSONResponse(
+                {"detail": "A run is already in progress.", "run_id": active_id},
+                status_code=409,
+            )
         run_name = _generate_run_name()
+        run_id = secrets.token_hex(8)
+        descriptor = _demo_descriptor(evaluation_id, list(evaluation.target_ids))
         _job_state.update(
-            status="running", stage="initializing", stage_index=0,
-            percent=STAGE_PERCENT["initializing"], message=STAGE_LABELS["initializing"],
+            status="running", state="running", run_id=run_id,
+            evaluation_id=evaluation_id, target_ids=list(evaluation.target_ids),
+            stage="initializing", stage_index=0,
+            percent=descriptor["stage_percent"]["initializing"],
+            message=descriptor["stages"][0]["label"],
             run_name=run_name, started_at=datetime.now(timezone.utc).isoformat(),
-            completed_at=None, result_url=None, error=None,
+            completed_at=None, results=None, result_url=None, report_url=None, error=None,
         )
         snapshot = dict(_job_state)
-        thread = threading.Thread(target=_run_job, args=(run_name,), daemon=True)
+        thread = threading.Thread(
+            target=_run_job, args=(run_name, run_id, evaluation_id, mode), daemon=True
+        )
         thread.start()
     return JSONResponse(snapshot, status_code=202)
 
@@ -269,12 +485,25 @@ async def start_lab(request: Request) -> JSONResponse:
     text = body.get("text") if isinstance(body, dict) else None
     if not isinstance(text, str):
         return JSONResponse({"status": "invalid", "error": "Text is required."}, status_code=422)
+    resolved = _resolve_public_evaluation(body)
+    if isinstance(resolved, JSONResponse):
+        return resolved
+    evaluation_id, _mode = resolved
     try:
-        result = lab_module.start_lab_job(text, lambda: _job_state["status"] == "running")
+        result = lab_module.start_lab_job(
+            text, lambda: _job_state["status"] == "running",
+            evaluation_id=evaluation_id,
+        )
     except lab_module.LabValidationError as exc:
         return JSONResponse({"status": "invalid", "error": str(exc)}, status_code=422)
-    status_code = 409 if result.get("status") == "busy" else 202
-    return JSONResponse(result, status_code=status_code)
+    if result.get("status") == "busy":
+        with _job_lock:
+            active_id = _job_state.get("run_id") or lab_module.active_job_id_unlocked()
+        return JSONResponse(
+            {"detail": "A run is already in progress.", "run_id": active_id},
+            status_code=409,
+        )
+    return JSONResponse(result, status_code=202)
 
 
 @app.get("/api/lab/status/{job_id}")

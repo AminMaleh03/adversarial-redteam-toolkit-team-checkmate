@@ -1,0 +1,62 @@
+{
+  "analysis.json": {
+    "bytes": 43161,
+    "path": "sentiment_oces_v1/analysis/analysis.json",
+    "sha256": "18bc903eb63367bbd4a729ddfbce1b787f27a94b922f8235b41e714b55c2e4ce"
+  },
+  "export_meta.json": {
+    "bytes": 338,
+    "path": "sentiment_oces_v1/analysis/export_meta.json",
+    "sha256": "bd664d53068480540f14c65c05210f62760f7c21166ee7ffec8bb79104216994"
+  },
+  "oces_freeze_content_hashes.json": {
+    "bytes": 1020,
+    "path": "sentiment_oces_v1/run/oces_freeze_content_hashes.json",
+    "sha256": "f39fd296a49e3f02076a2b50b6496b1934d9ed693be3c52fd2adddc8ab695f09"
+  },
+  "registry.json": {
+    "bytes": 5840,
+    "path": "sentiment_oces_v1/run/registry.json",
+    "sha256": "3212f30cde643ba6e53e8ef514ecce870f212b1a88bfa208876136cc9b8a0136"
+  },
+  "report.html": {
+    "bytes": 275807,
+    "path": "sentiment_oces_v1/analysis/report.html",
+    "sha256": "7ce1e49ef977683b584633a7e5e09483af792ebbfb51a410c90692b24883ffd0"
+  },
+  "run.json": {
+    "bytes": 1286,
+    "path": "sentiment_oces_v1/run/run.json",
+    "sha256": "f741faaae43de0d90303a88bea5c729f959504a5e1c403478c61ace3b0304bb9"
+  },
+  "sentiment_v1/coverage_map.json": {
+    "bytes": 22316,
+    "path": "sentiment_oces_v1/run/sentiment_v1/coverage_map.json",
+    "sha256": "93f706e64d5b46da89f91cbf7a33bb8bcf32e27149a4dbbffe0d62f489a8a90c"
+  },
+  "sentiment_v1/manifest.json": {
+    "bytes": 66241,
+    "path": "sentiment_oces_v1/run/sentiment_v1/manifest.json",
+    "sha256": "ef7f0150d561d1bd53bad326c5c024d764b3d6c2f342d027f796dec9602e0bcb"
+  },
+  "sentiment_v1/results.jsonl": {
+    "bytes": 42871,
+    "path": "sentiment_oces_v1/run/sentiment_v1/results.jsonl",
+    "sha256": "89fc140a268ab88081df1bdc9bcddc67de6fb0feb26065c1dc9866627c7cb87f"
+  },
+  "sentiment_v1/run_meta.json": {
+    "bytes": 11119,
+    "path": "sentiment_oces_v1/run/sentiment_v1/run_meta.json",
+    "sha256": "fce762823d702d1d3370b7077b51841fe96a39fac0b298e29b63be01423d393a"
+  },
+  "source/sentiment_seeds.json": {
+    "bytes": 4231,
+    "path": "sentiment_oces_v1/source/sentiment_seeds.json",
+    "sha256": "a16e5c999c68fc20e685e793b7cfd3e6de38cf49cfc70ebf1e42a833390fd2c5"
+  },
+  "verification_case_set.json": {
+    "bytes": 4277,
+    "path": "sentiment_oces_v1/run/verification_case_set.json",
+    "sha256": "fa55e3300d8b07087caeee12a7b950699f40a83398e65f4c17587f39353839b6"
+  }
+}

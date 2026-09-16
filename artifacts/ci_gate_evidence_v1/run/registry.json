@@ -1,0 +1,122 @@
+{
+  "registry_version": "3.0.0",
+  "_comment": [
+    "Static target registry. Parsed by endpoint/targets.py into the model-free types in",
+    "contract.py. Loading this file NEVER imports an endpoint module and NEVER loads model",
+    "weights. Revisions here are real, resolved 40-hex commits -- see",
+    "docs/stage3/MODEL_IDENTITY.md for how each was obtained. A branch name, short SHA or",
+    "placeholder is rejected at load time.",
+    "Created once by the Stage 3 foundation task; ownership transfers to Rayyan (endpoint/)."
+  ],
+  "models": {
+    "emotion_distilroberta": {
+      "model_id": "j-hartmann/emotion-english-distilroberta-base",
+      "revision": "0e1cd914e3d46199ed785853e12b57304e04178b",
+      "tokenizer_id": "j-hartmann/emotion-english-distilroberta-base",
+      "tokenizer_revision": "0e1cd914e3d46199ed785853e12b57304e04178b",
+      "labels": ["anger", "disgust", "fear", "joy", "neutral", "sadness", "surprise"],
+      "max_sequence_length": 512,
+      "notes": "Existing pinned model, unchanged. Revision verified against the local Hugging Face cache (refs/main). The V6 benchmark run itself predates this pin; see artifacts/benchmark_v6/PROVENANCE.md."
+    },
+    "sentiment_distilbert_sst2": {
+      "model_id": "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+      "revision": "714eb0fa89d2f80546fda750413ed43d93601a13",
+      "tokenizer_id": "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+      "tokenizer_revision": "714eb0fa89d2f80546fda750413ed43d93601a13",
+      "labels": ["NEGATIVE", "POSITIVE"],
+      "max_sequence_length": 512,
+      "notes": "Labels are UPPERCASE and must never be lowercased or mapped onto emotion labels. max_sequence_length is the tokenizer's model_max_length, not a model-card training length. Weight loading and served label space are Task 2's runtime acceptance requirement."
+    }
+  },
+  "tasks": {
+    "emotion_7": {
+      "model_ref": "emotion_distilroberta",
+      "baseline_file": "baseline/baseline.json",
+      "description": "Seven-label English emotion classification. The original experiment."
+    },
+    "sentiment_2": {
+      "model_ref": "sentiment_distilbert_sst2",
+      "baseline_file": "baseline/sentiment_baseline.json",
+      "description": "Two-label English sentiment classification (SST-2). Baseline file is produced by Task 4 and does not exist yet; its absence is checked when a sentiment evaluation is executed, not at registry load."
+    }
+  },
+  "targets": {
+    "emotion_v1": {
+      "task_id": "emotion_7",
+      "version": "v1",
+      "module": "endpoint.v1",
+      "app_attr": "app",
+      "port": 8000,
+      "hardened": false,
+      "description": "Original unhardened emotion endpoint. Unchanged."
+    },
+    "emotion_v2": {
+      "task_id": "emotion_7",
+      "version": "v2",
+      "module": "endpoint.v2",
+      "app_attr": "app",
+      "port": 8001,
+      "hardened": true,
+      "description": "Original hardened emotion endpoint with the four frozen defenses. Unchanged."
+    },
+    "sentiment_v1": {
+      "task_id": "sentiment_2",
+      "version": "v1",
+      "module": "endpoint.sentiment_v1",
+      "app_attr": "app",
+      "port": 8002,
+      "hardened": false,
+      "description": "V1-equivalent sentiment wrapper. There is deliberately no sentiment V2. version is v1 for legacy compatibility; target_id is what distinguishes it from emotion_v1. Module is created by Task 2 and does not exist yet."
+    }
+  },
+  "evaluations": {
+    "emotion.core": {
+      "kind": "paired",
+      "task_id": "emotion_7",
+      "suite_id": "core",
+      "target_ids": ["emotion_v1", "emotion_v2"],
+      "declared_families": ["malformed", "boundary", "perturbation", "encoding", "whitespace", "truncation"],
+      "mode": "standard",
+      "description": "The original V1/V2 emotion experiment. Uses the task baseline_file."
+    },
+    "emotion.oces": {
+      "kind": "paired",
+      "task_id": "emotion_7",
+      "suite_id": "oces",
+      "target_ids": ["emotion_v1", "emotion_v2"],
+      "declared_families": ["oces.paraphrase", "oces.distractor"],
+      "baseline_file": "baseline/oces/emotion_seeds.json",
+      "mode": "standard",
+      "description": "Additional evaluation against the same two emotion targets. Seed file overrides the task baseline; the hash recorded for a run must be of THIS file, not of baseline/baseline.json."
+    },
+    "sentiment.core": {
+      "kind": "single",
+      "task_id": "sentiment_2",
+      "suite_id": "core",
+      "target_ids": ["sentiment_v1"],
+      "declared_families": ["malformed", "boundary", "perturbation", "encoding", "whitespace", "truncation"],
+      "mode": "standard",
+      "description": "Single-target sentiment core run. Analysis emits comparison:null. The generated attack count is whatever the builders produce for this task; it is not required to equal the emotion suite's 1928."
+    },
+    "sentiment.oces": {
+      "kind": "single",
+      "task_id": "sentiment_2",
+      "suite_id": "oces",
+      "target_ids": ["sentiment_v1"],
+      "declared_families": ["oces.paraphrase", "oces.distractor"],
+      "baseline_file": "baseline/oces/sentiment_seeds.json",
+      "mode": "standard",
+      "description": "Single-target additional sentiment evaluation. comparison:null."
+    },
+    "ci.emotion": {
+      "kind": "single",
+      "task_id": "emotion_7",
+      "suite_id": "core",
+      "target_ids": ["emotion_v2"],
+      "declared_families": ["malformed", "boundary", "perturbation", "encoding", "whitespace", "truncation"],
+      "case_set_id": "ci_core_v1",
+      "mode": "ci",
+      "description": "The release gate. emotion_v2 as candidate against a frozen selection of the core suite. suite_id stays 'core' deliberately: CI is a selection, not a third suite. The approved clean-output reference replaces a second live V1 service."
+    }
+  }
+}

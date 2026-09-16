@@ -25,19 +25,16 @@ RUN pip install --no-cache-dir -r requirements.txt
 ENV PYTHONUNBUFFERED=1 \
     HF_HOME=/app/.cache/huggingface
 
-# Pre-download the exact pinned model/tokenizer revision at build time (network available
-# during build), so the image can run the model from its baked cache with no first-run
-# download. Same model ID/revision constants as endpoint/model.py; never fetches
-# unpinned `main`. Placed BEFORE `COPY . .` -- it only needs the installed dependencies
-# above, not the application source -- so ordinary source/frontend changes invalidate
-# neither this layer nor the pip-install layer above it; only `COPY . .` onward rebuilds.
+# Cache every model and tokenizer from the static registry at its exact revision. Copying
+# only the registry here keeps ordinary source/UI edits from invalidating this expensive
+# layer while ensuring a pin change necessarily rebuilds it.
+COPY endpoint/targets.json /tmp/targets.json
 RUN python -c "\
+import json; \
 from transformers import AutoTokenizer, AutoModelForSequenceClassification; \
-MODEL_NAME = 'j-hartmann/emotion-english-distilroberta-base'; \
-MODEL_REVISION = '0e1cd914e3d46199ed785853e12b57304e04178b'; \
-AutoTokenizer.from_pretrained(MODEL_NAME, revision=MODEL_REVISION); \
-AutoModelForSequenceClassification.from_pretrained(MODEL_NAME, revision=MODEL_REVISION); \
-print('model cached at pinned revision')"
+models=json.load(open('/tmp/targets.json', encoding='utf-8'))['models']; \
+[(AutoTokenizer.from_pretrained(m['tokenizer_id'], revision=m['tokenizer_revision']), AutoModelForSequenceClassification.from_pretrained(m['model_id'], revision=m['revision'])) for m in models.values()]; \
+print('all registry models and tokenizers cached at pinned revisions')"
 
 # Runtime never depends on network access to load the model -- it must come from the
 # image's own baked cache, matching the pinned revision above exactly.

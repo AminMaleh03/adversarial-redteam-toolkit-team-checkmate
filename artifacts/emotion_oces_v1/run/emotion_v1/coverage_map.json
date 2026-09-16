@@ -1,0 +1,492 @@
+{
+  "coverage_map_version": "1.0.0",
+  "authored_utc": "2026-09-15",
+  "source_manifest_path": "artifacts/benchmark_v6/run/manifest.json",
+  "source_manifest_sha256": "0471bccbf293095d15287904a7ddfdef15161e3fb2efdcb773ccd1b952cca717",
+  "source_suite_fingerprint": "7fcccf16989784ca046317158a97fca6fcb52299eae99deda62ab0c63914a430",
+  "defense_identity": {
+    "defense_commit": "257e15f3432aa29a3942d52b2cf3befb12ba3354",
+    "v2_blob_oid": "b71787e3bf39e4062f883c9e34fae78d5b7c6263",
+    "v2_repo_content_sha256": "b71193bef639410c828ec78e9aacc172e5da6a1c3b9fd8e5f7041ee6afc78baf",
+    "foundation_recorded_sha256_crlf": "cf364b70c80c25081a5cb5a0ff83c844fe9199d7cbc65a517b59177ccf434a9e",
+    "note": "v2.py git blob matches the foundation exactly; the foundation's SHA-256 was taken on a Windows/CRLF checkout, so the platform-independent (LF) content SHA-256 differs. Canonical identity: the git blob OID. Pending Ahsan's confirmation."
+  },
+  "controls": {
+    "length": "V2 rejects input whose TOKEN count exceeds the model limit, checked before inference. This is a post-parse token-length gate, NOT an HTTP/wire body-size limit.",
+    "strict_type_schema": "V2 uses StrictStr + extra='forbid' on the request model; wrong types, missing/unknown fields and incompatible body shapes are rejected.",
+    "normalization": "V2 applies NFKC + control/format-character stripping + whitespace collapse before inference."
+  },
+  "cross_cutting_note": "The scoped exception handler (C3) is cross-cutting. Its observable responses are evaluated, but it is never listed in controls_targeted and never attributed as causal coverage by length/schema/normalization. A clean rejection may reflect framework/parser behaviour shared with V1, not V2 hardening.",
+  "classification_basis": "attack construction + declared control design; never observed V1/V2 results",
+  "class_subfamily_counts": {
+    "in_scope": 34,
+    "mixed": 5,
+    "not_targeted": 19,
+    "out_of_scope": 6
+  },
+  "subfamilies": {
+    "bidi_reorder": {
+      "family": "encoding",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "normalization"
+      ],
+      "coverage_rationale": "Bidi directional-format (Cf) controls; normalization strip is designed to remove them."
+    },
+    "broken_json": {
+      "family": "malformed",
+      "coverage_class": "out_of_scope",
+      "controls_targeted": [],
+      "coverage_rationale": "Unparseable JSON; fails at JSON decoding before the declared controls (which see an already-parsed {text}) run. C3 may shape the response; no causal control attribution."
+    },
+    "capitalization": {
+      "family": "perturbation",
+      "coverage_class": "not_targeted",
+      "controls_targeted": [],
+      "coverage_rationale": "Casing change in valid text; NFKC does not case-fold, so no declared control alters it -- model-level."
+    },
+    "compatibility_fullwidth": {
+      "family": "encoding",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "normalization"
+      ],
+      "coverage_rationale": "Full-width compatibility characters; NFKC normalization is designed to fold them to ASCII."
+    },
+    "compatibility_ligature": {
+      "family": "encoding",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "normalization"
+      ],
+      "coverage_rationale": "f-ligature compatibility characters; NFKC normalization is designed to fold them."
+    },
+    "deeply_nested_json_d1024": {
+      "family": "malformed",
+      "coverage_class": "mixed",
+      "controls_targeted": [
+        "strict_type_schema"
+      ],
+      "coverage_rationale": "Dual-purpose: parser-depth before validation; and object-typed `text` rejected by strict type/schema if it parses. Construction-based, not outcome-based."
+    },
+    "deeply_nested_json_d128": {
+      "family": "malformed",
+      "coverage_class": "mixed",
+      "controls_targeted": [
+        "strict_type_schema"
+      ],
+      "coverage_rationale": "Dual-purpose: parser-depth before validation; and object-typed `text` rejected by strict type/schema if it parses. Construction-based, not outcome-based."
+    },
+    "deeply_nested_json_d2000": {
+      "family": "malformed",
+      "coverage_class": "mixed",
+      "controls_targeted": [
+        "strict_type_schema"
+      ],
+      "coverage_rationale": "Dual-purpose: parser-depth before validation; and object-typed `text` rejected by strict type/schema if it parses. Construction-based, not outcome-based."
+    },
+    "deeply_nested_json_d32": {
+      "family": "malformed",
+      "coverage_class": "mixed",
+      "controls_targeted": [
+        "strict_type_schema"
+      ],
+      "coverage_rationale": "Dual-purpose by construction: (1) parser-depth/resource behaviour before validation; AND (2) if parsing succeeds, `text` is a nested object (not a string), which the strict type/schema control rejects. Not classified by observed outcome."
+    },
+    "deeply_nested_json_d512": {
+      "family": "malformed",
+      "coverage_class": "mixed",
+      "controls_targeted": [
+        "strict_type_schema"
+      ],
+      "coverage_rationale": "Dual-purpose: parser-depth before validation; and object-typed `text` rejected by strict type/schema if it parses. Construction-based, not outcome-based."
+    },
+    "delete_char": {
+      "family": "perturbation",
+      "coverage_class": "not_targeted",
+      "controls_targeted": [],
+      "coverage_rationale": "Character deletion in valid text; no declared control alters it -- model-level."
+    },
+    "deletion_backspace": {
+      "family": "encoding",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "normalization"
+      ],
+      "coverage_rationale": "Backspace (Cc) control chars; normalization strip is designed to remove them."
+    },
+    "duplicate_text_keys": {
+      "family": "malformed",
+      "coverage_class": "out_of_scope",
+      "controls_targeted": [],
+      "coverage_rationale": "Duplicate `text` keys; RFC 8259 leaves duplicate-name behaviour to the parser, which resolves the structure before Pydantic can inspect it -- parser semantics, not the schema control."
+    },
+    "empty_string": {
+      "family": "boundary",
+      "coverage_class": "not_targeted",
+      "controls_targeted": [],
+      "coverage_rationale": "Valid empty text; no declared control alters or rejects an empty value."
+    },
+    "extra_field": {
+      "family": "malformed",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "strict_type_schema"
+      ],
+      "coverage_rationale": "Unknown extra field beside valid text; V2 extra='forbid' is designed to reject it. This is the one case that differs from V1 (default 'ignore' accepts)."
+    },
+    "homoglyph": {
+      "family": "encoding",
+      "coverage_class": "not_targeted",
+      "controls_targeted": [],
+      "coverage_rationale": "Cross-script Cyrillic confusables: by construction NFKC does NOT fold confusables (UTS #39 is separate from UAX #15) and they are letters, not control chars -- no declared control alters them; any effect is model-level."
+    },
+    "homoglyph_greek": {
+      "family": "encoding",
+      "coverage_class": "not_targeted",
+      "controls_targeted": [],
+      "coverage_rationale": "Cross-script Greek confusables: same NFKC gap as Cyrillic; no declared control alters them; any effect is model-level."
+    },
+    "insert_char": {
+      "family": "perturbation",
+      "coverage_class": "not_targeted",
+      "controls_targeted": [],
+      "coverage_rationale": "Character insertion in valid text; no declared control alters it -- model-level."
+    },
+    "interior_runs": {
+      "family": "whitespace",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "normalization"
+      ],
+      "coverage_rationale": "Repeated interior spaces; normalization's whitespace collapse is designed to normalize them."
+    },
+    "invisible_zero_width": {
+      "family": "encoding",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "normalization"
+      ],
+      "coverage_rationale": "Zero-width (category Cf) chars; normalization's control-char strip is designed to remove them."
+    },
+    "keyboard_typo": {
+      "family": "perturbation",
+      "coverage_class": "not_targeted",
+      "controls_targeted": [],
+      "coverage_rationale": "Keyboard-neighbour typo in valid text; no declared control alters it -- model-level."
+    },
+    "keyboard_typo_second_word": {
+      "family": "perturbation",
+      "coverage_class": "not_targeted",
+      "controls_targeted": [],
+      "coverage_rationale": "Keyboard-neighbour typo on a second content word; no declared control alters it -- model-level."
+    },
+    "leading_trailing": {
+      "family": "whitespace",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "normalization"
+      ],
+      "coverage_rationale": "Leading/trailing whitespace; normalization strip is designed to remove it."
+    },
+    "length_at_limit": {
+      "family": "boundary",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "length"
+      ],
+      "coverage_rationale": "Text at the token limit; exercises the length-gate boundary. NOTE: exercises the POST-PARSE token-length gate, not an HTTP/wire body-size limit; Rayyan records exact serialized body bytes separately."
+    },
+    "length_clearly_over": {
+      "family": "boundary",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "length"
+      ],
+      "coverage_rationale": "Approximate-mode fallback of length_plus_one: text over the token limit. NOTE: exercises the POST-PARSE token-length gate, not an HTTP/wire body-size limit; Rayyan records exact serialized body bytes separately."
+    },
+    "length_clearly_under": {
+      "family": "boundary",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "length"
+      ],
+      "coverage_rationale": "Approximate-mode fallback of length_minus_one: text well under the token limit. NOTE: exercises the POST-PARSE token-length gate, not an HTTP/wire body-size limit; Rayyan records exact serialized body bytes separately."
+    },
+    "length_minus_one": {
+      "family": "boundary",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "length"
+      ],
+      "coverage_rationale": "Text just under the token limit; exercises the length gate on the accept side. NOTE: exercises the POST-PARSE token-length gate, not an HTTP/wire body-size limit; Rayyan records exact serialized body bytes separately."
+    },
+    "length_near_limit": {
+      "family": "boundary",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "length"
+      ],
+      "coverage_rationale": "Approximate-mode fallback of length_at_limit: text near the token limit. NOTE: exercises the POST-PARSE token-length gate, not an HTTP/wire body-size limit; Rayyan records exact serialized body bytes separately."
+    },
+    "length_plus_one": {
+      "family": "boundary",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "length"
+      ],
+      "coverage_rationale": "Text just over the token limit; the length control is designed to reject it. NOTE: exercises the POST-PARSE token-length gate, not an HTTP/wire body-size limit; Rayyan records exact serialized body bytes separately."
+    },
+    "malformed_utf8": {
+      "family": "malformed",
+      "coverage_class": "out_of_scope",
+      "controls_targeted": [],
+      "coverage_rationale": "Invalid UTF-8 bytes; decoding fails at the transport/parser layer before the declared controls."
+    },
+    "missing_field": {
+      "family": "malformed",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "strict_type_schema"
+      ],
+      "coverage_rationale": "Required `text` absent; the schema/type validation surface governs it. Rejection is shared with V1 (base validation); NOT evidence of incremental V2 hardening."
+    },
+    "misspell": {
+      "family": "perturbation",
+      "coverage_class": "not_targeted",
+      "controls_targeted": [],
+      "coverage_rationale": "Common misspelling in valid text; no declared control alters it -- model-level."
+    },
+    "newlines": {
+      "family": "whitespace",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "normalization"
+      ],
+      "coverage_rationale": "Newlines; normalization's whitespace collapse is designed to normalize them."
+    },
+    "null_byte": {
+      "family": "encoding",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "normalization"
+      ],
+      "coverage_rationale": "NUL (Cc); normalization strip is designed to remove it."
+    },
+    "oversized_100kb": {
+      "family": "malformed",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "length"
+      ],
+      "coverage_rationale": "Very large text value; once parsed it is exactly what the token-length control is designed to reject. NOTE: exercises the POST-PARSE token-length gate, not an HTTP/wire body-size limit; Rayyan records exact serialized body bytes separately."
+    },
+    "oversized_10mb": {
+      "family": "malformed",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "length"
+      ],
+      "coverage_rationale": "Very large text value; once parsed it is exactly what the token-length control is designed to reject. NOTE: exercises the POST-PARSE token-length gate, not an HTTP/wire body-size limit; Rayyan records exact serialized body bytes separately."
+    },
+    "oversized_1mb": {
+      "family": "malformed",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "length"
+      ],
+      "coverage_rationale": "Very large text value; once parsed it is exactly what the token-length control is designed to reject. NOTE: exercises the POST-PARSE token-length gate, not an HTTP/wire body-size limit; Rayyan records exact serialized body bytes separately."
+    },
+    "repeat_char": {
+      "family": "perturbation",
+      "coverage_class": "not_targeted",
+      "controls_targeted": [],
+      "coverage_rationale": "Character repetition in valid text; no declared control alters it -- model-level."
+    },
+    "repeated_punctuation": {
+      "family": "whitespace",
+      "coverage_class": "not_targeted",
+      "controls_targeted": [],
+      "coverage_rationale": "Repeated punctuation (not whitespace); no declared control removes punctuation; may shift intensity -- model-level."
+    },
+    "signal_end_over_limit": {
+      "family": "truncation",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "length"
+      ],
+      "coverage_rationale": "Signal + long filler exceeding the token limit; the length control is designed to reject it before inference. NOTE: exercises the POST-PARSE token-length gate, not an HTTP/wire body-size limit; Rayyan records exact serialized body bytes separately."
+    },
+    "signal_end_short": {
+      "family": "truncation",
+      "coverage_class": "not_targeted",
+      "controls_targeted": [],
+      "coverage_rationale": "Under-limit valid text, signal at end; positional/semantic -- no declared control acts."
+    },
+    "signal_head_only": {
+      "family": "truncation",
+      "coverage_class": "not_targeted",
+      "controls_targeted": [],
+      "coverage_rationale": "Under-limit truncated head of the signal; no declared control acts -- model-level/diagnostic."
+    },
+    "signal_start_over_limit": {
+      "family": "truncation",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "length"
+      ],
+      "coverage_rationale": "Signal + long filler exceeding the token limit; the length control is designed to reject it before inference. NOTE: exercises the POST-PARSE token-length gate, not an HTTP/wire body-size limit; Rayyan records exact serialized body bytes separately."
+    },
+    "signal_start_short": {
+      "family": "truncation",
+      "coverage_class": "not_targeted",
+      "controls_targeted": [],
+      "coverage_rationale": "Under-limit valid text, signal at start; positional/semantic -- no declared control acts."
+    },
+    "signal_tail_only": {
+      "family": "truncation",
+      "coverage_class": "not_targeted",
+      "controls_targeted": [],
+      "coverage_rationale": "Under-limit truncated tail of the signal; no declared control acts -- model-level/diagnostic."
+    },
+    "single_char": {
+      "family": "boundary",
+      "coverage_class": "not_targeted",
+      "controls_targeted": [],
+      "coverage_rationale": "Valid single-character text; no declared control acts."
+    },
+    "single_space": {
+      "family": "boundary",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "normalization"
+      ],
+      "coverage_rationale": "Whitespace-only text; normalization is designed to collapse/strip it."
+    },
+    "swap_adjacent": {
+      "family": "perturbation",
+      "coverage_class": "not_targeted",
+      "controls_targeted": [],
+      "coverage_rationale": "Adjacent-letter swap in valid text; no declared control alters it -- model-level."
+    },
+    "tabs": {
+      "family": "whitespace",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "normalization"
+      ],
+      "coverage_rationale": "Tabs; normalization's whitespace collapse is designed to normalize them."
+    },
+    "top_level_array": {
+      "family": "malformed",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "strict_type_schema"
+      ],
+      "coverage_rationale": "JSON parses but the top-level value is an array, not the declared request object; schema/model validation rejects the body shape. Rejection is shared with V1 (base validation); NOT evidence of incremental V2 hardening."
+    },
+    "top_level_number": {
+      "family": "malformed",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "strict_type_schema"
+      ],
+      "coverage_rationale": "Top-level JSON number, not the declared request object; schema/model validation rejects the body shape. Rejection is shared with V1 (base validation); NOT evidence of incremental V2 hardening."
+    },
+    "top_level_string": {
+      "family": "malformed",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "strict_type_schema"
+      ],
+      "coverage_rationale": "Top-level JSON string, not the declared request object; schema/model validation rejects the body shape. Rejection is shared with V1 (base validation); NOT evidence of incremental V2 hardening."
+    },
+    "trailing_garbage": {
+      "family": "malformed",
+      "coverage_class": "out_of_scope",
+      "controls_targeted": [],
+      "coverage_rationale": "Valid JSON followed by trailing non-JSON; rejected at the parser layer before the declared controls."
+    },
+    "type_confusion_boolean": {
+      "family": "boundary",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "strict_type_schema"
+      ],
+      "coverage_rationale": "Non-string (boolean) for text; strict type/schema governs it. Rejection is shared with V1 (base validation); NOT evidence of incremental V2 hardening."
+    },
+    "type_confusion_list": {
+      "family": "boundary",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "strict_type_schema"
+      ],
+      "coverage_rationale": "Non-string (array) for text; strict type/schema governs it. Rejection is shared with V1 (base validation); NOT evidence of incremental V2 hardening."
+    },
+    "type_confusion_nested_object": {
+      "family": "boundary",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "strict_type_schema"
+      ],
+      "coverage_rationale": "Non-string (object) for text; strict type/schema governs it. Rejection is shared with V1 (base validation); NOT evidence of incremental V2 hardening."
+    },
+    "type_confusion_null": {
+      "family": "boundary",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "strict_type_schema"
+      ],
+      "coverage_rationale": "Non-string (null) for text; the strict type/schema control governs it. Rejection is shared with V1 (base validation); NOT evidence of incremental V2 hardening."
+    },
+    "type_confusion_number": {
+      "family": "boundary",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "strict_type_schema"
+      ],
+      "coverage_rationale": "Non-string (number) for text; strict type/schema governs it. Rejection is shared with V1 (base validation); NOT evidence of incremental V2 hardening."
+    },
+    "unicode_spaces": {
+      "family": "whitespace",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "normalization"
+      ],
+      "coverage_rationale": "Unicode space look-alikes; NFKC + whitespace collapse are designed to normalize them."
+    },
+    "unusual_json_escapes": {
+      "family": "malformed",
+      "coverage_class": "not_targeted",
+      "controls_targeted": [],
+      "coverage_rationale": "Valid JSON \\u escapes that decode to ordinary text; the request is valid and no declared control alters it."
+    },
+    "utf8_bom": {
+      "family": "malformed",
+      "coverage_class": "out_of_scope",
+      "controls_targeted": [],
+      "coverage_rationale": "UTF-8 BOM prefix; byte-level decoding at the transport/parser layer, before the declared controls."
+    },
+    "word_split": {
+      "family": "perturbation",
+      "coverage_class": "not_targeted",
+      "controls_targeted": [],
+      "coverage_rationale": "A single space inserted inside a word; not a whitespace run, so normalization does not collapse it -- model-level."
+    },
+    "wrong_content_type": {
+      "family": "malformed",
+      "coverage_class": "out_of_scope",
+      "controls_targeted": [],
+      "coverage_rationale": "Valid JSON body labelled text/plain; content-type handling is transport/framework layer, before the declared controls."
+    },
+    "wrong_field_name": {
+      "family": "malformed",
+      "coverage_class": "in_scope",
+      "controls_targeted": [
+        "strict_type_schema"
+      ],
+      "coverage_rationale": "`txt` not `text`: required field missing + unknown field present; schema/type governs it. Rejection is shared with V1 (base validation); NOT evidence of incremental V2 hardening."
+    }
+  },
+  "case_exceptions": {}
+}

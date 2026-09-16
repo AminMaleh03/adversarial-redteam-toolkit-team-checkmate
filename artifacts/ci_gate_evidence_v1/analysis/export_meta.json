@@ -1,0 +1,9 @@
+{
+  "report_version": 2,
+  "analysis_schema_version": 3,
+  "source_sha256": "af9d5357a4aa63a3c0641675146b55f810cd96f6a8df02bf16931bdbd4e97280",
+  "files": {
+    "report.html": "1b0a9da546f09031b65b0b30c9b0436c868c048b7edabeffa2ab3c592f43c3c0",
+    "analysis.json": "af9d5357a4aa63a3c0641675146b55f810cd96f6a8df02bf16931bdbd4e97280"
+  }
+}

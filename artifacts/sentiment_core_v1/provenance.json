@@ -1,0 +1,62 @@
+{
+  "analysis.json": {
+    "bytes": 182534,
+    "path": "sentiment_core_v1/analysis/analysis.json",
+    "sha256": "7847d2c4bbd6cca79f399ccc83f0aabfe4cd79a1230ae5c814f4dfdfa1678f27"
+  },
+  "export_meta.json": {
+    "bytes": 338,
+    "path": "sentiment_core_v1/analysis/export_meta.json",
+    "sha256": "b105d4ffbc2481fcc55424338735466c0e6f0cfc8e7cc7796264e47d25b079ab"
+  },
+  "registry.json": {
+    "bytes": 5840,
+    "path": "sentiment_core_v1/run/registry.json",
+    "sha256": "3212f30cde643ba6e53e8ef514ecce870f212b1a88bfa208876136cc9b8a0136"
+  },
+  "report.html": {
+    "bytes": 318092,
+    "path": "sentiment_core_v1/analysis/report.html",
+    "sha256": "ada29d6b1719899312bd06749572a37d917ca0134524ec6e3440ce75a3d74989"
+  },
+  "run.json": {
+    "bytes": 1362,
+    "path": "sentiment_core_v1/run/run.json",
+    "sha256": "90ce65e77b16793658c1904e30e35e943e2db912f9fc99bf783181551ced40a7"
+  },
+  "sentiment_v1/coverage_map.json": {
+    "bytes": 22316,
+    "path": "sentiment_core_v1/run/sentiment_v1/coverage_map.json",
+    "sha256": "93f706e64d5b46da89f91cbf7a33bb8bcf32e27149a4dbbffe0d62f489a8a90c"
+  },
+  "sentiment_v1/manifest.json": {
+    "bytes": 2468637,
+    "path": "sentiment_core_v1/run/sentiment_v1/manifest.json",
+    "sha256": "1837121e8719272bfcf8bdbfa1d260fd6a13111c935a56bfcc873e465bc94ff1"
+  },
+  "sentiment_v1/results.jsonl": {
+    "bytes": 1405525,
+    "path": "sentiment_core_v1/run/sentiment_v1/results.jsonl",
+    "sha256": "ffd0a2ab0c34d0eb409603ced419e1cd1aa760be3a6537840a4af5bd21d3f11c"
+  },
+  "sentiment_v1/run_meta.json": {
+    "bytes": 351358,
+    "path": "sentiment_core_v1/run/sentiment_v1/run_meta.json",
+    "sha256": "356db0a90dd729d6156d01673f30cd607727db25719405fecbe32854cd597b68"
+  },
+  "source/sentiment_baseline.json": {
+    "bytes": 9144,
+    "path": "sentiment_core_v1/source/sentiment_baseline.json",
+    "sha256": "33077982c79553d0ae700ed0658c5912186958750866d725792e7f9bf4c87bd2"
+  },
+  "source/sentiment_provenance.json": {
+    "bytes": 10839,
+    "path": "sentiment_core_v1/source/sentiment_provenance.json",
+    "sha256": "a96ac92863f18c87a86eebf8d6f5169a038267452474940c933eb4b6d681805f"
+  },
+  "verification_case_set.json": {
+    "bytes": 206728,
+    "path": "sentiment_core_v1/run/verification_case_set.json",
+    "sha256": "1daf7ab561e92c1ed1f3adc7b037be3b7c61de04826fbbfdff475d42a2de58f5"
+  }
+}

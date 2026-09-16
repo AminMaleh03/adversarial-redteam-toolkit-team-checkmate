@@ -8,6 +8,7 @@ webbrowser.open is allowed to be called).
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -179,6 +180,165 @@ def test_run_analysis_and_report_emits_analyzing_then_generating_results(monkeyp
         progress_callback=lambda stage, message: events.append(stage),
     )
     assert events == ["analyzing", "generating_results"]
+
+
+def test_registry_experiment_accepts_relative_results_root(monkeypatch, tmp_path):
+    class PlannedStop(RuntimeError):
+        pass
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        run_all, "_plan_evaluation",
+        lambda *args, **kwargs: (_ for _ in ()).throw(PlannedStop("planned stop")),
+    )
+
+    with pytest.raises(PlannedStop, match="planned stop"):
+        run_all.run_experiment(
+            mode="ci",
+            run_name="relative_root",
+            results_root=Path("relative-results"),
+            evaluation_ids=["ci.emotion"],
+            html_only=True,
+        )
+
+    run_dirs = list((tmp_path / "relative-results").iterdir())
+    assert len(run_dirs) == 1
+    run_dir = run_dirs[0]
+    document = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+    target_dirs = document["evaluations"][0]["target_dirs"]
+    assert target_dirs == {"emotion_v2": "runs/ci_emotion/emotion_v2"}
+    assert not Path(target_dirs["emotion_v2"]).is_absolute()
+    assert (run_dir / Path(target_dirs["emotion_v2"]).parent).is_dir()
+
+
+# ------------------------------------------------------------------------------------------
+# v6.2: application-commit provenance is obtained once, reused, and honestly explained
+# ------------------------------------------------------------------------------------------
+
+
+def test_run_json_records_the_real_forty_char_application_commit(monkeypatch, tmp_path):
+    class PlannedStop(RuntimeError):
+        pass
+
+    synthetic_sha = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+    assert len(synthetic_sha) == 40
+    monkeypatch.setattr(
+        run_all.runner_mod, "code_provenance",
+        lambda root: {"app_commit": synthetic_sha, "dirty": False},
+    )
+    monkeypatch.setattr(
+        run_all, "_plan_evaluation",
+        lambda *args, **kwargs: (_ for _ in ()).throw(PlannedStop("planned stop")),
+    )
+    with pytest.raises(PlannedStop):
+        run_all.run_experiment(
+            mode="ci", run_name="commit_check", results_root=tmp_path,
+            evaluation_ids=["ci.emotion"], html_only=True,
+        )
+    run_dir = next((tmp_path).iterdir())
+    document = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+    assert document["app_commit"] == synthetic_sha
+    assert len(document["app_commit"]) == 40
+
+
+def test_app_commit_unavailable_reason_is_none_when_commit_present():
+    assert run_all._app_commit_unavailable_reason({"app_commit": "a" * 40, "dirty": False}) is None
+
+
+def test_app_commit_unavailable_reason_explains_missing_provenance_explicitly():
+    reason = run_all._app_commit_unavailable_reason({"app_commit": None, "dirty": None})
+    assert reason
+    assert "git" in reason.lower()
+    # Must never look like a silent "unknown", a branch name, or a remote head standing in.
+    assert reason not in ("unknown", "main", "HEAD", "origin/main")
+
+
+def test_app_commit_unavailable_reason_never_invents_a_commit_from_empty_string():
+    # An empty string is falsy, same as None -- must still produce an explicit reason,
+    # never render as if a (blank) commit were recorded.
+    reason = run_all._app_commit_unavailable_reason({"app_commit": "", "dirty": None})
+    assert reason
+
+
+# ------------------------------------------------------------------------------------------
+# v6.2: report limitations must not leak paired-only (V1/V2 hardening) wording into a
+# sentiment-only (single-target) run.
+# ------------------------------------------------------------------------------------------
+
+_PAIRED_ONLY_NOTE = "V2's defenses are application-layer only; no retraining was done."
+
+
+def _real_registry():
+    return run_all.target_registry.load_registry()
+
+
+def test_applicable_limitations_excludes_paired_only_note_for_sentiment_only_run():
+    assert any(_PAIRED_ONLY_NOTE in note for note in run_all.analysis_mod.LIMITATION_NOTES)
+    blocks = [{
+        "kind": "single",
+        "targets": ["sentiment_v1"],
+        "summaries": {"sentiment_v1": {"limitations": list(run_all.analysis_mod.LIMITATION_NOTES)}},
+    }]
+    notes = run_all._applicable_limitations(blocks, _real_registry())
+    assert not any("V2's defenses are application-layer only" in note for note in notes)
+    assert not any("hardening" in note.lower() for note in notes)
+    assert len(notes) == len(run_all.analysis_mod.LIMITATION_NOTES) - 1
+
+
+def test_applicable_limitations_keeps_paired_only_note_when_a_paired_evaluation_exists():
+    blocks = [
+        {"kind": "paired", "targets": ["emotion_v1", "emotion_v2"],
+         "summaries": {
+             "emotion_v1": {"limitations": list(run_all.analysis_mod.LIMITATION_NOTES)},
+             "emotion_v2": {"limitations": list(run_all.analysis_mod.LIMITATION_NOTES)},
+         }},
+        {"kind": "single", "targets": ["sentiment_v1"],
+         "summaries": {"sentiment_v1": {"limitations": list(run_all.analysis_mod.LIMITATION_NOTES)}}},
+    ]
+    notes = run_all._applicable_limitations(blocks, _real_registry())
+    assert any("V2's defenses are application-layer only" in note for note in notes)
+    # Deduplicated across both evaluations, not doubled.
+    assert len(notes) == len(run_all.analysis_mod.LIMITATION_NOTES)
+
+
+def test_applicable_limitations_keeps_paired_only_note_for_single_kind_hardened_target():
+    # Regression guard: the CI gate's own ci.emotion evaluation is "single" kind (it tests
+    # emotion_v2 alone against an approved clean-output reference, never a live V1 -- see
+    # endpoint/targets.json) but is still genuinely about a hardened target. Gating on
+    # evaluation "kind" alone (rather than registry.target(...).hardened) would wrongly strip
+    # this note from every CI gate report and broke the real CI run once during development.
+    blocks = [{
+        "kind": "single", "targets": ["emotion_v2"],
+        "summaries": {"emotion_v2": {"limitations": list(run_all.analysis_mod.LIMITATION_NOTES)}},
+    }]
+    notes = run_all._applicable_limitations(blocks, _real_registry())
+    assert any("V2's defenses are application-layer only" in note for note in notes)
+    assert len(notes) == len(run_all.analysis_mod.LIMITATION_NOTES)
+
+
+def test_applicable_limitations_preserves_order_and_dedupes():
+    blocks = [{
+        "kind": "paired", "targets": ["emotion_v1", "emotion_v2"],
+        "summaries": {
+            "emotion_v1": {"limitations": ["a", "b"]},
+            "emotion_v2": {"limitations": ["b", "c"]},
+        },
+    }]
+    assert run_all._applicable_limitations(blocks, _real_registry()) == ["a", "b", "c"]
+
+
+def test_release_workflow_prepares_results_and_preserves_gate_exit_code():
+    workflow = (ROOT / ".github" / "workflows" / "release-gate.yml").read_text(
+        encoding="utf-8"
+    )
+    mkdir = workflow.index("mkdir -p results")
+    producer = workflow.index("python -m runner.gate")
+    tee = workflow.index("tee results/gate.log")
+    capture = workflow.index("code=${PIPESTATUS[0]}")
+    record = workflow.index('echo "$code" > results/gate-exit-code.txt')
+    enforce = workflow.index("code=$(cat results/gate-exit-code.txt 2>/dev/null || echo 2)")
+    assert mkdir < producer < tee < capture < record < enforce
+    assert 'test "$code" -eq 0' in workflow[enforce:]
 
 
 def test_cli_opens_browser_by_default_but_not_with_no_open(monkeypatch, tmp_path):

@@ -1,0 +1,49 @@
+{
+  "run_id": "3dacde929d414d3b",
+  "run_name": "v63-local-78188ad",
+  "created_at_utc": "2026-09-16T08:22:37+00:00",
+  "app_commit": "78188adbdcb4449429116af3161a032516d38aa8",
+  "dirty": false,
+  "mode": "ci",
+  "status": "complete",
+  "registry": {
+    "registry_version": "3.0.0",
+    "source_path": "endpoint/targets.json",
+    "source_sha256": "3212f30cde643ba6e53e8ef514ecce870f212b1a88bfa208876136cc9b8a0136"
+  },
+  "evaluations": [
+    {
+      "evaluation_id": "ci.emotion",
+      "kind": "single",
+      "task_id": "emotion_7",
+      "suite_id": "core",
+      "declared_families": [
+        "malformed",
+        "boundary",
+        "perturbation",
+        "encoding",
+        "whitespace",
+        "truncation"
+      ],
+      "case_set_id": "ci_core_v1",
+      "baseline_file": "baseline/baseline.json",
+      "target_dirs": {
+        "emotion_v2": "runs/ci_emotion/emotion_v2"
+      },
+      "case_selection_sha256": "25573a71931259a3da4241af4ee507314544fd783f796c74c32d0fa88c56ec9d"
+    }
+  ],
+  "completed_at_utc": "2026-09-16T08:23:13+00:00",
+  "resources": {
+    "emotion_v2": {
+      "peak_process_memory_bytes": 616071168,
+      "elapsed_seconds": 16.375,
+      "measurement_scope": "uvicorn endpoint process; sequential startup does not prove only one model was resident"
+    }
+  },
+  "artifacts": {
+    "analysis_json": "report/analysis.json",
+    "report_html": "report/report.html",
+    "report_pdf": null
+  }
+}

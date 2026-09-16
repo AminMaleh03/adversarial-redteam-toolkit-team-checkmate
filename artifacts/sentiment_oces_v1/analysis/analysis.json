@@ -1,0 +1,974 @@
+{
+  "schema_version": 3,
+  "contracts_version": "3.0.0",
+  "run_identity": {
+    "run_id": "087292c1c53c433c",
+    "run_name": "v63_real_sentiment_oces",
+    "created_at_utc": "2026-09-16T08:22:28+00:00",
+    "app_commit": "78188adbdcb4449429116af3161a032516d38aa8",
+    "app_commit_unavailable_reason": null,
+    "dirty": false,
+    "registry_sha256": "3212f30cde643ba6e53e8ef514ecce870f212b1a88bfa208876136cc9b8a0136"
+  },
+  "evaluations": [
+    {
+      "evaluation_id": "sentiment.oces",
+      "kind": "single",
+      "task_id": "sentiment_2",
+      "suite_id": "oces",
+      "targets": [
+        "sentiment_v1"
+      ],
+      "summaries": {
+        "sentiment_v1": {
+          "version": "v1",
+          "target_id": "sentiment_v1",
+          "task_id": "sentiment_2",
+          "suite_id": "oces",
+          "identity": {
+            "target_id": "sentiment_v1",
+            "task_id": "sentiment_2",
+            "suite_id": "oces",
+            "provenance": "declared",
+            "declared": {
+              "target_id": "sentiment_v1",
+              "task_id": "sentiment_2",
+              "suite_id": "oces"
+            },
+            "model": {
+              "model_id": "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+              "revision": "714eb0fa89d2f80546fda750413ed43d93601a13",
+              "tokenizer_id": "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+              "tokenizer_revision": "714eb0fa89d2f80546fda750413ed43d93601a13",
+              "labels": [
+                "NEGATIVE",
+                "POSITIVE"
+              ],
+              "max_sequence_length": 512
+            },
+            "baseline": {
+              "path": "baseline/oces/sentiment_seeds.json",
+              "sha256": "a16e5c999c68fc20e685e793b7cfd3e6de38cf49cfc70ebf1e42a833390fd2c5"
+            },
+            "evaluation_run_id": "087292c1c53c433c",
+            "evaluation_id": "sentiment.oces",
+            "case_set_id": null
+          },
+          "coverage": {
+            "planned": 60,
+            "skipped": 0,
+            "limit_excluded": 0,
+            "deselected": 0,
+            "selected": 60,
+            "completed": 60,
+            "missing": 0,
+            "coverage_rate": 1.0
+          },
+          "category_stats": {
+            "oces.paraphrase": {
+              "eligible": 13,
+              "failed": 0,
+              "review": 7,
+              "diagnostic": 0,
+              "unevaluable": 0,
+              "failure_rate": 0.0
+            },
+            "oces.distractor": {
+              "eligible": 15,
+              "failed": 2,
+              "review": 5,
+              "diagnostic": 0,
+              "unevaluable": 0,
+              "failure_rate": 0.13333333333333333
+            }
+          },
+          "operational": {
+            "unhandled_5xx": 0,
+            "timeouts": 0,
+            "connection_failures": 0,
+            "service_unavailable": 0,
+            "slow_responses": 0,
+            "info_leaks": 0,
+            "invalid_input_accepted": 0
+          },
+          "drift": {
+            "eligible_comparisons": 28,
+            "qualifying_flips": 2,
+            "flip_rate": 0.07142857142857142,
+            "baseline_denominator": {
+              "eligible": 20,
+              "total": 20,
+              "excluded_below_threshold": 0,
+              "excluded_baselines": [],
+              "no_prediction": [],
+              "statement": "20 of 20 baselines eligible for flip scoring",
+              "threshold": 0.6
+            },
+            "confidence_change": {
+              "mean_delta_on_flips": -0.08906799554824829,
+              "per_flip": [
+                {
+                  "attack_id": "sst2-val-59.oces.distractor",
+                  "clean_confidence": 0.8743264675140381,
+                  "attacked_confidence": 0.7016822099685669,
+                  "delta": -0.1726442575454712
+                },
+                {
+                  "attack_id": "sst2-val-248.oces.distractor",
+                  "clean_confidence": 0.9621613025665283,
+                  "attacked_confidence": 0.9566695690155029,
+                  "delta": -0.005491733551025391
+                }
+              ]
+            },
+            "excluded": {
+              "review_unresolved": 12
+            },
+            "unevaluable": {},
+            "flip_attack_ids": [
+              "sst2-val-59.oces.distractor",
+              "sst2-val-248.oces.distractor"
+            ]
+          },
+          "findings": [
+            {
+              "finding": {
+                "finding_id": "F-v1-001",
+                "title": "oces.distractor/logistical: prediction flip",
+                "category": "oces.distractor",
+                "severity_score": 58.108065128326416,
+                "severity_tier": "Medium",
+                "description": "1 case(s) in oces.distractor/logistical produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
+                "remediation": "1 case(s) observed as 200x1. This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "evidence": [
+                  "sst2-val-248.oces.distractor"
+                ]
+              },
+              "subfamily": "logistical",
+              "failure_mode": "prediction_flip",
+              "validity_tiers": [
+                "SILVER"
+              ],
+              "affected_cases": 1,
+              "remediation_detail": {
+                "rule_id": "RM-FLIP-MODEL",
+                "rule_version": "1.0.0",
+                "rule_sha256": "829a3f8942430d885620f2c4736d9ad54332343d4f2aa16415cc33705d26b894",
+                "is_fallback": false,
+                "observed": "1 of 1 cited case row(s) were available; recorded outcomes: HTTP 200: 1; post-request health-check failures: 0.",
+                "significance": "The top label changed under a transformation intended to preserve meaning, while the clean prediction was confident. This is a model-level sensitivity: the input reached the model unchanged in the ways the input controls check, so no endpoint control addresses it.",
+                "diagnosis_confidence": "supported",
+                "fix": "This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "verification": {
+                  "target_id": "sentiment_v1",
+                  "case_set_file": "results/v63_real_sentiment_oces_087292c1c53c433c/runs/sentiment_oces/verification_case_set.json",
+                  "includes_baselines": true,
+                  "command": "python -m runner.run --target-id sentiment_v1 --case-set results/v63_real_sentiment_oces_087292c1c53c433c/runs/sentiment_oces/verification_case_set.json --out results/verify_sentiment_v1",
+                  "expected": "after retraining or augmentation, the same case ids are re-run and the flip rate over the same eligible denominator is compared",
+                  "inspect": "results/verify_sentiment_v1/results_sentiment_v1.jsonl -- check the rows whose attack_id is one of: sst2-val-248.oces.distractor"
+                },
+                "unavailable_evidence": [],
+                "limitation": "This is a model-level weakness. No endpoint control fixes it, and inventing one would misrepresent the finding; the fix above is an evaluation and retraining procedure instead."
+              }
+            },
+            {
+              "finding": {
+                "finding_id": "F-v1-002",
+                "title": "oces.distractor/temporal: prediction flip",
+                "category": "oces.distractor",
+                "severity_score": 53.716323375701904,
+                "severity_tier": "Medium",
+                "description": "1 case(s) in oces.distractor/temporal produced prediction flip -- the top label changed under a meaning-preserving transformation while the clean prediction was confident (at or above 0.6). Severity is scored from the single highest-scoring instance; the 1 affected case(s) indicate reproducibility, not impact.",
+                "remediation": "1 case(s) observed as 200x1. This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "evidence": [
+                  "sst2-val-59.oces.distractor"
+                ]
+              },
+              "subfamily": "temporal",
+              "failure_mode": "prediction_flip",
+              "validity_tiers": [
+                "SILVER"
+              ],
+              "affected_cases": 1,
+              "remediation_detail": {
+                "rule_id": "RM-FLIP-MODEL",
+                "rule_version": "1.0.0",
+                "rule_sha256": "829a3f8942430d885620f2c4736d9ad54332343d4f2aa16415cc33705d26b894",
+                "is_fallback": false,
+                "observed": "1 of 1 cited case row(s) were available; recorded outcomes: HTTP 200: 1; post-request health-check failures: 0.",
+                "significance": "The top label changed under a transformation intended to preserve meaning, while the clean prediction was confident. This is a model-level sensitivity: the input reached the model unchanged in the ways the input controls check, so no endpoint control addresses it.",
+                "diagnosis_confidence": "supported",
+                "fix": "This is not fixable by an endpoint control, and adding one would misrepresent the weakness. The appropriate response is a model-level procedure: augment training data with this transformation family and re-evaluate, or document the sensitivity as a known limitation with its measured rate.",
+                "verification": {
+                  "target_id": "sentiment_v1",
+                  "case_set_file": "results/v63_real_sentiment_oces_087292c1c53c433c/runs/sentiment_oces/verification_case_set.json",
+                  "includes_baselines": true,
+                  "command": "python -m runner.run --target-id sentiment_v1 --case-set results/v63_real_sentiment_oces_087292c1c53c433c/runs/sentiment_oces/verification_case_set.json --out results/verify_sentiment_v1",
+                  "expected": "after retraining or augmentation, the same case ids are re-run and the flip rate over the same eligible denominator is compared",
+                  "inspect": "results/verify_sentiment_v1/results_sentiment_v1.jsonl -- check the rows whose attack_id is one of: sst2-val-59.oces.distractor"
+                },
+                "unavailable_evidence": [],
+                "limitation": "This is a model-level weakness. No endpoint control fixes it, and inventing one would misrepresent the finding; the fix above is an evaluation and retraining procedure instead."
+              }
+            }
+          ],
+          "validity_tier_census": {
+            "SILVER": 2
+          },
+          "diagnostic_observations": [],
+          "review_cases": [
+            {
+              "attack_id": "sst2-val-18.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "expansion"
+            },
+            {
+              "attack_id": "sst2-val-18.oces.distractor",
+              "category": "oces.distractor",
+              "subfamily": "logistical"
+            },
+            {
+              "attack_id": "sst2-val-121.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "lexical"
+            },
+            {
+              "attack_id": "sst2-val-121.oces.distractor",
+              "category": "oces.distractor",
+              "subfamily": "logistical"
+            },
+            {
+              "attack_id": "sst2-val-211.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "syntactic"
+            },
+            {
+              "attack_id": "sst2-val-211.oces.distractor",
+              "category": "oces.distractor",
+              "subfamily": "temporal"
+            },
+            {
+              "attack_id": "sst2-val-13.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "lexical"
+            },
+            {
+              "attack_id": "sst2-val-13.oces.distractor",
+              "category": "oces.distractor",
+              "subfamily": "temporal"
+            },
+            {
+              "attack_id": "sst2-val-52.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "syntactic"
+            },
+            {
+              "attack_id": "sst2-val-52.oces.distractor",
+              "category": "oces.distractor",
+              "subfamily": "logistical"
+            },
+            {
+              "attack_id": "sst2-val-201.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "clause_restructuring"
+            },
+            {
+              "attack_id": "sst2-val-248.oces.paraphrase",
+              "category": "oces.paraphrase",
+              "subfamily": "lexical"
+            }
+          ],
+          "limitations": [
+            "Drift is measured against each endpoint's own clean prediction, never the dataset label a baseline sentence was written to represent. Where a baseline does not predict its intended label the comparison remains valid, and no model-accuracy claim in this analysis rests on those baselines.",
+            "V2's defenses are application-layer only; no retraining was done. V2 is therefore not expected to reduce model-level sensitivity to typos or other meaning-preserving perturbations. A perturbation finding that persists on V2 is an honest non-improvement, not a gap in the hardening.",
+            "A failed health check records observed unavailability only. It is not evidence that the operating-system process died, and no process-death claim is made anywhere here.",
+            "Validity tiers are preserved per finding. Most of the suite is SILVER -- mechanically justified but not hand-verified -- so findings resting on SILVER evidence carry weaker semantic assurance than GOLD ones."
+          ]
+        }
+      },
+      "comparison": null,
+      "coverage": null,
+      "oces": {
+        "families": [
+          "oces.paraphrase",
+          "oces.distractor"
+        ],
+        "summaries": {
+          "sentiment_v1": {
+            "target_id": "sentiment_v1",
+            "planned": 40,
+            "statuses": {
+              "meets_expectation": 0,
+              "violates_expectation": 0,
+              "excluded": 12,
+              "unevaluable": 28,
+              "not_executed": 0
+            },
+            "violation_rate": {
+              "numerator": 0,
+              "denominator": 0,
+              "rate": null
+            },
+            "families": {
+              "oces.paraphrase": {
+                "planned": 20,
+                "statuses": {
+                  "meets_expectation": 0,
+                  "violates_expectation": 0,
+                  "excluded": 7,
+                  "unevaluable": 13,
+                  "not_executed": 0
+                },
+                "violation_rate": {
+                  "numerator": 0,
+                  "denominator": 0,
+                  "rate": null
+                },
+                "violation_case_ids": [],
+                "induced_misclassification": {
+                  "count": 0,
+                  "case_ids": [],
+                  "note": "Counted only where the clean prediction matched its reference label; otherwise a change is a consistency failure and the correct label is not established."
+                }
+              },
+              "oces.distractor": {
+                "planned": 20,
+                "statuses": {
+                  "meets_expectation": 0,
+                  "violates_expectation": 0,
+                  "excluded": 5,
+                  "unevaluable": 15,
+                  "not_executed": 0
+                },
+                "violation_rate": {
+                  "numerator": 0,
+                  "denominator": 0,
+                  "rate": null
+                },
+                "violation_case_ids": [],
+                "induced_misclassification": {
+                  "count": 0,
+                  "case_ids": [],
+                  "note": "Counted only where the clean prediction matched its reference label; otherwise a change is a consistency failure and the correct label is not established."
+                }
+              }
+            },
+            "author_exposure": "Additional evaluation authored after the evaluated defenses were frozen; the authors were aware of the defenses; not a blind holdout.",
+            "interpretation_limits": [
+              "Valid JSON, an accepted type, bounded tokens and an unchanged clean_text result establish only that those specific input gates accepted the text unchanged. They do not show the exception handler is irrelevant and they do not show semantic preservation.",
+              "A changed prediction is a consistency failure under an intended label-preserving change. It does not establish which prediction is correct."
+            ]
+          }
+        },
+        "cases": {
+          "sentiment_v1": [
+            {
+              "case_id": "sst2-val-109.oces.distractor",
+              "family": "oces.distractor",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-109.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "sst2-val-109.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-109.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "sst2-val-110.oces.distractor",
+              "family": "oces.distractor",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-110.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "sst2-val-110.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-110.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "sst2-val-111.oces.distractor",
+              "family": "oces.distractor",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-111.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "sst2-val-111.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-111.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "sst2-val-120.oces.distractor",
+              "family": "oces.distractor",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-120.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "sst2-val-120.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-120.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "sst2-val-121.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "sst2-val-121.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "sst2-val-13.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "sst2-val-13.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "sst2-val-136.oces.distractor",
+              "family": "oces.distractor",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-136.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "sst2-val-136.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-136.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "sst2-val-162.oces.distractor",
+              "family": "oces.distractor",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-162.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "sst2-val-162.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-162.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "sst2-val-17.oces.distractor",
+              "family": "oces.distractor",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-17.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "sst2-val-17.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-17.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "sst2-val-18.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "sst2-val-18.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "sst2-val-201.oces.distractor",
+              "family": "oces.distractor",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-201.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "sst2-val-201.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "sst2-val-211.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "sst2-val-211.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "sst2-val-227.oces.distractor",
+              "family": "oces.distractor",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-227.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "sst2-val-227.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-227.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "sst2-val-248.oces.distractor",
+              "family": "oces.distractor",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-248.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "sst2-val-248.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "sst2-val-290.oces.distractor",
+              "family": "oces.distractor",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-290.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "sst2-val-290.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-290.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "sst2-val-319.oces.distractor",
+              "family": "oces.distractor",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-319.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "sst2-val-319.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-319.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "sst2-val-341.oces.distractor",
+              "family": "oces.distractor",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-341.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "sst2-val-341.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-341.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "sst2-val-35.oces.distractor",
+              "family": "oces.distractor",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-35.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "sst2-val-35.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-35.oces.paraphrase"
+              ]
+            },
+            {
+              "case_id": "sst2-val-52.oces.distractor",
+              "family": "oces.distractor",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "sst2-val-52.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "excluded",
+              "reason": "REVIEW tier: needs human review before it can be trusted",
+              "validity_tier": "REVIEW",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": []
+            },
+            {
+              "case_id": "sst2-val-59.oces.distractor",
+              "family": "oces.distractor",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-59.oces.distractor"
+              ]
+            },
+            {
+              "case_id": "sst2-val-59.oces.paraphrase",
+              "family": "oces.paraphrase",
+              "status": "unevaluable",
+              "reason": "no clean baseline result for the same target",
+              "validity_tier": "SILVER",
+              "clean_label": null,
+              "clean_confidence": null,
+              "observed_label": null,
+              "observed_confidence": null,
+              "clean_matches_reference": null,
+              "evidence_refs": [
+                "attack:sst2-val-59.oces.paraphrase"
+              ]
+            }
+          ]
+        },
+        "provenance": {
+          "path": "oces_freeze_content_hashes.json",
+          "sha256": "f39fd296a49e3f02076a2b50b6496b1934d9ed693be3c52fd2adddc8ab695f09",
+          "document": {
+            "artifact": "oces_freeze_content_hashes",
+            "generator_version": "1.2.1",
+            "coverage_map_version": "1.0.0",
+            "note": "SHA-256 of each finalized OCES freeze file (content identity for reproducibility). This file does not hash itself.",
+            "files": {
+              "baseline/oces/emotion_seeds.json": "d5cc6011848ad5800fdfbb2b006a2cc77e7f8de0bd0d6cef3e5d012565951af3",
+              "baseline/oces/sentiment_seeds.json": "a16e5c999c68fc20e685e793b7cfd3e6de38cf49cfc70ebf1e42a833390fd2c5",
+              "attacks/data/oces/emotion_cases.json": "f2e8e394f8cb90cf9dab6de225bb8033868f72ee273f7ea61516a5ff1af65863",
+              "attacks/data/oces/sentiment_cases.json": "053737c338ae0102807e7099963817de33c6d89c972d4e87d93226d504799e04",
+              "attacks/data/oces/provenance.json": "6131332e7988f0e56a9c53556bc09c702e785a64b02625caaec6ed2ec50e0c4d",
+              "baseline/oces/oces_content.py": "522f7f89c878ce7170a0dae9f913ae744e9e466ac904fde2d5e75264b7273ad2",
+              "baseline/oces/build_oces.py": "437664a5617005e6c58d6fa8e527707fa06b15cf222fcfc823f1498b45b0ab1e"
+            }
+          }
+        },
+        "author_exposure": "Additional evaluation authored after the evaluated defenses were frozen; the authors were aware of the defenses; not a blind holdout.",
+        "separation_note": "OCES findings and rates are reported separately from the original core suite and from other models. The suites test different things on different data."
+      },
+      "baseline_file": "baseline/oces/sentiment_seeds.json",
+      "baseline_file_sha256": "a16e5c999c68fc20e685e793b7cfd3e6de38cf49cfc70ebf1e42a833390fd2c5"
+    }
+  ],
+  "limitations": [
+    "Drift is measured against each endpoint's own clean prediction, never the dataset label a baseline sentence was written to represent. Where a baseline does not predict its intended label the comparison remains valid, and no model-accuracy claim in this analysis rests on those baselines.",
+    "A failed health check records observed unavailability only. It is not evidence that the operating-system process died, and no process-death claim is made anywhere here.",
+    "Validity tiers are preserved per finding. Most of the suite is SILVER -- mechanically justified but not hand-verified -- so findings resting on SILVER evidence carry weaker semantic assurance than GOLD ones."
+  ]
+}

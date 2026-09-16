@@ -597,3 +597,44 @@ Next: fetch origin and confirm `origin/stage3/ahsan` is still `7c46303` (unchang
 v6.1's push) before pushing this commit, push normally (no force), observe the one
 automatically triggered gate run, confirm its deploy job is skipped, and leave PR #11 draft
 and unmerged. Do not touch Hugging Face.
+
+**Pushed, CI failed, root-caused, fixed, re-pushed, CI passed.** `12ab918` pushed cleanly
+(`7c46303..12ab918` — origin had not advanced). GitHub Actions run `35068155196` completed
+`failure`: "Enforce gate outcome" rejected the run (`results/gate-exit-code.txt` non-zero).
+No CI logs/artifacts were downloadable without repo-admin auth (`gh` unavailable,
+`actions/jobs/.../logs` and the artifact zip both returned 401/403), so this was
+root-caused by re-reading the actual production code paths the CI gate exercises (the real
+run against `emotion_v2` under `analysis/policies/ci_core_v1.json`, `--html-only`, which
+still renders `template_v3.html`) rather than log inspection. Found two real bugs:
+1. The new model/tokenizer-revision template code assumed
+   `identity.declared.model_id`/`model_revision` (the shape in
+   `tests/fixtures/stage3/expected_analysis_v3.json`, which is NOT what
+   `analysis.analyze.build_identity_block` actually returns) instead of the real
+   `identity.model.{model_id,revision,tokenizer_id,tokenizer_revision}`. Local tests passed
+   only because they were run against the same mismatched fixture; a real analysis document
+   crashed the renderer under Jinja `StrictUndefined`.
+2. `_applicable_limitations` gated the V2-hardening note on evaluation `kind == "paired"`,
+   which wrongly stripped it from the CI gate's own `ci.emotion` evaluation — `"kind":
+   "single"` in `endpoint/targets.json` (it tests `emotion_v2` alone against an approved
+   clean-output reference, no live V1), but still genuinely about a hardened target.
+Fixed both (see commit `a45de6d3a86ce578d49abaaaddbeb313512394a1` below) and added
+regression tests tying the template's identity assumption directly to
+`build_identity_block`'s real return shape, and a `_applicable_limitations` test using
+`emotion_v2`/`"single"` kind matching the real `ci.emotion` shape exactly, so this class of
+mismatch cannot recur silently. Re-ran the full focused suite (**370 passed**), fetched
+(origin unchanged at `31723ee`), committed as `a45de6d3a86ce578d49abaaaddbeb313512394a1`
+(`fix(v6.2): use the real identity.model shape and gate on hardened targets`), pushed
+(`31723ee..a45de6d`). GitHub Actions run `35069400992` completed **success**; "Deploy tested
+release to Hugging Face Space" `skipped`. PR #11 confirmed open, draft, unmerged. Hugging
+Face `space` remote was never touched at any point in this session.
+
+**Final v6.2 SHA: `a45de6d3a86ce578d49abaaaddbeb313512394a1`.**
+
+Lesson for future sessions: `tests/fixtures/stage3/expected_analysis_v3.json`'s per-target
+`identity` block does not match `analysis.analyze.build_identity_block`'s real output shape
+(it has `declared.model_id`/`model_revision`; the real function puts model info in a
+sibling `identity.model` key with `revision` not `model_revision`). Do not add new
+template/report code that reads `summary.identity.*` based on this fixture alone --
+cross-check against `analysis/analyze.py`'s actual construction first. This is a
+pre-existing fixture/reality drift, not something this session's scope authorized fixing in
+the fixture itself.

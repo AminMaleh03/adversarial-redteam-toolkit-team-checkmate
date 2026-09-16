@@ -12,6 +12,9 @@
   var textarea = document.getElementById("lab-text");
   var evaluationSelect = document.getElementById("lab-evaluation");
   var modelDescription = document.getElementById("lab-model-description");
+  var introDeck = document.getElementById("lab-intro-deck");
+  var heroControlPaired = document.getElementById("lab-hero-control-paired");
+  var heroControlSingle = document.getElementById("lab-hero-control-single");
   var execModelNote = document.getElementById("lab-exec-model-note");
   var resultsModelNote = document.getElementById("lab-results-model-note");
   var counter = document.getElementById("lab-counter");
@@ -548,6 +551,17 @@
     if (modelDescription) modelDescription.textContent = sentiment ?
       "Explore one pinned two-label sentiment target without a fabricated before/after comparison." :
       "The same emotion model through two endpoint configurations.";
+    // V6.5: the intro copy and V1/V2 badges are paired-comparison language -- sentiment has
+    // no V2, so both must switch to single-target wording instead of inheriting emotion's.
+    if (introDeck) introDeck.textContent = sentiment ?
+      "Enter a sentence and Red Lab will generate controlled adversarial variants and test " +
+      "them against the single configured sentiment target. There is no sentiment_v2, so no " +
+      "before/after hardening comparison is made or implied." :
+      "Enter a sentence and Red Lab will generate controlled adversarial variants, test them " +
+      "against the same model through V1 and V2, and show which weaknesses are mitigated by " +
+      "endpoint hardening and which persist.";
+    if (heroControlPaired) heroControlPaired.hidden = sentiment;
+    if (heroControlSingle) heroControlSingle.hidden = !sentiment;
   }
   if (evaluationSelect) evaluationSelect.addEventListener("change", function () {
     generation++; clearTimeout(pollTimer); clearJobId(); lastText = "";

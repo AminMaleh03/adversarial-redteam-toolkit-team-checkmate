@@ -1,7 +1,7 @@
 {
   "report_identity": {
     "name": "Red Lab Master Technical Report",
-    "product_version_label": "Red Lab v6.4",
+    "product_version_label": "Red Lab v6.5",
     "contracts_version": "3.0.0",
     "generator_module": "report.master_report",
     "generator_version": "1.0.0",
@@ -238,8 +238,8 @@
       "reason": "attacks/data/oces/oces_review_sheet.csv proposed_tier column contains zero GOLD rows (0 GOLD / 50 SILVER / 32 REVIEW of 82)."
     }
   ],
-  "rendered_index_sha256": "434b56cb50854761a9101056b9d5fc9fcbe7702116b2649bd46eb99fa7893b89",
-  "rendered_pdf_sha256": "bf2a904c2cfecbcf9cc0d5e856240f7c946f02a87912dea9e791c8d89e052350",
+  "rendered_index_sha256": "b54ac78d7a2c139153503345790a2101739262ae38656881f49524b2c7de7297",
+  "rendered_pdf_sha256": "f0b04ccc7626fd4f9aec3eb3ac1482eba672b89d1c1f4c58b09cb634ca320cc2",
   "pdf_reproducibility_limit": "Verified non-reproducible: rendering this same HTML twice (including across separate processes with PYTHONHASHSEED fixed) produces report.pdf files that differ in length and SHA-256. This build's PDFs carry no /CreationDate or /ModDate at all, so the divergence is not a timestamp; it appears inside a compressed content stream, consistent with non-deterministic internal serialization (e.g. font-subsetting order) in WeasyPrint/pydyf. The rendered HTML and the PDF's actual page content are reproducible from the same evidence; the PDF file bytes are not. The recorded hash below identifies this specific committed file, not a value a fresh regeneration reproduces.",
-  "generated_at_utc": "2026-09-16T09:42:03.816640+00:00"
+  "generated_at_utc": "2026-09-16T11:40:46.158562+00:00"
 }

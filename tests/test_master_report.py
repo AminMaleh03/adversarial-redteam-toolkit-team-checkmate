@@ -167,10 +167,10 @@ def test_pdf_has_multiple_pages_and_substantive_size(generated_with_pdf):
     assert len(document.pages) >= 10, f"expected a multi-page report, got {len(document.pages)} pages"
 
 
-def test_active_version_label_is_v6_4(generated):
+def test_active_version_label_is_v6_5(generated):
     html, _ = generated
-    assert "Red Lab v6.4" in html
-    assert "Red Lab v6.3" not in html
+    assert "Red Lab v6.5" in html
+    assert "Red Lab v6.4" not in html
 
 
 def test_sidebar_anchors_all_resolve(generated):
@@ -180,6 +180,35 @@ def test_sidebar_anchors_all_resolve(generated):
     assert toc_hrefs, "no sidebar links found"
     for anchor in toc_hrefs:
         assert f'id="{anchor}"' in html, f"sidebar link #{anchor} has no matching section id"
+
+
+def test_no_limitations_section_but_facts_survive_elsewhere(generated):
+    """V6.5 requirement 4: the standalone "Limitations" section/TOC entry is gone, but the
+    facts a reader needs to interpret the evidence correctly must still be stated where
+    the relevant numbers actually live."""
+    html, _ = generated
+    assert 'id="limitations"' not in html
+    assert "Known Limitations" not in html
+    assert "<h2>Limitations</h2>" not in html
+    # OCES provenance (team-authored after defenses frozen) -- section F.
+    assert "authored by this team after the evaluated defenses were already frozen" in html
+    # OCES 0/0 scored-outcome denominator -- section F (already covered in detail by
+    # test_oces_zero_scored_outcomes_are_not_rendered_as_a_rate; spot-checked here too).
+    assert "0 of 0 cases produced a scored expectation outcome" in html
+    # Sentiment single-target identity -- sections E and F.
+    assert "sentiment_v1 is the only sentiment target; there is no sentiment_v2" in html
+    assert "Single-target evaluation of sentiment_v1 only; comparison is null" in html
+
+
+def test_sidebar_drawer_breakpoint_matches_between_css_and_script(generated):
+    """V6.5: the sidebar collapses to a drawer at a wider breakpoint (1024px) than the
+    report's general mobile typography (760px) -- style.css and the inline scrollspy
+    script must agree on that number, or the drawer's open/close JS behavior (inert,
+    focus trap, auto-close-on-navigate) would desync from what is actually visible."""
+    html, _ = generated
+    assert "@media (max-width: 1024px)" in html
+    assert 'window.matchMedia("(max-width: 1024px)").matches' in html
+    assert 'window.matchMedia("(max-width: 1024px)").addEventListener' in html
 
 
 def test_build_manifest_generator_reproduces_the_committed_manifest(tmp_path):

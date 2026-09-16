@@ -38,12 +38,13 @@
       <section class="hero lab-hero" id="lab-input">
         <p class="rl-creator">{{ creator_name }} <span class="lab-feature">Interactive lab</span></p>
         <h1 class="lab-heading">Live Red-Team Lab</h1>
-        <p class="deck">
+        <p class="deck" id="lab-intro-deck">
           Enter a sentence and Red Lab will generate controlled adversarial variants, test them
           against the same model through V1 and V2, and show which weaknesses are mitigated by
           endpoint hardening and which persist.
         </p>
-        <div class="hero-control"><span class="control-v1">V1 &middot; Unhardened</span><span class="control-model">Same model</span><span class="control-v2">V2 &middot; Hardened</span></div>
+        <div class="hero-control" id="lab-hero-control-paired"><span class="control-v1">V1 &middot; Unhardened</span><span class="control-model">Same model</span><span class="control-v2">V2 &middot; Hardened</span></div>
+        <div class="hero-control" id="lab-hero-control-single" hidden><span class="control-single">sentiment_v1 &middot; Single configured target, no V2</span></div>
 
         <form id="lab-form" class="lab-editor" novalidate>
           <p class="eyebrow">01 / Start with a clean reference</p>

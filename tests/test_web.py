@@ -64,14 +64,14 @@ def test_index_returns_branded_welcome_page(client):
 
 def test_home_shows_red_lab_version_label(client):
     body = client.get("/").text
-    assert "Red Lab v6.4" in body
+    assert "Red Lab v6.5" in body
 
 
 def test_active_pages_use_centralized_version_source_not_a_hardcoded_string(client):
     # v6.1: home, lab and generated report pages must all read the same PRODUCT_VERSION_LABEL
     # constant rather than each carrying its own copy of the string.
     from report.generate import PRODUCT_VERSION_LABEL
-    assert PRODUCT_VERSION_LABEL == "Red Lab v6.4"
+    assert PRODUCT_VERSION_LABEL == "Red Lab v6.5"
     home_body = client.get("/").text
     lab_body = client.get("/lab").text
     assert PRODUCT_VERSION_LABEL in home_body
@@ -114,6 +114,77 @@ def test_home_hero_has_secondary_cta_to_technical_report_when_available(client):
     if "View Technical Report" not in body:
         pytest.skip("verified_full_report artifact not present in this checkout")
     assert 'id="run"' in body
+
+
+def test_home_three_primary_actions_share_one_actions_row(client):
+    """V6.5: Run Live Demo, Try Your Own Input and View Technical Report are three
+    .hero-path children of the same #run actions row (not a separate button glued on
+    below), so they can lay out as one row on desktop and step down together."""
+    body = client.get("/").text
+    if "View Technical Report" not in body:
+        pytest.skip("verified_full_report artifact not present in this checkout")
+    row = body[body.index('id="run"'): body.index("</div>", body.index("View Technical Report"))]
+    assert row.count("hero-path") >= 3
+    assert "Run Live Demo" in row and "Try Your Own Input" in row and "View Technical Report" in row
+
+
+def test_home_hero_statement_rotates_among_multiple_accurate_messages(client):
+    """V6.5: the hero statement is a small rotator with >= 3 lines, one active by default,
+    distinguishing paired emotion, standalone sentiment and the release-candidate framing
+    -- never suggesting a sentiment_v2 or a sentiment hardening comparison."""
+    body = client.get("/").text
+    section = body[body.index('id="hero-statement"'): body.index("</div>", body.index('id="hero-statement"'))]
+    lines = section.count("hero-statement-line")
+    assert lines >= 3
+    assert section.count("is-active") == 1
+    assert "sentiment_v2" not in section.lower()
+    assert "challenge the standalone sentiment classifier" in section.lower()
+
+    js = client.get("/static/app.js").text
+    assert "hero-statement-line" in js
+    assert "prefers-reduced-motion: reduce" in js
+
+
+def test_home_hero_control_badges_switch_with_evaluation_selection(client):
+    """V6.5: the V1/V2 hardening badges (#hero-control-paired) only ever apply to emotion;
+    sentiment gets its own single-target indicator (#hero-control-single) instead of
+    inheriting a misleading paired-comparison badge row."""
+    body = client.get("/").text
+    assert 'id="hero-control-paired"' in body
+    assert 'id="hero-control-single"' in body
+    single = body[body.index('id="hero-control-single"'): body.index(">", body.index('id="hero-control-single"'))]
+    assert "hidden" in single
+
+    js = client.get("/static/app.js").text
+    assert "heroControlPaired" in js and "heroControlSingle" in js
+
+
+def test_lab_model_picker_is_left_aligned_with_the_rest_of_the_form(client):
+    """V6.5: the shared .model-picker centers itself for the Home hero's centered
+    composition -- on /lab, which is left-aligned, that made the selector look like a
+    disconnected, centered island. A scoped override removes the centering there."""
+    css = client.get("/static/app.css").text
+    assert ".lab-editor .model-picker" in css
+    picker_rule = css[css.index(".lab-editor .model-picker"):]
+    picker_rule = picker_rule[:picker_rule.index("}") + 1]
+    assert "margin: 0 auto" not in picker_rule
+
+
+def test_lab_intro_copy_and_badges_switch_for_sentiment_selection(client):
+    """V6.5 requirement 5: emotion may show V1/V2 paired-comparison language; sentiment
+    must show only sentiment_v1 and must not inherit it, in both the intro copy and the
+    hero-control badges."""
+    body = client.get("/lab").text
+    assert 'id="lab-intro-deck"' in body
+    assert 'id="lab-hero-control-paired"' in body
+    assert 'id="lab-hero-control-single"' in body
+    single = body[body.index('id="lab-hero-control-single"'): body.index(">", body.index('id="lab-hero-control-single"'))]
+    assert "hidden" in single
+
+    js = client.get("/static/lab.js").text
+    assert "introDeck" in js
+    assert "heroControlPaired" in js and "heroControlSingle" in js
+    assert "before/after hardening comparison is made or implied" in js
 
 
 # ------------------------------------------------------------------------------------------
@@ -712,7 +783,7 @@ def test_technical_report_route_serves_master_report(client):
         pytest.skip("technical_report artifact not present in this checkout")
     resp = client.get("/technical-report/")
     assert resp.status_code == 200
-    assert "Red Lab v6.4" in resp.text
+    assert "Red Lab v6.5" in resp.text
     assert "MASTER TECHNICAL REPORT" in resp.text
 
 

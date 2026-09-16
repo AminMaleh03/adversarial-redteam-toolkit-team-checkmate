@@ -28,7 +28,10 @@
   --rl-masthead-width: 1160px;
   --rl-masthead-pad-x: 32px;
   --rl-masthead-pad-y: 16px;
-  --report-toc-width: 280px;
+  /* Fluid, not a fixed 280px: a mid-range window (or a higher browser zoom, which shrinks
+     effective CSS px the same way) shrinks the rail gracefully instead of eating an
+     ever-larger share of a narrowing viewport right up until the drawer breakpoint. */
+  --report-toc-width: clamp(220px, 21vw, 280px);
   --report-toc-collapsed-width: 56px;
 }
 * { box-sizing: border-box; }
@@ -243,10 +246,14 @@ footer { max-width: 1080px; margin: 35px auto 0; padding: 25px 0 35px; border-to
   .report-toc, .toc-group-toggle::before, .toc-collapse-icon { transition: none !important; }
 }
 
-@media (max-width: 760px) {
-  .masthead { padding: 18px 22px; flex-wrap: wrap; gap: 16px; }.masthead nav { order: 3; width: 100%; margin: 0; gap: 14px 20px; }.brand-logo { height: 24px; width: 24px; }.downloads a { font-size: 10px; }.brand-creator { font-size: 8px; letter-spacing: 1px; }.brand-product { font-size: 11px; }main { padding: 0 22px; }.hero { padding-top: 42px; }h1 { font-size: 53px; letter-spacing: -2.5px; }h1.page-title { font-size: 30px; letter-spacing: -1px; }.deck { font-size: 17px; }.verdict { padding: 24px; }.verdict-heading { display: block; }.verdict-heading .badge { margin-bottom: 14px; }.metrics { flex-wrap: wrap; gap: 23px 0; }.metric { flex-basis: 50%; padding-right: 10px; }.metric:nth-child(3) { border: 0; padding-left: 0; }.metric strong { font-size: 40px; }.two-up { display: block; }.two-up > .panel { width: 100%; }.panel { padding: 19px; }h2 { font-size: 24px; }.category-table td { padding: 14px 8px; }.category-table th:first-child { width: 29%; }.rate-label { display: block; }.rate-label span { display: block; }.compact { font-size: 9px; }.compact th, .compact td { padding: 4px; }.compact thead th { letter-spacing: 0; font-size: 8px; }.finding-index { grid-template-columns: 1fr; }.finding { padding: 20px; }footer { margin: 25px 22px 0; display: block; }footer a { display: block; margin-top: 10px; }
-  .endpoint-pair { flex-direction: column; }
-
+/* V6.5: the report-contents rail switches to a collapsible drawer at a wider breakpoint
+   than the rest of the report's mobile typography -- a mid-range window (a tablet, a
+   narrowed desktop browser, or full-size desktop at a higher zoom level, which shrinks
+   effective CSS px the same way) used to keep the 280px grid column, which crowded the
+   report body well before the page's text/table breakpoints kicked in. Below this width a
+   collapsible drawer (identical interaction to the phone-width drawer) is used instead of
+   a fixed sidebar column; script.js's isMobile() check uses the same 1024px threshold. */
+@media (max-width: 1024px) {
   .report-shell { display: block; }
   .report-shell.toc-collapsed { display: block; }
   .toc-toggle { display: inline-flex; order: 2; }
@@ -269,8 +276,13 @@ footer { max-width: 1080px; margin: 35px auto 0; padding: 25px 0 35px; border-to
     display: block; position: fixed; inset: 0; background: rgba(23, 25, 29, 0.45); z-index: 55;
   }
 }
-@media (prefers-reduced-motion: reduce) and (max-width: 760px) {
+@media (prefers-reduced-motion: reduce) and (max-width: 1024px) {
   .report-toc { transition: none !important; }
+}
+
+@media (max-width: 760px) {
+  .masthead { padding: 18px 22px; flex-wrap: wrap; gap: 16px; }.masthead nav { order: 3; width: 100%; margin: 0; gap: 14px 20px; }.brand-logo { height: 24px; width: 24px; }.downloads a { font-size: 10px; }.brand-creator { font-size: 8px; letter-spacing: 1px; }.brand-product { font-size: 11px; }main { padding: 0 22px; }.hero { padding-top: 42px; }h1 { font-size: 53px; letter-spacing: -2.5px; }h1.page-title { font-size: 30px; letter-spacing: -1px; }.deck { font-size: 17px; }.verdict { padding: 24px; }.verdict-heading { display: block; }.verdict-heading .badge { margin-bottom: 14px; }.metrics { flex-wrap: wrap; gap: 23px 0; }.metric { flex-basis: 50%; padding-right: 10px; }.metric:nth-child(3) { border: 0; padding-left: 0; }.metric strong { font-size: 40px; }.two-up { display: block; }.two-up > .panel { width: 100%; }.panel { padding: 19px; }h2 { font-size: 24px; }.category-table td { padding: 14px 8px; }.category-table th:first-child { width: 29%; }.rate-label { display: block; }.rate-label span { display: block; }.compact { font-size: 9px; }.compact th, .compact td { padding: 4px; }.compact thead th { letter-spacing: 0; font-size: 8px; }.finding-index { grid-template-columns: 1fr; }.finding { padding: 20px; }footer { margin: 25px 22px 0; display: block; }footer a { display: block; margin-top: 10px; }
+  .endpoint-pair { flex-direction: column; }
 }
 @page { size: A4; margin: 17mm 16mm 18mm; @bottom-left { content: "TEAM CHECKMATE  /  ROBUSTNESS REPORT"; font: 8px "Segoe UI", sans-serif; color: #53676b; } @bottom-right { content: counter(page) " / " counter(pages); font: 9px "Segoe UI", sans-serif; color: #53676b; } }
 @media print {
@@ -439,6 +451,15 @@ footer { max-width: 1080px; margin: 35px auto 0; padding: 25px 0 35px; border-to
 .v3-rate-grid dd { margin: 4px 0 0; font-weight: 750; }
 .v3-target { margin-top: 22px; }
 .v3-target > h4 { margin-top: 28px; }
+
+/* V6.5: the evaluation-level label ("CORE · PAIRED"), identity (evaluation_id) and
+   task/target detail line share one row when space permits, wrapping in order (never
+   overlapping or squeezed) at narrow widths -- .section-heading's default flex row
+   otherwise squashes a 29px h2 against two small eyebrow-style lines with no wrap. */
+.v3-eval-heading { flex-wrap: wrap; align-items: baseline; column-gap: 16px; row-gap: 6px; }
+.v3-eval-heading .eyebrow { margin: 0; flex: none; }
+.v3-eval-heading h2 { margin: 0; flex: none; }
+.v3-eval-heading .v3-eval-detail { margin: 0; color: var(--muted); font-size: 13px; flex: 1 1 240px; }
 .v3-finding { margin: 16px 0; padding: 20px; }
 .v3-finding h5 { font-size: 19px; margin: 6px 0 12px; }
 .v3-remediation { display: grid; grid-template-columns: minmax(130px, 0.3fr) 1fr; gap: 10px 18px; }

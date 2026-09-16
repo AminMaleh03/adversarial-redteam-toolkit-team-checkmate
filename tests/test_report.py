@@ -583,7 +583,7 @@ def test_demo_hero_uses_functional_identity_not_marketing_copy(demo_data):
     assert "in one minute" not in result
     assert "V1" in result and "Unhardened Endpoint" in result
     assert "V2" in result and "Hardened Endpoint" in result
-    assert "Red Lab v6.4" in result and "Team Checkmate" in result
+    assert "Red Lab v6.5" in result and "Team Checkmate" in result
 
 
 def test_demo_crash_note_is_a_small_caption_not_a_warning_box(demo_data):
@@ -648,7 +648,7 @@ def test_reports_credit_team_checkmate_and_show_red_lab_version(demo_data):
     for mode in ("demo", "full"):
         result = html(demo_data, mode=mode)
         assert "Team Checkmate" in result
-        assert "Red Lab v6.4" in result
+        assert "Red Lab v6.5" in result
 
 
 # ----------------------------------------------------------------------------------------
@@ -722,7 +722,7 @@ def test_reports_masthead_brand_shows_version_label(demo_data):
         header = result[result.index("<header"):result.index("</header>")]
         assert "Team Checkmate" in header
         assert 'class="brand-creator"' in header
-        assert "Red Lab v6.4" in header
+        assert "Red Lab v6.5" in header
 
 
 def test_reports_masthead_brand_uses_shared_class_names_with_web_app(demo_data):
@@ -1030,7 +1030,7 @@ def test_full_report_analysis_schema_not_a_hero_badge(data):
     assert "Analysis schema" not in hero  # moved out of the hero entirely
     provenance = result[result.index('id="provenance"'):result.index("</section>", result.index('id="provenance"'))]
     assert "Analysis schema v2" in provenance
-    assert "Red Lab v6.4" in provenance  # product version, a distinct concept, still present
+    assert "Red Lab v6.5" in provenance  # product version, a distinct concept, still present
 
 
 def test_full_report_remediation_architecture_preserved(data):
@@ -1138,6 +1138,19 @@ def test_v3_report_renders_targets_single_explanation_and_structured_remediation
     assert "Why it matters" in result
     assert "Verification" in result
     assert "Additional evaluation" in result
+
+
+def test_v3_evaluation_header_label_identity_and_detail_share_one_aligned_row():
+    """V6.5 requirement 3: the "CORE · PAIRED"-style eyebrow, the evaluation_id heading and
+    the task/target detail line must use the dedicated alignment class -- plain
+    .section-heading's default flex row (built for master_template's 2-child layout) puts
+    all three of these directly-nested children in an unwrapped row with no wrap, which
+    overflows or crowds at narrow widths instead of wrapping in order."""
+    result = report.render_html(_stage3_document(), source_sha256="c" * 64, include_pdf=False)
+    assert 'class="section-heading v3-eval-heading"' in result
+    assert ".v3-eval-heading" in result  # the CSS rule itself is embedded inline
+    assert "flex-wrap: wrap" in result
+    assert 'class="v3-eval-detail"' in result
 
 
 def test_v3_single_target_cannot_claim_a_comparison():
@@ -1383,22 +1396,26 @@ def test_v3_single_target_sentiment_contains_no_v2_or_hardening_claims():
     assert "Common eligible denominator" not in section
 
 
-def test_v3_report_never_shows_v2_hardening_limitation_when_run_has_no_paired_evaluation():
-    # v6.2 requirement 4 at the run-wide "Limitations" section: analysis.analyze.
-    # LIMITATION_NOTES' V2-hardening note is emitted unconditionally per target by the
-    # (frozen) analysis layer -- a sentiment-only run's report must not surface it.
+def test_v3_report_has_no_limitations_section():
+    # V6.5 requirement 4: live-demo result reports (schema v3, both emotion and sentiment)
+    # no longer render a "Limitations" heading/section at all -- the analysis layer's
+    # `limitations` field (a frozen per-summary/per-report contract field analysis still
+    # writes; see the parametrized field-presence test above) is simply not rendered here
+    # any more. The facts a reader actually needs to interpret the evidence (single-target
+    # identity, no-V2/no-hardening-claim wording, OCES provenance) live in the sections
+    # that already carry them -- see the sibling v3_single_target_* tests.
     payload = _stage3_document()
+    html = report.render_html(payload, source_sha256="8" * 64, include_pdf=False)
+    assert 'id="limitations"' not in html
+    assert "Known Limitations" not in html
+    assert "<h2>Limitations</h2>" not in html
+
     sentiment_only = {
         "schema_version": 3, "contracts_version": "3.0.0",
         "run_identity": dict(payload["run_identity"]),
         "evaluations": [next(e for e in payload["evaluations"] if e["kind"] == "single")],
-        "limitations": [
-            note for note in
-            payload["evaluations"][0]["summaries"][payload["evaluations"][0]["targets"][0]].get("limitations", [])
-            if "V2" not in note
-        ] or ["Single-target observations only."],
+        "limitations": ["Single-target observations only."],
     }
-    html = report.render_html(sentiment_only, source_sha256="8" * 64, include_pdf=False)
-    limitations_section = html[html.index('id="limitations"'):]
-    assert "V2" not in limitations_section
-    assert "hardening" not in limitations_section.lower()
+    single_html = report.render_html(sentiment_only, source_sha256="9" * 64, include_pdf=False)
+    assert 'id="limitations"' not in single_html
+    assert "<h2>Limitations</h2>" not in single_html

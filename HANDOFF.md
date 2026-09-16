@@ -984,3 +984,125 @@ Actions run `35082203070` ("Stage 3 release gate", PR #11) completed **success**
 via the public, unauthenticated GitHub REST API); its "Deploy tested release to Hugging
 Face Space" job was `skipped`. PR #11 confirmed open, draft, unmerged via the same API.
 Hugging Face `space` remote was never touched at any point in this session.
+
+# RED LAB v6.5 — homepage/lab/report content and layout corrections
+
+2026-09-16 15:53 +0400. Branch `stage3/ahsan`, worktree `stage3-ahsan`, starting HEAD
+confirmed at the v6.4 closeout commit `71bc7d8bd5fac3bd3c195e7e5c7f40baaf0b46d0` with a
+clean tree before any edits. Six focused corrections requested as the last pass before
+Ahsan's local functional acceptance; v7 (broader UI redesign) explicitly deferred.
+
+**1. Homepage (`web/templates/index.html`, `web/static/app.{css,js}`).** Deck copy rewritten
+to state both classifiers accurately (paired emotion V1/V2 vs. standalone sentiment, no
+sentiment_v2 implied anywhere). The hero statement is now a 3-message rotator (`#hero-
+statement` + `.hero-statement-line`, one `.is-active` at a time) stacked in one CSS grid
+cell so swapping the active line never resizes the container -- no layout jump -- and
+`prefers-reduced-motion: reduce` visitors get a static first line (verified: `setInterval`
+never starts). The V1/V2 hardening badges (`#hero-control-paired`) now hide behind a
+single-target badge (`#hero-control-single`) when sentiment is selected, driven by
+`updateModelCopy()`. "View Technical Report" moved into the same three-column
+`.hero-actions` row as the other two CTAs (was a separate button below); vertical rhythm
+across the whole hero (padding, logo size, statement/deck font sizes, gaps) was tightened
+so all three actions clear the fold at both 1366x768 and 1920x1080 with room to spare --
+verified with a real Chromium browser (Playwright, headless, real viewport sizes, bounding-
+box measurement, see below). A 1080px breakpoint steps the row down to 2+1 before the
+existing 760px single-column mobile layout; mobile keeps the full copy/animation/logos/
+three actions per the brief (no one-screen mobile requirement).
+
+**2. Technical-report sidebar (`report/style.css`, `report/master_template.html`).** The
+fixed 280px sidebar column used to stay a grid column all the way down to the 760px phone
+breakpoint, crowding the report body at ordinary "narrower window" or higher-zoom desktop
+widths. `--report-toc-width` is now `clamp(220px, 21vw, 280px)` (shrinks gracefully instead
+of a hard cliff), and the sidebar's collapse-to-drawer behavior was extracted from the
+760px media query into its own `@media (max-width: 1024px)` block (same drawer markup/CSS,
+wider trigger). The inline scrollspy script's `isMobile()` and its resize listener were
+updated from 760px to 1024px to match, so drawer inert/focus-trap/auto-close behavior never
+desyncs from what's actually visible. Verified via real browser at 1440px (normal fixed
+sidebar), 900px and 800px (drawer with working toggle), and confirmed the v6.4 scrollspy
+fix still holds: clicking the first (`#overview`) and last (`#historical`) sidebar links
+both correctly set `.is-active` on the clicked link.
+
+**3. Live-demo results alignment (`report/template_v3.html`, `report/style.css`).** The
+per-evaluation header (eyebrow "CORE · PAIRED", the `evaluation_id` heading, and the task/
+target detail line) were three direct children of a plain `.section-heading` flex row with
+no wrap -- fine for master_template's two-child layout, but here it just crammed a 29px
+heading against two small caption lines with no wrap at narrow widths. Added a
+`.v3-eval-heading` modifier class (`flex-wrap: wrap; align-items: baseline`) plus a
+`.v3-eval-detail` class on the trailing line so the three pieces share one row when space
+permits and wrap onto their own lines in order otherwise -- verified visually at 1366px
+(one row) and 500px (label+identity, then detail line on its own row, no overlap). Applies
+identically to emotion and sentiment since both render through the same template.
+
+**4. Limitations sections removed (`report/master_template.html`, `report/template_v3.html`,
+`report/master_report.py`).** Removed the "Limitations" heading, its TOC entry, and its
+rendered `<ul>` from the current master technical report, and the equivalent section from
+the schema-v3 live-demo report template (shared by emotion and sentiment runs). The
+`master_report.py` `context["limitations"]` list (8 hand-written bullets) was deleted
+entirely since nothing renders it any more. The frozen per-summary/per-report `limitations`
+field in the analysis JSON contract itself was **not** touched -- schema validation in
+`report/generate.py` still requires it; only the template's rendering of it changed. Checked
+that every fact worth keeping already lives elsewhere and still renders: OCES provenance
+("authored by this team after the evaluated defenses were already frozen") in section F,
+the OCES 0/0 scored-outcome wording (`oces_scored_note`, unchanged from v6.4) in D/E/F,
+sentiment's single-target identity in sections E/F, and the CI gate's one-candidate scope
+note in section H. `/verified-full/` (schema v2, frozen V5 archive) was not touched --
+confirmed via `test_technical_report_verified_full_bytes_unmodified` (byte-for-byte hash
+check, still passing).
+
+**5. Try Your Own Input page (`web/templates/lab.html`, `web/static/{app.css,lab.js}`).**
+`.model-picker`'s own `margin: 0 auto` (needed to center it on Home's centered hero) was
+centering it as a narrower island inside `/lab`'s left-aligned form, disconnected from the
+textarea directly below it. Added `.lab-editor .model-picker { max-width: none; margin: 0
+0 20px; }` so it now sits flush with the "Your sentence" label/textarea (verified: both
+start at the same x-coordinate in a live render). The intro deck paragraph and the V1/V2
+badge row were static regardless of selection, so selecting sentiment still visually
+implied a V1/V2 hardening comparison; both now toggle via `updateModelJourney()` the same
+way the existing caption/model-identity text already did -- sentiment gets its own
+single-target copy and an `id="lab-hero-control-single"` badge instead of inheriting
+emotion's paired-comparison wording and badges.
+
+**6. Versioning.** `report/generate.py`'s single-source `PRODUCT_VERSION_LABEL` bumped
+`"Red Lab v6.4"` → `"Red Lab v6.5"` (read by both `web/app.py` and `report/master_report.py`
+via `MASTER_REPORT_VERSION_LABEL = PRODUCT_VERSION_LABEL`); `report/master_evidence/
+build_manifest.py`'s `REPORT_IDENTITY.product_version_label` bumped the same way, then
+`python -m report.master_evidence.build_manifest` regenerated `manifest.json` (diff is
+exactly the one label line -- all 18 evidence source hashes unchanged, confirmed via
+`git diff`). `python -m report.master_report` regenerated `artifacts/technical_report/
+index.html` + `report.pdf` + `master_evidence_manifest.json` from that manifest. As with
+v6.4, PDF byte-reproducibility is **not** claimed -- only the content/manifest hash of this
+specific committed `report.pdf` is recorded, consistent with the already-documented,
+already-verified WeasyPrint/pydyf non-determinism.
+
+**Final bundle (this milestone):** `rendered_index_sha256`
+`b54ac78d7a2c139153503345790a2101739262ae38656881f49524b2c7de7297`,
+`rendered_pdf_sha256`
+`f0b04ccc7626fd4f9aec3eb3ac1482eba672b89d1c1f4c58b09cb634ca320cc2`,
+PDF page count **18** (down from v6.4's 19 -- the removed Limitations section was one full
+page under the print CSS's per-section page break; confirmed no orphan blank page at the
+old boundary or after the new final page via a real Chromium PDF-viewer render).
+
+**Validation by this Claude session:** `tests/test_master_report.py` (23, incl. 2 new: no-
+Limitations-but-facts-survive, sidebar-breakpoint-css-and-script-agree) +
+`tests/test_report.py` (158, incl. 1 new alignment test + 1 rewritten no-Limitations test)
++ `tests/test_web.py` (65, incl. 5 new: three-actions-one-row, hero-statement-rotates,
+hero-control-badges-switch, lab-model-picker-left-aligned, lab-intro-copy-and-badges-
+switch) = **245 passed**. `git diff --check`: clean (only pre-existing LF/CRLF autocrlf
+notices, no real whitespace errors). Real-browser verification (Playwright + the same
+locally-installed Chromium from v6.4, not committed): homepage at 1366x768 (all three CTAs
+fit, no scroll needed to reach them), 1920x1080 (fits with large margin), a narrow-desktop
+900px window (orderly 2+1 stepdown, all three fit), and a 390px mobile viewport (stacks
+correctly, third action scrolls into view as expected/allowed); hero rotation confirmed to
+advance after 5.5s under normal motion and stay pinned on the first message under
+`reduced_motion="reduce"`; sentiment selection confirmed to swap both the homepage and lab-
+page badges/copy live; `/lab` model-picker confirmed pixel-aligned with the textarea;
+`/technical-report/` sidebar confirmed to switch from fixed column to drawer between
+1024px and 900px, and the drawer opens/closes correctly; the regenerated `report.pdf`
+opened in Chromium's real PDF viewer, 18 pages, no clipped/overlapping content, no orphan
+blank page. Did not run the full pytest suite, model evaluations, OCES evaluations, Docker,
+or CI-policy regeneration (out of scope per the brief; only the listed focused suites ran).
+
+**Not done in this milestone (explicit scope boundary):** commit is local only on
+`stage3/ahsan` -- not pushed, so no CI gate run to observe this time (the brief's final ask
+was the commit SHA and a locally-reviewable diff, not a push/CI cycle; push on request).
+v7 (broader visual/UI redesign) not started. Hugging Face untouched. `/verified-full/` V5
+archive untouched (byte-verified). PR #11 unaffected (still draft, unmerged).

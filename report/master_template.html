@@ -124,10 +124,6 @@
           <ul id="toc-group-repro" class="toc-sublist"><li><a href="#provenance" data-toc-link>Provenance &amp; Evidence Hashes</a></li></ul>
         </li>
         <li class="toc-group">
-          <button class="toc-group-toggle" type="button" aria-expanded="true" aria-controls="toc-group-limits">Limitations</button>
-          <ul id="toc-group-limits" class="toc-sublist"><li><a href="#limitations" data-toc-link>Known Limitations</a></li></ul>
-        </li>
-        <li class="toc-group">
           <button class="toc-group-toggle" type="button" aria-expanded="true" aria-controls="toc-group-historical">Historical Evidence</button>
           <ul id="toc-group-historical" class="toc-sublist"><li><a href="#historical" data-toc-link>Archived Red Lab v5 Benchmark</a></li></ul>
         </li>
@@ -284,11 +280,6 @@
       <ul>{% for na in provenance.not_applicable %}<li><strong>{{ na.field }}</strong> &mdash; {{ na.reason }}</li>{% endfor %}</ul>
     </section>
 
-    <section class="report-section" id="limitations">
-      <div class="section-heading"><span class="section-number">J</span><div><p class="eyebrow">INTERPRETATION</p><h2>Limitations</h2></div></div>
-      <div class="panel"><ul>{% for note in limitations %}<li>{{ note }}</li>{% endfor %}</ul></div>
-    </section>
-
     <section class="report-section" id="historical">
       <div class="section-heading"><p class="eyebrow">ARCHIVED EVIDENCE</p><h2>Historical Red Lab v5 benchmark</h2></div>
       <div class="panel">
@@ -317,7 +308,11 @@ function rlGoBack(event) {
   var tocBackdrop = document.getElementById("toc-backdrop");
   var tocCollapse = document.getElementById("toc-collapse");
   if (!shell || !toc) { return; }
-  function isMobile() { return window.matchMedia("(max-width: 760px)").matches; }
+  // V6.5: matches style.css's drawer breakpoint (1024px), which is wider than the report's
+  // general text/table mobile breakpoint (760px) -- the sidebar collapses to a drawer at a
+  // narrower window or higher zoom well before body content would otherwise be considered
+  // "mobile", so this must not be conflated with the 760px used elsewhere in this file/CSS.
+  function isMobile() { return window.matchMedia("(max-width: 1024px)").matches; }
   function openDrawer() {
     toc.classList.add("is-open");
     toc.inert = false;
@@ -351,7 +346,7 @@ function rlGoBack(event) {
     }
   });
   toc.inert = isMobile();
-  window.matchMedia("(max-width: 760px)").addEventListener("change", function () {
+  window.matchMedia("(max-width: 1024px)").addEventListener("change", function () {
     closeDrawer();
     toc.inert = isMobile();
   });

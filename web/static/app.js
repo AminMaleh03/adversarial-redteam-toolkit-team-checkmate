@@ -10,6 +10,8 @@
   var evaluationSelect = document.getElementById("demo-evaluation");
   var modelDescription = document.getElementById("model-description");
   var modelIdentity = document.getElementById("model-identity");
+  var heroControlPaired = document.getElementById("hero-control-paired");
+  var heroControlSingle = document.getElementById("hero-control-single");
   var sameModelLabelEl = document.getElementById("same-model-label");
   var sameModelNoteEl = document.getElementById("same-model-note");
   var cardsEl = document.getElementById("version-context");
@@ -216,6 +218,10 @@
     if (modelIdentity) modelIdentity.textContent = sentiment ?
       "Model: distilbert-base-uncased-finetuned-sst-2-english · 2 sentiment labels" :
       "Model: j-hartmann/emotion-english-distilroberta-base · 7 emotion labels";
+    // V6.5: the V1/V2 hardening badges only ever applied to emotion -- sentiment has no
+    // sentiment_v2, so it gets its own single-target indicator instead of inheriting them.
+    if (heroControlPaired) heroControlPaired.hidden = sentiment;
+    if (heroControlSingle) heroControlSingle.hidden = !sentiment;
   }
   if (evaluationSelect) evaluationSelect.addEventListener("change", function () {
     generation++; clearTimeout(timer); timer = null;
@@ -224,4 +230,17 @@
   });
   updateModelCopy();
   reconcile(true);
+
+  // V6.5: rotate the hero statement among its ~3 accurate messages. All lines are stacked
+  // in one CSS grid cell (app.css's .hero-statement), so swapping .is-active never resizes
+  // the container -- no layout jump. Reduced-motion visitors get a static first line.
+  var heroLines = document.querySelectorAll(".hero-statement-line");
+  if (heroLines.length > 1 && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    var heroIndex = 0;
+    setInterval(function () {
+      heroLines[heroIndex].classList.remove("is-active");
+      heroIndex = (heroIndex + 1) % heroLines.length;
+      heroLines[heroIndex].classList.add("is-active");
+    }, 5000);
+  }
 })();

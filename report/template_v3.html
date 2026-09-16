@@ -34,10 +34,10 @@
 
   {% for evaluation in data.evaluations %}
   <section class="report-section v3-evaluation" id="evaluation-{{ loop.index }}">
-    <div class="section-heading">
+    <div class="section-heading v3-eval-heading">
       <p class="eyebrow">{{ evaluation.suite_id|upper }} &middot; {{ evaluation.kind|upper }}</p>
       <h2>{{ evaluation.evaluation_id }}</h2>
-      <p>{{ evaluation.task_id }} &middot; {{ evaluation.targets|join(', ') }}</p>
+      <p class="v3-eval-detail">{{ evaluation.task_id }} &middot; {{ evaluation.targets|join(', ') }}</p>
     </div>
 
     {% if evaluation.kind == 'single' %}
@@ -142,8 +142,6 @@
     {% endif %}
   </section>
   {% endfor %}
-
-  <section class="report-section" id="limitations"><div class="section-heading"><p class="eyebrow">INTERPRETATION</p><h2>Limitations</h2></div><div class="panel"><ul>{% for note in data.limitations %}<li>{{ note }}</li>{% endfor %}</ul></div></section>
 </main>
 <footer class="site-footer"><p>{{ creator_name }} &mdash; {{ product_name }}, {{ product_tagline }}</p><p>Source SHA-256 <code>{{ source_sha256 }}</code></p></footer>
 </body>

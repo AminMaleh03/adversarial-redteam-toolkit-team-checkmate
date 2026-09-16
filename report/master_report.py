@@ -391,16 +391,6 @@ def build_context(verified: dict) -> dict:
             "external_citations": load_manifest()["external_citations"],
             "not_applicable": load_manifest()["not_applicable"],
         },
-        "limitations": [
-            "Bounded to English text classification; the toolkit does not evaluate arbitrary modalities or languages.",
-            "There is no arbitrary public-model-upload or external-endpoint-URL feature; a new target must be registered in endpoint/targets.json by someone with repository access.",
-            "Sentiment has no V2 and therefore no hardening-improvement comparison; comparison is null everywhere sentiment appears.",
-            "OCES is authored by the team after the evaluated defenses were frozen -- it is not blind or externally authored, and is not a substitute for an independent audit.",
-            "OCES contains zero GOLD-tier cases across both emotion and sentiment (0 of 82); most of its evidentiary weight is SILVER, with a real REVIEW-tier minority.",
-            "The CI release gate (ci.emotion) currently certifies only the approved emotion_v2 candidate against its own frozen policy; it does not certify sentiment or any other target.",
-            "A robustness evaluation of named adversarial inputs does not prove complete safety, fairness or general correctness of the underlying model.",
-            "Diagnostic truncation cases are pre-registered as having no fixed oracle and are never automatically treated as evidence of a meaning-preserving vulnerability, even when the observed label changes.",
-        ],
         "historical": {
             "note": (
                 "The Red Lab v5 emotion benchmark (the 1928-case, 218/112-flip V1/V2 "

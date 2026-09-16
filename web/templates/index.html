@@ -45,11 +45,19 @@
             <p class="rl-tagline">{{ product_tagline }}</p>
           </div>
         </div>
-        <p class="hero-statement">Put the endpoint under pressure.<br>See what hardening changes.</p>
-        <p class="deck">Controlled malformed, boundary, encoding and adversarial inputs.
-          The same AI model, tested before and after application-layer hardening.</p>
-        <div class="hero-control" aria-label="Experiment design">
+        <div class="hero-statement" id="hero-statement" aria-live="polite">
+          <p class="hero-statement-line is-active">Put the emotion endpoint under pressure &mdash; see what hardening changes.</p>
+          <p class="hero-statement-line">Challenge the standalone sentiment classifier and inspect its results.</p>
+          <p class="hero-statement-line">Follow the evidence and assess the hardened emotion release candidate.</p>
+        </div>
+        <p class="deck">Two classifiers, evaluated with the same controlled malformed, boundary, encoding and
+          adversarial inputs: an emotion model compared before and after application-layer hardening, and a
+          standalone sentiment model evaluated on its own, with no hardened counterpart.</p>
+        <div class="hero-control" id="hero-control-paired" aria-label="Experiment design">
           <span class="control-v1">V1 &middot; Unhardened</span><span class="control-model">Same model</span><span class="control-v2">V2 &middot; Hardened</span>
+        </div>
+        <div class="hero-control" id="hero-control-single" aria-label="Experiment design" hidden>
+          <span class="control-single">sentiment_v1 &middot; Single configured target, no V2</span>
         </div>
         <div class="model-picker">
           <label for="demo-evaluation">Model journey</label>
@@ -63,10 +71,10 @@
         <div class="cta-row hero-actions" id="run">
           <div class="hero-path"><button id="run-btn" class="button primary" type="button">Run Live Demo</button><p class="caption">Explore a curated attack suite</p></div>
           <div class="hero-path"><a class="button secondary" href="/lab">Try Your Own Input</a><p class="caption">Put your own sentence to the test</p></div>
+          {% if technical_report_available %}
+          <div class="hero-path"><a class="button tertiary" href="{{ technical_report_href }}">View Technical Report</a><p class="caption">Inspect the full evidence bundle</p></div>
+          {% endif %}
         </div>
-        {% if technical_report_available %}
-        <a class="button tertiary hero-report" href="{{ technical_report_href }}">View Technical Report</a>
-        {% endif %}
         <p id="cta-note" class="caption">Real requests. Recorded outcomes. Evidence you can inspect.</p>
         <p class="model" id="model-identity">Model: j-hartmann/emotion-english-distilroberta-base &middot; 7 emotion labels</p>
       </section>

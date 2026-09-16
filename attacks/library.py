@@ -21,10 +21,11 @@ from __future__ import annotations
 
 from typing import Callable, Optional
 
-from contract import AttackCase, BaselineCase, ContractError, SUITES, SUITE_CORE
+from contract import AttackCase, BaselineCase, ContractError, SUITES, SUITE_CORE, SUITE_OCES
 from attacks import boundary, encoding, malformed, perturbation, truncation, whitespace
 from attacks import coverage
 from attacks import metadata as md
+from attacks import oces
 
 # The tasks this library knows how to build a suite for. task_id is VALIDATED here; it does
 # NOT branch the core construction and is NOT stored in per-attack metadata (the frozen
@@ -98,9 +99,12 @@ def build_suite(baselines: list[BaselineCase], *,
     ``attacks/coverage_map.json`` (so ``write_manifest`` emits it), and an unmapped subfamily
     fails loudly here rather than silently downstream.
 
-    Only the ``core`` suite is generated in code. OCES variants are authored as frozen,
-    reviewed data files (Phase 4) rather than generated on the fly, so ``suite="oces"`` is
-    rejected here rather than silently returning core cases mislabelled as OCES.
+    The ``core`` suite is generated in code. ``oces`` variants are authored as frozen,
+    reviewed data files (Phase 4) rather than generated on the fly: ``attacks.oces.load_suite``
+    verifies the seven frozen artifacts against their recorded hashes, loads the already-
+    reviewed cases for ``task_id``, and registers their (already-resolved) coverage
+    declaration -- so, unlike core, OCES cases are never re-stamped from
+    ``attacks/coverage_map.json`` here.
     """
     if suite not in SUITES:
         raise ContractError(f"unknown suite {suite!r}; known: {sorted(SUITES)}")
@@ -108,11 +112,8 @@ def build_suite(baselines: list[BaselineCase], *,
         raise ContractError(
             f"unknown task_id {task_id!r}; known: {sorted(KNOWN_TASK_IDS)}"
         )
-    if suite != SUITE_CORE:
-        raise ContractError(
-            f"build_suite generates the {SUITE_CORE!r} suite only; {suite!r} variants are "
-            "authored as frozen data files (Phase 4), not generated here"
-        )
+    if suite == SUITE_OCES:
+        return oces.load_suite(baselines, task_id=task_id)
     cases = list(standalone_cases(token_counter=token_counter, max_tokens=max_tokens))
     for baseline in baselines:
         cases.extend(build_derived(baseline))

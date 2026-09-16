@@ -1,8 +1,16 @@
 # Robustness report
 
-The report consumes the [analysis schema v2 JSON](../analysis/README.md), renders an
+The report consumes historical schema-v2 or target-aware schema-v3
+[analysis JSON](../analysis/README.md), renders an
 offline HTML report with Jinja2, and exports an A4 PDF with WeasyPrint. It does not load
 the classifier, import another component, rescore attacks, or infer finding resolution.
+
+Schema v3 renders each target independently, shows a comparison only for a valid paired
+evaluation, and explains why a single-target comparison is null. Core evaluations require
+coverage evidence; OCES evaluations require their frozen additional-evaluation block. Every
+new finding must carry observed evidence, significance, diagnosis confidence, a specific
+fix, and a runnable target-aware verification route. Missing required evidence fails
+validation instead of producing an empty successful panel.
 
 ## Generate a report
 
@@ -91,6 +99,32 @@ The CLI exits 0 on success, 1 on input/render/output failure and 2 for invalid a
 Validation and PDF rendering finish before the output directory is created. A filesystem
 failure during publication can leave a partial new directory; the command reports failure.
 Keep that directory for diagnosis and use a fresh destination after resolving the error.
+
+## Master technical report (V6.3+)
+
+`report/master_report.py` renders the multi-target master technical report served at
+`/technical-report/`, combining the historical emotion.core benchmark with real
+sentiment.core, emotion.oces, sentiment.oces and ci.emotion evidence into one navigable
+document. It never re-scores or re-runs an evaluation -- it only reads already-recorded
+evidence, listed with its SHA-256 in `report/master_evidence/manifest.json`.
+
+```powershell
+.\.venv\Scripts\python.exe -m report.master_report
+```
+
+This re-hashes every file the manifest lists and refuses to render (exit 1) if any is
+missing or its bytes no longer match -- evidence integrity fails closed, not silently.
+Output is committed at `artifacts/technical_report/` (the same pattern as
+`artifacts/verified_full_report/`): pre-generated, never regenerated on request by the
+web app. `web/app.py` mounts it at `/technical-report/` alongside the archived
+`/verified-full/` route, which the master report links to as historical evidence and
+never overwrites.
+
+To add a new evidence source: run it for real, commit the resulting bundle under
+`artifacts/<name>/` with its own `PROVENANCE.md`, add its path and SHA-256 to
+`report/master_evidence/manifest.json`, then extend `master_report.build_context` and
+`master_template.html` to read it. Never hand-edit a bundle's bytes after generation, and
+never point the manifest at a path under gitignored `results/`.
 
 ## Validate
 

@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Red Lab by Team Checkmate: run a real live adversarial attack test against a hardened and unhardened AI endpoint.">
   <title>{{ product_name }} &mdash; {{ product_tagline }}</title>
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
 </head>
-<body>
+<body class="page-home">
   <header class="masthead">
     <a href="/" id="exec-back" class="rl-back-btn" aria-label="Back" title="Back" hidden>&larr;</a>
     <div class="masthead-inner">
@@ -26,8 +27,8 @@
         <a href="/" id="nav-home" aria-current="page">Home</a>
         <a href="#run" id="nav-live-demo">Live Demo</a>
         <a href="/lab" id="nav-try-lab">Try Your Own Input</a>
-        {% if verified_full_available %}
-        <a href="{{ verified_full_href }}">Technical Report</a>
+        {% if technical_report_available %}
+        <a href="{{ technical_report_href }}">Technical Report</a>
         {% endif %}
       </nav>
     </div>
@@ -45,21 +46,41 @@
             <p class="rl-tagline">{{ product_tagline }}</p>
           </div>
         </div>
-        <p class="hero-statement">Put the endpoint under pressure.<br>See what hardening changes.</p>
-        <p class="deck">Controlled malformed, boundary, encoding and adversarial inputs.
-          The same AI model, tested before and after application-layer hardening.</p>
-        <div class="hero-control" aria-label="Experiment design">
+        <div class="hero-statement" id="hero-statement" aria-live="polite">
+          <p class="hero-statement-line is-active">Put the emotion endpoint under pressure &mdash; see what hardening changes.</p>
+          <p class="hero-statement-line">Challenge the standalone sentiment classifier and inspect its results.</p>
+          <p class="hero-statement-line">Follow the evidence and assess the hardened emotion release candidate.</p>
+        </div>
+        <p class="deck">Two classifiers, evaluated with the same controlled malformed, boundary, encoding and
+          adversarial inputs: an emotion model compared before and after application-layer hardening, and a
+          standalone sentiment model evaluated on its own, with no hardened counterpart.</p>
+        <div class="hero-control" id="hero-control-paired" aria-label="Experiment design">
           <span class="control-v1">V1 &middot; Unhardened</span><span class="control-model">Same model</span><span class="control-v2">V2 &middot; Hardened</span>
         </div>
+        <div class="hero-control" id="hero-control-single" aria-label="Experiment design" hidden>
+          <span class="control-single">sentiment_v1 &middot; Single configured target, no V2</span>
+        </div>
+        <div class="model-picker">
+          <div class="model-picker-row">
+            <label for="demo-evaluation">Model journey</label>
+            <span id="demo-evaluation-tag" class="model-picker-tag"></span>
+          </div>
+          <select id="demo-evaluation" name="evaluation_id">
+            <option value="emotion.core">Emotion &mdash; compare unhardened V1 with hardened V2</option>
+            <option value="sentiment.core">Sentiment &mdash; evaluate the configured sentiment endpoint</option>
+          </select>
+          <p id="model-description" class="caption">Paired, seven-label emotion robustness comparison.</p>
+        </div>
+        <script id="demo-descriptors" type="application/json">{{ demo_descriptors | tojson }}</script>
         <div class="cta-row hero-actions" id="run">
           <div class="hero-path"><button id="run-btn" class="button primary" type="button">Run Live Demo</button><p class="caption">Explore a curated attack suite</p></div>
           <div class="hero-path"><a class="button secondary" href="/lab">Try Your Own Input</a><p class="caption">Put your own sentence to the test</p></div>
+          {% if technical_report_available %}
+          <div class="hero-path"><a class="button tertiary" href="{{ technical_report_href }}">View Technical Report</a><p class="caption">Inspect the full evidence bundle</p></div>
+          {% endif %}
         </div>
-        {% if verified_full_available %}
-        <a class="button tertiary hero-report" href="{{ verified_full_href }}">View Technical Report</a>
-        {% endif %}
         <p id="cta-note" class="caption">Real requests. Recorded outcomes. Evidence you can inspect.</p>
-        <p class="model">Model: j-hartmann/emotion-english-distilroberta-base &middot; 7 emotion labels</p>
+        <p class="model" id="model-identity">Model: j-hartmann/emotion-english-distilroberta-base &middot; 7 emotion labels</p>
       </section>
     </div>
 
@@ -67,7 +88,8 @@
       <div class="execution-inner">
 
         <p class="exec-identity">{{ creator_name }} / {{ product_version_label }}</p>
-        <p class="exec-kicker">LIVE DEMO <span class="exec-mode">Controlled experiment</span></p>
+        <p class="exec-breadcrumb"><a href="/">Red Lab</a><span class="sep" aria-hidden="true">/</span>Live Demo</p>
+        <p class="exec-kicker"><span class="live-dot" aria-hidden="true"></span>LIVE DEMO <span class="exec-mode">CONTROLLED EXPERIMENT</span></p>
         <h1 id="exec-heading" class="exec-heading" tabindex="-1" aria-live="polite">Launching adversarial test&hellip;</h1>
 
         <div id="exec-body">
@@ -76,28 +98,12 @@
           </div>
           <p id="exec-percent" class="exec-percent" aria-hidden="true">0%</p>
 
-
-
-          <p class="same-model-label">Same model <span>Two endpoint configurations</span></p>
-          <div class="version-context">
-            <div class="version-card v1" data-lane="v1" data-state="not-started">
-              <span class="lane-status">Not started</span>
-              <p class="version-card-title">V1 &mdash; Unhardened Endpoint</p>
-              <p class="version-card-note">No application-layer hardening.</p>
-            </div>
-            <div class="version-card v2" data-lane="v2" data-state="not-started">
-              <span class="lane-status">Not started</span>
-              <p class="version-card-title">V2 &mdash; Hardened Endpoint</p>
-              <p class="version-card-note">Input validation, length controls, exception handling and normalization.</p>
-            </div>
-          </div>
+          <ul id="exec-config" class="exec-config"></ul>
+          <p id="same-model-label" class="same-model-label" hidden>Same model <span id="same-model-note"></span></p>
+          <div class="version-context" id="version-context"></div>
           <p class="tracker-label">Experiment stages</p>
-          <ol class="stage-list" id="stage-list">
-            {% for stage in stage_order %}
-            <li data-stage="{{ stage }}">{{ stage_labels[stage] }}</li>
-            {% endfor %}
-          </ol>
-          <p class="exec-model-note">Same underlying AI model in both cases &mdash; only the endpoint hardening differs.</p>
+          <ol class="stage-list" id="stage-list"></ol>
+          <p class="exec-model-note" id="exec-model-note"></p>
         </div>
 
         <div class="exec-failure" id="exec-failure" hidden>
@@ -115,8 +121,8 @@
     <p>{{ creator_name }} &mdash; {{ product_name }}, {{ product_tagline }}</p>
   </footer>
 
-  <script src="/static/chrome.js"></script>
-  <script src="/static/app.js"></script>
-  <script src="/static/particles.js"></script>
+  <script src="{{ asset('chrome.js') }}"></script>
+  <script src="{{ asset('app.js') }}"></script>
+  <script src="{{ asset('particles.js') }}"></script>
 </body>
 </html>

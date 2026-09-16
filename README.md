@@ -1,5 +1,5 @@
 ---
-title: Team Checkmate — Adversarial Input Red-Teaming Toolkit
+title: RED LAB — Adversarial Testing Redefined
 emoji: ♟️
 colorFrom: gray
 colorTo: blue
@@ -9,298 +9,643 @@ fullWidth: true
 header: mini
 ---
 
-# Adversarial Red-Teaming Toolkit — Team Checkmate
+# RED LAB — Adversarial Testing Redefined
 
-Toolkit for automated robustness testing of AI inference endpoints.
+**Team Checkmate's automated adversarial red-teaming toolkit for deployed AI inference endpoints.**
 
-**Red Lab V6 deployment release.** Team Checkmate's adversarial testing application
-includes a live curated Demo, a private custom-input Lab, and the preserved technical
-benchmark report. V5.5 visual design is approved; V6 fixes internal report history and
-packages the existing application for deployment. See `HANDOFF.md` for verified release
-and cloud status. Model, attacks and analysis semantics remain unchanged.
+**Current release: Red Lab v7** — multi-target evaluation registry, additional out-of-coverage
+evaluations, an automated CI release gate, and a dark brand system across the app and the
+generated reports.
 
-## What This Project Does
+[![Live Application](https://img.shields.io/badge/Live%20Application-RED%20LAB-c6253d)](https://ahsan-141117-project-red-lab.hf.space/)
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Endpoint-009688)](https://fastapi.tiangolo.com/)
+[![Docker](https://img.shields.io/badge/Docker-Deployed-2496ED)](https://www.docker.com/)
 
-This toolkit fires adversarial and malformed inputs at an AI inference endpoint and produces a
-robustness report. The target is a Hugging Face text classifier wrapped in FastAPI. We build two
-versions of the endpoint, an unhardened V1 and a hardened V2, and run the same attack suite against
-both. The report measures the difference between them, showing which attacks break V1 and which of
-those the V2 defenses actually stop.
+> **Live application:** https://ahsan-141117-project-red-lab.hf.space/  
+> **Supporting files / submission material:** https://drive.google.com/drive/folders/1gHsV9YVZ7aJrIQTeHOKQeq_nqM8JGULM?usp=sharing
 
-## Model
+*The Hugging Face Space listing may be set to Protected rather than fully Public. The link above
+still works for anyone who has it — Protected only removes the Space from public search and
+the unauthenticated Hub API, it does not block the running application.*
 
-We use [`j-hartmann/emotion-english-distilroberta-base`](https://huggingface.co/j-hartmann/emotion-english-distilroberta-base),
-which classifies English text into 7 emotion labels: anger, disgust, fear, joy, neutral, sadness,
-and surprise.
+---
 
-The exact revision is pinned in [`endpoint/model.py`](endpoint/model.py) so every teammate's
-cache and both endpoint versions resolve to identical weights regardless of what `main` points
-to later:
+## Overview
 
+RED LAB tests how a deployed AI endpoint behaves when its inputs are malformed, adversarial,
+ambiguous, unusually large, or deliberately perturbed.
+
+Instead of evaluating only the model in isolation, RED LAB exercises the **served API and the
+model together**, through a small, model-free **target registry** (`endpoint/targets.json`)
+that declares every model, endpoint and evaluation the toolkit knows how to run. Adding a new
+target is registry configuration, not a code change to the attack suite, the runner, the
+analysis engine or the report generator.
+
+Two independent classification tasks are currently registered:
+
+- **Emotion (7-way)** — the original experiment. The same pinned model is deployed behind two
+  endpoints, **V1 (unhardened)** and **V2 (hardened)**, so the same benchmark run against both
+  isolates exactly what application-layer hardening changed, without retraining anything.
+- **Sentiment (2-way, SST-2)** — a second, independent classification task with a single
+  endpoint and **no hardened counterpart by design**. It exists to prove the registry and the
+  rest of the pipeline generalize to a target that was never part of the original experiment,
+  and its results are never presented as a before/after comparison.
+
+RED LAB produces structured evidence including:
+
+- HTTP responses and errors
+- latency
+- prediction changes
+- confidence changes
+- probability-distribution drift
+- finding severity
+- V1 → V2 comparison (paired evaluations only)
+- remediation guidance
+- HTML, PDF and JSON reports, including one multi-target **Master Technical Report**
+
+---
+
+## Try It Live
+
+Both the Live Demo and the Live Red-Team Lab let you pick which registered evaluation to run —
+the paired emotion journey (V1 vs. V2) or the standalone sentiment journey — from a single
+selector; the rest of the experience adapts to whichever one is chosen.
+
+### Run Live Demo
+
+The deployed **Live Demo** runs a curated subset of real benchmark cases against the selected
+evaluation's target(s).
+
+For the emotion journey, it demonstrates two important classes of failure:
+
+1. **Endpoint-level failure** — for example, an oversized request that produces an unhandled
+   HTTP 500 on V1 but is safely rejected by V2.
+2. **Prediction instability** — for example, a visually confusable Unicode character that
+   changes the model's top prediction while the API still returns HTTP 200.
+
+### Try Your Own Input
+
+The **Live Red-Team Lab** allows a visitor to enter a sentence.
+
+RED LAB automatically derives a bounded set of controlled adversarial variants and sends them
+through the selected target(s).
+
+For each variant, the system compares:
+
+- acceptance / rejection behavior
+- top-label changes
+- confidence
+- full class-probability distribution
+- total variation distance
+- latency
+- whether the weakness was mitigated by V2 (paired evaluations only)
+
+Each result is classified as:
+
+- **Mitigated by V2**
+- **Persists after hardening**
+- **V2 regression**
+- **No material effect**
+- **Inconclusive**
+
+(the sentiment journey reports acceptance, label, confidence and distribution shift directly,
+without a mitigation verdict, since it has no hardened counterpart to compare against.)
+
+▶ **Launch RED LAB:**  
+https://ahsan-141117-project-red-lab.hf.space/
+
+---
+
+## Evaluation Registry
+
+Every evaluation RED LAB knows how to run is declared once, by identity, in
+`endpoint/targets.json`. Five evaluation identities are registered:
+
+| Evaluation ID | Kind | Target(s) | Suite | Purpose |
+|---|---|---|---|---|
+| `emotion.core` | Paired | `emotion_v1`, `emotion_v2` | `core` — 1,928 cases | The original V1/V2 hardening comparison |
+| `emotion.oces` | Paired | `emotion_v1`, `emotion_v2` | `oces` — 63 cases | Additional paraphrase/distractor cases, authored *after* the defenses were frozen |
+| `sentiment.core` | Single | `sentiment_v1` | `core` — 1,931 cases | Standalone sentiment robustness; no hardened counterpart |
+| `sentiment.oces` | Single | `sentiment_v1` | `oces` | Additional sentiment paraphrase/distractor cases |
+| `ci.emotion` | Single (CI) | `emotion_v2` | frozen selection `ci_core_v1` — 162 cases | Automated release gate: candidate vs. a frozen reference |
+
+A paired evaluation's `comparison` is a real before/after verdict. A single-target
+evaluation's `comparison` is explicitly `null` in its analysis document — the toolkit never
+invents a comparison where there is nothing to compare against.
+
+**OCES** (the additional-evaluation suites) are paraphrase and distractor cases the team wrote
+*after* V2's four defenses were already frozen, precisely so the extra evidence cannot have
+been shaped by already knowing what would pass.
+
+---
+
+## Benchmark
+
+### Emotion — core suite
+
+| Component | Count |
+|---|---:|
+| Clean baselines | 42 |
+| Attack cases | 1,886 |
+| **Total requests per endpoint** | **1,928** |
+| Automatically scored attack cases | 1,718 |
+| REVIEW / DIAGNOSTIC attack cases | 168 |
+
+The attack cases span six categories:
+
+| Category | Examples |
+|---|---|
+| Malformed / oversized | Large bodies, malformed requests, unknown fields |
+| Boundary & type | Length boundaries, incorrect types |
+| Perturbation | Typos, transpositions, deletions, word splitting |
+| Encoding | Cyrillic/Greek confusables, fullwidth characters, zero-width characters, bidi |
+| Whitespace | Tabs, newlines, Unicode spaces, repeated spacing |
+| Truncation | Inputs placing semantic cues near or beyond sequence boundaries |
+
+REVIEW and DIAGNOSTIC cases are retained as evidence but excluded from automatic vulnerability
+rates where their intended semantics cannot be established reliably.
+
+### Sentiment — core suite
+
+1,931 requests against the single sentiment endpoint (a materially different case count and
+composition from the emotion suite — never presented as the emotion total).
+
+### Additional evaluations (OCES)
+
+| Evaluation | Planned cases (per endpoint) | Composition |
+|---|---:|---|
+| `emotion.oces` | 63 | 21 seed baselines + 21 `oces.paraphrase` + 21 `oces.distractor` |
+| `sentiment.oces` | — | Sentiment-specific paraphrase/distractor seed set |
+
+---
+
+## Results
+
+### Emotion — V1 vs. V2 (core suite)
+
+| Metric | V1 — Unhardened | V2 — Hardened |
+|---|---:|---:|
+| Unhandled HTTP 5xx responses | **91** | **0** |
+| Automatically scored failures | **310 / 1,718** | **113 / 1,718** |
+| Observed scored failure rate | **18.0%** | **6.6%** |
+| Qualifying prediction flips | **218 / 1,370** | **112 / 1,373** |
+| Finding groups | **29** | **14** |
+| Critical + High finding groups remaining | **7** | **0** |
+
+**15 of 29 finding groups were resolved with no model retraining.**
+
+The remaining findings are important: application-layer hardening eliminated the observed
+endpoint failures, but prediction sensitivity to typo-style perturbations and cross-script
+homoglyphs still remained.
+
+That distinction is intentional. RED LAB does not treat endpoint defenses as proof that the
+underlying model has become robust.
+
+### Sentiment — core suite (single target, no comparison)
+
+| Metric | sentiment_v1 |
+|---|---:|
+| Coverage | 1,931 / 1,931 (100%) |
+| Unhandled HTTP 5xx responses | **85** |
+| Timeouts | 1 |
+| Eligible drift comparisons | 1,604 |
+| Qualifying prediction flips | 99 (6.17%) |
+| Finding groups | 18 |
+
+### Additional evaluations (OCES) — no findings on the frozen defenses
+
+| Evaluation | Eligible comparisons | Qualifying flips | Finding groups | 5xx / timeouts |
+|---|---:|---:|---:|---:|
+| `emotion.oces` (both endpoints) | 18 | 0 | 0 | 0 |
+| `sentiment.oces` | 28 | 2 | 2 | 0 |
+
+> These measurements describe this fixed benchmark, these model revisions and this
+> deployment. They should not be interpreted as a general robustness guarantee.
+
+---
+
+## V2 Hardening (Emotion Target Only)
+
+V2 adds four application-layer controls while keeping the model unchanged:
+
+1. **Input-length validation** before inference
+2. **Strict request schema validation**
+3. **Scoped exception handling**
+4. **Unicode and whitespace normalization**
+
+Because emotion V1 and V2 use the **same exact pinned model revision**, the experiment
+isolates the effect of these application-layer defenses. Sentiment has **no V2** — that
+absence is deliberate, not a gap, and its results are never framed as a before/after story.
+
+---
+
+## Automated CI Release Gate
+
+`ci.emotion` turns one real evaluation into a pass/fail decision usable by CI:
+
+- `runner/gate.py` runs the actual orchestrator against `emotion_v2` (the candidate) and a
+  frozen 162-case selection (`analysis/case_sets/ci_core_v1.json`) with a frozen reference and
+  policy (`analysis/policies/ci_core_v1.json`).
+- The decision logic lives entirely in `analysis/policy.py`, kept separate from the gate
+  runner itself — a policy that cannot be loaded, or an evaluation that could not run,
+  produces an execution error, never a silent pass and never a silent fail.
+- A GitHub Actions workflow (`.github/workflows/release-gate.yml`) runs this same gate on
+  every push, verifies the candidate's commit and model identity, uploads the evidence even on
+  a failing policy, and only permits a Hugging Face deployment after a real pass on a
+  published release.
+- Real local reproduction: 13/13 checks, exit code 0 (`artifacts/ci_gate_evidence_v1/`).
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+    R[Target Registry] --> D[Automated Runner]
+    A[Baselines] --> C[Attack Library]
+    B[Attack Cases] --> C
+    C --> D
+
+    D --> E[Emotion V1]
+    D --> F[Emotion V2]
+    D --> S[Sentiment V1]
+
+    E --> G[Captured Evidence]
+    F --> G
+    S --> G
+
+    G --> H[Analysis]
+    H --> I[Finding Groups]
+    H --> J[Severity]
+    H --> K[V1 vs V2 Comparison]
+
+    I --> L[Master Technical Report]
+    J --> L
+    K --> L
+
+    L --> M[PDF]
+    L --> N[JSON]
 ```
-MODEL_ID       j-hartmann/emotion-english-distilroberta-base
-MODEL_REVISION 0e1cd914e3d46199ed785853e12b57304e04178b
+
+The major pipeline stages are deliberately separated:
+
+```text
+Target Registry (endpoint/targets.json)
+   ↓
+Baselines
+   ↓
+Attack Library
+   ↓
+Runner
+   ↓
+V1 / V2 (or single target)
+   ↓
+Analysis
+   ↓
+Report
 ```
 
-## Development Environment
+A shared contract (`contract.py`) defines the data exchanged between components, including the
+model-free registry types every component reads instead of duplicating target configuration.
 
-- Python 3.11
-- A local virtual environment named exactly `.venv`, because that is the name `.gitignore` ignores
-- Dependencies pinned in `requirements.txt`
+---
 
-Python 3.11 is not a preference, it is a hard requirement. `torch==2.5.1` publishes no wheel above
-CPython 3.12, so on Python 3.13 the install fails outright at torch. Check with `python --version`
-before creating the environment.
+## Models
 
-Create the environment with an explicit Python 3.11 interpreter. On Windows:
+RED LAB currently evaluates two independently trained, unmodified public models:
+
+| Task | Model | Revision | Labels |
+|---|---|---|---|
+| Emotion (7-way) | [`j-hartmann/emotion-english-distilroberta-base`](https://huggingface.co/j-hartmann/emotion-english-distilroberta-base) | `0e1cd914e3d46199ed785853e12b57304e04178b` | anger, disgust, fear, joy, neutral, sadness, surprise |
+| Sentiment (2-way, SST-2) | [`distilbert/distilbert-base-uncased-finetuned-sst-2-english`](https://huggingface.co/distilbert/distilbert-base-uncased-finetuned-sst-2-english) | `714eb0fa89d2f80546fda750413ed43d93601a13` | NEGATIVE, POSITIVE |
+
+Revisions are pinned exactly so every endpoint, every teammate's cache, and the CI gate resolve
+to identical weights regardless of what each model's `main` branch points to later. Neither
+model is fine-tuned or modified in any way — both are evaluated exactly as published.
+
+---
+
+## Repository Structure
+
+```text
+contract.py
+    Shared experiment data contracts, including the model-free target/evaluation types.
+
+endpoint/
+    Model loading, V1/V2 (and single-target) FastAPI endpoints, and targets.json — the
+    static registry of every model, endpoint and evaluation identity.
+
+baseline/
+    Clean baseline sentences for each registered task (emotion and sentiment).
+
+attacks/
+    Attack generators, metadata, evidence tiers, coverage map and manifest generation.
+
+runner/
+    Executes the benchmark and records responses, errors, health and latency;
+    gate.py runs the automated CI release-gate evaluation.
+
+analysis/
+    Evaluates attack oracles, prediction drift, severity and V1/V2 comparison;
+    policy.py holds the pure pass/fail decision logic for the CI gate;
+    case_sets/ and policies/ hold the frozen CI selection and policy.
+
+report/
+    Generates technical HTML/PDF/JSON reports, including master_report.py — the
+    multi-target Master Technical Report covering all five evaluation identities.
+
+web/
+    Public RED LAB web application, the Live Red-Team Lab, and the target-aware
+    progress/status layer shared by both.
+
+artifacts/
+    Preserved verified benchmark reports and evidence for every evaluation identity.
+
+tests/
+    Unit, integration and browser regression tests.
+
+docs/stage3/
+    Planning documents, decisions and per-member task records for the registry/
+    multi-target/CI-gate work.
+
+run_all.py
+    Main experiment orchestrator; resolves a requested evaluation against the
+    registry and drives the runner, analysis and report stages for it.
+```
+
+---
+
+## Running Locally
+
+### Requirements
+
+The release was developed and validated using **Python 3.11**.
+
+Clone the repository:
 
 ```bash
-py -3.11 -m venv .venv
+git clone https://github.com/AminMaleh03/adversarial-redteam-toolkit-team-checkmate.git
+cd adversarial-redteam-toolkit-team-checkmate
 ```
 
-On macOS/Linux, use `python3.11 -m venv .venv`.
+Create a virtual environment:
 
-Activate it on Windows (PowerShell):
+### Windows
 
 ```powershell
-.venv\Scripts\Activate.ps1
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
 ```
 
-Activate it on macOS or Linux:
+### macOS / Linux
 
 ```bash
+python3.11 -m venv .venv
 source .venv/bin/activate
 ```
 
-Then install:
+Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### Note on WeasyPrint
+---
 
-WeasyPrint needs system libraries that `pip` does not install. On Windows this means the GTK
-runtime, and on macOS it means installing `pango` and its dependencies through Homebrew. Follow the
-[WeasyPrint installation docs](https://doc.courtbouillon.org/weasyprint/stable/first_steps.html) for
-your platform. Everything except PDF generation works without it.
+## Run the Web Application
 
-The failure is confusing because `pip install` **succeeds** — WeasyPrint is pure Python and the
-missing pieces are native libraries loaded at import time. Verified on Windows: the install exits 0
-and then `import weasyprint` raises
-
-```
-OSError: cannot load library 'gobject-2.0-0': error 0x7e.
+```bash
+python -m uvicorn web.app:app --host 127.0.0.1 --port 7860
 ```
 
-If you see that, it is not a bug in our code. Install the
-[GTK3 runtime for Windows](https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer/releases)
-and reopen your shell so the DLLs are on `PATH`.
+Then open:
 
-## Folder Structure
-
-```
-run_all.py                Single-command orchestration: full experiment, fast demo, reproducible runs.
-Team Checkmate Logo.png   The real project logo. Required -- report generation refuses to
-                          substitute a placeholder if this file is missing. Do not rename/edit it.
-contract.py               Frozen shared dataclasses; integration boundaries are in AGENTS.md.
-endpoint/                 The FastAPI target: shared model loading, unhardened V1, hardened V2.
-baseline/                 Clean sentences that attacks mutate and analysis compares against.
-attacks/                  Attack generators, one module per category, assembled by library.py.
-runner/                   Sends every case to both endpoints and records the results.
-analysis/                 Turns results into findings: drift, severity, V1 vs V2 comparison.
-report/                   Jinja2 templates (full audit report + short demo report) and the
-                          renderer that produces the HTML and PDF.
-artifacts/                Stable, project-relative location for the canonical verified full
-                          benchmark report that demo mode links to. Not gitignored like
-                          results/; see "Verified full-benchmark artifact" below.
-tests/                    Pytest suites, one per component.
-results/                  Run output. Gitignored and created at runtime, never committed.
+```text
+http://127.0.0.1:7860/
 ```
 
-## Team Workflow
+The web application exposes only the public controller on port `7860`. V1, V2 and the
+sentiment target are started internally when required and are not intended to be exposed
+publicly.
 
-Development happens on individual feature branches, one per person, merged into `main` through pull
-requests. Only Ahsan merges to `main`.
+---
 
-## Running the Toolkit
+## Run the Experiment
 
-`run_all.py` is the single entry point. It starts V1, runs the attack suite against it, stops
-it, starts V2, runs the same suite against V2, stops it, then runs analysis and renders the
-report -- using the existing runner/analysis/report components unchanged. From the repository
-root with `.venv` active:
+`run_all.py` is the main experiment entry point.
 
-**Full experiment** (all 42 baselines + 1,886 attacks per version, including the 10 MB case).
-Renders the complete technical/audit report: full results, the complete finding register,
-Method, and the audit appendix.
+### Curated demo (default emotion journey)
 
-```powershell
-python run_all.py --mode full
-```
-
-**Fast demo**, for judges or a quick check. Same endpoints, same attack definitions, same
-runner, same real inference and analysis -- only a small curated subset of real attacks is
-sent, so it finishes in well under a minute instead of several minutes. One case,
-`malformed.oversized_10mb`, is excluded from the demo's curated subset only (it sits right at
-the 10-second request deadline and has been observed to land as either a slow-but-completed
-response or a genuine timeout depending on machine load, which would make a live demo look
-like it found a new V2 regression purely from timing noise). It is untouched everywhere else:
-still built, still registered in the manifest, still sent in full mode.
-
-Demo mode renders a short, single-page, judge-facing report instead of the full audit report:
-a partial-suite banner (real executed/planned counts, never hardcoded), one featured server
-failure and one featured prediction flip with the actual input text and a visually highlighted
-changed character, a concise demo-subset comparison, and a short Method section -- roughly 5
-PDF pages instead of the full report's ~47. Its navbar links to **View Detailed Report**,
-which opens the canonical [verified full benchmark](#verified-full-benchmark-artifact) in a
-new tab, so a judge can go from the live demo straight to the authoritative evidence.
-
-```powershell
+```bash
 python run_all.py --mode demo
 ```
 
-Both modes automatically open the generated `report.html` in your default browser when they
-finish. Pass `--no-open` to skip that (CI, Docker, headless runs, automated tests) -- the run
-still completes and the report still gets written, it just is not opened:
+The Demo runs the same real pipeline using a curated attack subset suitable for an interactive
+demonstration.
 
-```powershell
+### Full benchmark
+
+```bash
+python run_all.py --mode full
+```
+
+Full mode against the default emotion evaluation executes:
+
+```text
+42 clean baselines
++
+1,886 attack cases
+=
+1,928 requests against V1
+
+and
+
+1,928 requests against V2
+```
+
+### Running a specific registered evaluation
+
+```bash
+python run_all.py --mode full --evaluation sentiment.core --html-only
+python run_all.py --mode full --evaluation emotion.oces --html-only
+```
+
+The pipeline resolves the evaluation from `endpoint/targets.json`, then runs the same
+runner/analysis/report stages against whichever target(s) it names.
+
+To run without automatically opening the report:
+
+```bash
 python run_all.py --mode demo --no-open
 python run_all.py --mode full --no-open
 ```
 
-Browser launching lives only in the CLI (`run_all.py main()`); the reusable
-`run_experiment()` function below never touches a browser, so a future server/Docker/Hugging
-Face caller can invoke it directly with no risk of it trying to open a window.
+---
 
-**Reproducibility**: run full mode twice with different names and compare the two reports.
-Each name gets its own output directory, so the second run never overwrites the first:
+## Docker
 
-```powershell
-python run_all.py --mode full --run-name repro_1
-python run_all.py --mode full --run-name repro_2
-```
+RED LAB is deployed as a Docker application.
 
-Add `--run-name NAME` to any mode to control the output directory name; otherwise it defaults
-to a UTC timestamp (`full_20260909_135157`, `demo_20260909_140301`, ...). Do not pass
-`--reload` to anything in this pipeline -- it would silently restart the endpoint mid-suite
-and hide exactly the failures being measured.
-
-### Output layout
-
-```
-results/<run-name>/
-├── v1/                    manifest.json, results_v1.jsonl, run_meta_v1.json, v1_server.log
-├── v2/                    manifest.json, results_v2.jsonl, run_meta_v2.json, v2_server.log
-├── demo_evidence.json     featured failure + featured prediction flip, machine-readable
-└── report/                report.html, report.pdf, analysis.json, export_meta.json
-    └── detailed/          demo mode only: a portable copy of the verified full benchmark
-                            (report.html, report.pdf, analysis.json, export_meta.json) that
-                            "View Detailed Report" links to. Present only if
-                            artifacts/verified_full_report/ exists when the demo report is
-                            generated.
-```
-
-Open `results/<run-name>/report/report.html` in a browser (this happens automatically unless
-you passed `--no-open`), or `report.pdf` in a PDF viewer. `demo_evidence.json` carries a
-`literal_crash_case_available` flag: it is only `true` when a request in that run actually
-made the post-request health check fail (observed unavailability). An HTTP 5xx alone, with the
-service still answering health checks afterward, is reported as an unhandled server error, not
-a crash -- this distinction is preserved even though the demo report keeps that specific note
-small and out of the way rather than in a large warning box.
-
-Every generated `report.html`/`report.pdf` embeds the real Team Checkmate logo (read once from
-`Team Checkmate Logo.png` at the repo root and inlined as a `data:` URI), so the report is
-fully self-contained and portable -- it displays correctly wherever the file is opened from or
-copied to, with no separate asset file and no absolute path. If that source file is missing,
-report generation fails loudly rather than substituting a placeholder logo.
-
-`run_all.py` also exposes `run_experiment(mode, run_name=None)` as a plain Python function
-(no interactive prompts, project-relative paths, returns a structured result dict) for a future
-deployment UI to call directly instead of shelling out to the CLI.
-
-### Verified full-benchmark artifact
-
-`artifacts/verified_full_report/` is the stable, project-relative copy of the canonical full
-benchmark report that demo mode's "View Detailed Report" link points to. Unlike `results/`,
-it is not gitignored by the same blanket rule and is meant to be a durable reference, not
-run output -- decide with the team whether to commit it.
-
-It holds a plain copy of a `report.generate.generate_report(..., mode="full")` bundle
-(`report.html`, `report.pdf`, `analysis.json`, `export_meta.json`) produced from one already-
-validated full run's `analysis.json` (1928/1928 coverage both versions, matching planned and
-manifest fingerprints). To (re)create or refresh it after a template change, without rerunning
-the 1,928-case benchmark, re-render an existing validated `analysis.json`:
-
-```powershell
-$env:PYTHONIOENCODING = "utf-8"
-python -c "from pathlib import Path; from report import generate as r; r.generate_report(Path('results/<validated-run>/report/analysis.json').read_bytes(), 'artifacts/verified_full_report', mode='full')"
-```
-
-Only do this from a run that already met the full-coverage/matching-fingerprint bar above --
-never from a partial or demo run, and never by inventing new results.
-
-### Manual component commands (troubleshooting)
-
-For debugging one stage in isolation, run the components directly. Use separate terminals from
-the repository root with `.venv` active:
-
-```powershell
-python -m uvicorn endpoint.v1:app --host 127.0.0.1 --port 8000
-python -m runner.run --target http://127.0.0.1:8000 --version v1 --out results/my-benchmark/v1
-# stop V1 (Ctrl+C), then:
-python -m uvicorn endpoint.v2:app --host 127.0.0.1 --port 8001
-python -m runner.run --target http://127.0.0.1:8001 --version v2 --out results/my-benchmark/v2
-```
-
-Both endpoints expose `POST /predict` and `GET /health`. For a smaller smoke run use
-`--limit 20` on the runner. See [runner/README.md](runner/README.md) for coverage, artifact
-behavior and exit codes.
-
-Then analyze and render manually:
-
-```powershell
-$env:PYTHONIOENCODING = "utf-8"
-$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
-python -m analysis.analyze results/my-benchmark | python -m report.generate --input - --out results/my-report
-```
-
-Add `--html-only` to `report.generate` to render without the native PDF runtime, and
-`--mode {full,demo}` to pick the presentation (default `full`). The output directory must not
-already exist. The [report guide](report/README.md) covers saved input, interpretation,
-safety and testing; the [analysis guide](analysis/README.md) defines the schema and
-comparison rules.
-
-## Deployment (Red Lab V6)
-
-`web/` is a thin FastAPI layer around the same `run_experiment()` used by `run_all.py` --
-it does not reimplement any attack/runner/analysis/report logic. It serves a public
-Home page, a "Run Live Demo" button that starts one background demo run at a
-time (protected by an in-process lock), and serves the resulting report over HTTP. See
-`AGENTS.md` for the full architecture and ownership rules.
-
-Local (without Docker):
-
-```powershell
-.\.venv\Scripts\python.exe -m uvicorn web.app:app --host 0.0.0.0 --port 7860
-```
-
-Then open `http://localhost:7860/`.
-
-With Docker (matches the Hugging Face Docker Space build):
+Build locally:
 
 ```bash
-docker build -t red-lab-v6:latest .
-docker run --rm -p 7860:7860 red-lab-v6:latest
+docker build -t red-lab .
 ```
 
-Only port 7860 is public; V1/V2 (`127.0.0.1:8000`/`8001`) run and are attacked entirely
-inside the container during a live run and are never exposed to the host or the browser.
+Run:
+
+```bash
+docker run --rm -p 7860:7860 red-lab
+```
+
+Then visit:
+
+```text
+http://localhost:7860/
+```
+
+The deployment architecture exposes only port `7860`; the V1/V2/sentiment target processes
+remain internal to the container. The Dockerfile pre-caches every model/tokenizer pair listed
+in `endpoint/targets.json` at its exact pinned revision, so the first live run pays no cold
+download.
+
+---
 
 ## Testing
 
-```powershell
-.\.venv\Scripts\python.exe -m pytest -q
+Run the complete automated test suite:
+
+```bash
+python -m pytest -q
 ```
 
-For cached-model offline testing, set `HF_HUB_OFFLINE=1` and `TRANSFORMERS_OFFLINE=1` in
-the shell first. Report tests include real PDF export when the native runtime is available.
+The v7 release runs **1,134 automated tests (27 skipped)** — unit, integration and browser
+regression coverage across the registry, runner, analysis, CI gate and web layers.
+
+Release acceptance also covered:
+
+- full application startup
+- Live Demo execution across both the paired emotion and single-target sentiment journeys
+- Custom → Demo → Custom sequential runs
+- active-run reattachment
+- reload during execution
+- browser Back / Forward handling
+- report navigation, including the multi-target Master Technical Report
+- mobile/responsive layouts
+- static-asset cache invalidation across releases
+- a real, passing local reproduction of the automated CI release gate
+- Docker execution
+- deployed Hugging Face Space behavior
+
+---
+
+## Reports and Evidence
+
+RED LAB produces:
+
+- machine-readable JSON evidence
+- short Live Demo reports
+- a full **Master Technical Report** covering all five evaluation identities in one
+  navigable document, with independent sections per evaluation
+- PDF export
+- ranked findings
+- remediation recommendations
+- explicit denominators
+- evidence hashes, re-verified against the recorded bytes before every report render
+
+The deployed application provides access to the preserved **full technical report** separately
+from the curated Live Demo results.
+
+This distinction is deliberate:
+
+> **Live Demo = interactive subset**  
+> **Master Technical Report = authoritative full evidence across every registered evaluation**
+
+---
+
+## Reproducibility
+
+The experiment pins:
+
+- Python/runtime dependencies
+- every model's identifier and exact revision (`endpoint/targets.json`)
+- attack manifests
+- baseline sets
+- analysis rules
+- the frozen CI selection and policy
+
+The runner records:
+
+- selected and completed case IDs
+- suite fingerprints
+- manifests
+- response bodies
+- errors
+- latency
+- endpoint health
+- registry identity (which target, task and model produced each result)
+
+The verified emotion benchmark achieved **1,928 / 1,928 coverage on both V1 and V2**; the
+sentiment benchmark achieved **1,931 / 1,931 coverage** on its single target.
+
+---
+
+## Limitations
+
+This prototype evaluates:
+
+- two English text-classification models (one 7-way emotion model, one 2-way sentiment model)
+- one pinned revision of each
+- fixed adversarial benchmarks
+
+Most prediction perturbation evidence is mechanically justified rather than manually
+relabelled sentence-by-sentence.
+
+Latency measurements depend on the execution environment.
+
+The reported results therefore describe these experiments and this deployment; they are
+**not a universal guarantee of AI-model robustness**.
+
+---
+
+## Version History
+
+| Version | What changed |
+|---|---|
+| V1 – V4 | Core pipeline: baseline generation, attack library, runner, analysis, report, initial web deployment |
+| V5.x | Visual design passes (branding through final tuning) |
+| V6 | Deployment release: report-navigation fixes, byte-exact Hugging Face Space deployment |
+| **V7 (current)** | Model-free target/evaluation registry (emotion + sentiment), OCES additional evaluations, automated CI release gate, multi-target Master Technical Report, dark brand system across the app and generated reports |
+
+---
+
+## Team Checkmate
+
+RED LAB is developed by **Team Checkmate**. The v7 release was built by:
+
+- **Ahsan** — product integration, web application, deployment, reporting
+- **Rayyan** — endpoint and runner
+- **Khalid** — analysis and the CI release-gate policy
+- **Lamei** — attack library and baselines
+
+Earlier phases of the project were also built with **Amin**, whose runner ownership has since
+transferred to Rayyan.
+
+---
+
+## Links
+
+**Live RED LAB**  
+https://ahsan-141117-project-red-lab.hf.space/
+
+**GitHub Repository**  
+https://github.com/AminMaleh03/adversarial-redteam-toolkit-team-checkmate
+
+**Submission / Supporting Files**  
+https://drive.google.com/drive/folders/1gHsV9YVZ7aJrIQTeHOKQeq_nqM8JGULM?usp=sharing
+
+---
+
+**Team Checkmate — RED LAB**  
+*Adversarial Testing Redefined*

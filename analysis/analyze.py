@@ -21,7 +21,9 @@ from contract import (
     CONTRACTS_VERSION,
     EVAL_KIND_PAIRED,
     EVAL_KIND_SINGLE,
+    OCES_FAMILIES,
     SUITE_CORE,
+    SUITE_OCES,
     Finding,
     RunResult,
 )
@@ -266,13 +268,23 @@ def _empty_category_bucket() -> dict:
     return {"eligible": 0, "failed": 0, "review": 0, "diagnostic": 0, "unevaluable": 0}
 
 
-def compute_category_stats(evaluations: list[CaseEvaluation]) -> dict[str, dict]:
+def compute_category_stats(
+    evaluations: list[CaseEvaluation], *, suite_id: str = SUITE_CORE,
+) -> dict[str, dict]:
     """Per-category rate with an explicit denominator. Zero eligible cases -> None (N/A).
 
     Diagnostic and unresolved REVIEW cases never enter eligible/failed. A case counts at
     most once in the numerator even if it fired several distinct failure modes.
+
+    The pre-seeded category vocabulary depends on ``suite_id``: the six core families for
+    ``core`` (and historical/blank, for backward compatibility), the two OCES families for
+    ``oces``. Pre-seeding with the wrong suite's families would either hide a real zero-
+    count core category or -- for an OCES run -- declare empty buckets for core families
+    that suite never has, which report/generate.py's v3 validator then correctly refuses
+    to render (a family not declared for the suite).
     """
-    stats = {cat: _empty_category_bucket() for cat in CATEGORIES}
+    declared = OCES_FAMILIES if suite_id == SUITE_OCES else CATEGORIES
+    stats = {cat: _empty_category_bucket() for cat in declared}
     for evaluation in evaluations:
         bucket = stats.setdefault(evaluation.category, _empty_category_bucket())
         if evaluation.bucket == "diagnostic":
@@ -289,6 +301,22 @@ def compute_category_stats(evaluations: list[CaseEvaluation]) -> dict[str, dict]
     for bucket in stats.values():
         bucket["failure_rate"] = (bucket["failed"] / bucket["eligible"]) if bucket["eligible"] else None
     return stats
+
+
+def _ordered_category_union(stats_a: dict, stats_b: dict) -> tuple:
+    """Deterministic category order for a two-sided (v1/v2) comparison block.
+
+    Prefers each vocabulary's own stable, already-defined order (CATEGORIES for core,
+    OCES_FAMILIES for oces) so existing core output is byte-for-byte unchanged; falls back
+    to a sorted union only if the two sides genuinely disagree on vocabulary, which never
+    happens for a real paired evaluation (both targets are analysed against the same suite).
+    """
+    present = set(stats_a) | set(stats_b)
+    if present <= set(CATEGORIES):
+        return tuple(c for c in CATEGORIES if c in present)
+    if present <= set(OCES_FAMILIES):
+        return tuple(c for c in OCES_FAMILIES if c in present)
+    return tuple(sorted(present))
 
 
 def compute_operational_stats(evaluations: list[CaseEvaluation]) -> dict:
@@ -551,7 +579,11 @@ def analyze_version(
             )
         evaluations.append(evaluate_case(result, meta, drift_by_attack.get(result.attack_id)))
 
-    category_stats = compute_category_stats(evaluations)
+    # Blank suite_id (historical artifacts, where Identity.suite_id is "" per
+    # validation.resolve_identity) means the original core suite -- same fallback the
+    # rest of the codebase uses for a blank RunResult.suite_id.
+    resolved_suite_id = getattr(identity, "suite_id", None) or SUITE_CORE
+    category_stats = compute_category_stats(evaluations, suite_id=resolved_suite_id)
     operational = compute_operational_stats(evaluations)
     findings, finding_meta, finding_groups = build_findings(evaluations, version)
 
@@ -787,15 +819,26 @@ def build_comparison_summary(
                 "v1_baseline_denominator": v1_analysis.drift.baselines.summary_text,
                 "v2_baseline_denominator": v2_analysis.drift.baselines.summary_text,
             },
+            # Both sides' category_stats are already seeded (by compute_category_stats) with
+            # the family vocabulary for whatever suite this evaluation actually is -- the six
+            # core families, or the two OCES families. Deriving the category set from that,
+            # instead of always using the hardcoded core-only CATEGORIES, keeps this legacy-
+            # shaped v1/v2-keyed block meaningful for an OCES pair too, rather than raising a
+            # KeyError for a core family that suite never had. The stable, already-defined
+            # tuple order is kept for the two known vocabularies; anything else (should not
+            # happen -- both sides are seeded from the same suite) falls back to a sorted,
+            # still-deterministic union so JSON key order never depends on set-hash order.
             "category_failure_rates": {
                 category: {
-                    version: {"failed": stats[category]["failed"],
-                              "eligible": stats[category]["eligible"],
-                              "rate": format_rate(stats[category]["failure_rate"])}
+                    version: {"failed": stats.get(category, {}).get("failed", 0),
+                              "eligible": stats.get(category, {}).get("eligible", 0),
+                              "rate": format_rate(stats.get(category, {}).get("failure_rate"))}
                     for version, stats in (("v1", v1_analysis.category_stats),
                                            ("v2", v2_analysis.category_stats))
                 }
-                for category in CATEGORIES
+                for category in _ordered_category_union(
+                    v1_analysis.category_stats, v2_analysis.category_stats
+                )
             },
             "findings_resolved": [
                 list(r.key) for r in result.resolutions if r.status == "resolved"

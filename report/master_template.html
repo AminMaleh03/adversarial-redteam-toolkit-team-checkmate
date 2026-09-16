@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+  <meta name="description" content="Team Checkmate: Stage 3 multi-target master technical report -- architecture, evidence and remediation across emotion, sentiment and the CI release gate.">
+  <title>Technical Report | Red Lab</title>
+  <style>{{ css|safe }}</style>
+  <script>
+  document.addEventListener("click", function (event) {
+    if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey ||
+        event.shiftKey || event.altKey) return;
+    var link = event.target.closest ? event.target.closest('a[href^="#"]') : null;
+    if (!link || !link.hash || link.hash === "#") return;
+    var hash = link.hash;
+    event.preventDefault();
+    var target = document.getElementById(hash.slice(1));
+    if (!target) {
+      window.history.replaceState(window.history.state, "", hash);
+      document.addEventListener("DOMContentLoaded", function () {
+        var late = document.getElementById(hash.slice(1));
+        if (late) late.scrollIntoView({ behavior: "instant", block: "start" });
+        if (typeof window.rlOnInternalNav === "function") window.rlOnInternalNav(hash);
+      }, { once: true });
+      return;
+    }
+    target.scrollIntoView({ behavior: "instant", block: "start" });
+    if (link.classList.contains("skip-link")) {
+      if (!target.hasAttribute("tabindex")) target.setAttribute("tabindex", "-1");
+      target.focus({ preventScroll: true });
+    }
+    window.history.replaceState(window.history.state, "", hash);
+    if (typeof window.rlOnInternalNav === "function") window.rlOnInternalNav(hash);
+  });
+  </script>
+</head>
+<body class="has-back">
+{% macro rate_line(numerator, denominator, pct) -%}
+{{ numerator }} / {{ denominator }} ({{ pct }})
+{%- endmacro %}
+{% macro finding_card(entry, anchor) -%}
+<section class="finding v3-finding" id="{{ anchor }}">
+  <p class="eyebrow">{{ entry.finding.severity_tier }} &middot; {{ entry.finding.category }}/{{ entry.subfamily }} &middot; {{ entry.failure_mode }}</p>
+  <h5>{{ entry.finding.title }}</h5>
+  <p>{{ entry.finding.description }}</p>
+  {% if entry.get('remediation_detail') %}
+  <dl class="v3-remediation">
+    <dt>Observed evidence</dt><dd>{{ entry.remediation_detail.observed }}</dd>
+    <dt>Why it matters</dt><dd>{{ entry.remediation_detail.significance }}</dd>
+    <dt>Recommended action</dt><dd>{{ entry.remediation_detail.fix }}</dd>
+    <dt>How to verify the fix</dt><dd><code>{{ entry.remediation_detail.verification.command }}</code><br>{{ entry.remediation_detail.verification.expected }}</dd>
+  </dl>
+  {% else %}
+  <dl class="v3-remediation">
+    <dt>Recommended action</dt><dd>{{ entry.finding.remediation }}</dd>
+  </dl>
+  {% endif %}
+  <details class="evidence"><summary>Evidence cases &middot; {{ entry.finding.evidence|length }}</summary><div class="id-list">{% for case_id in entry.finding.evidence %}<code>{{ case_id }}</code>{% endfor %}</div></details>
+</section>
+{%- endmacro %}
+<a class="skip-link" href="#report-main">Skip to report content</a>
+<header class="masthead">
+  <a class="rl-back-btn" href="/" onclick="return rlGoBack(event)" aria-label="Back" title="Back">&larr;</a>
+  <div class="masthead-inner">
+    <a class="brand" href="#overview"><img src="{{ logo_data_uri }}" alt="{{ creator_name }}" class="brand-logo"><span class="brand-text"><span class="brand-creator">{{ creator_name }}</span><span class="brand-product">{{ product_version_label }}</span></span></a>
+    <button id="toc-toggle" class="toc-toggle" type="button" aria-expanded="false" aria-controls="report-toc">
+      <span class="toc-toggle-bars" aria-hidden="true"></span> Contents
+    </button>
+    <div class="downloads"><a class="home-link" href="/">Back to Red Lab</a><a href="master_evidence_manifest.json" target="_blank" rel="noopener">Evidence manifest</a><a href="/verified-full/report.html">Historical V5 report</a>{% if include_pdf %}<a class="button" href="report.pdf" download>Download PDF <span aria-hidden="true">&darr;</span></a>{% endif %}</div>
+  </div>
+</header>
+
+<div class="report-shell" id="report-shell">
+  <div id="toc-backdrop" class="toc-backdrop" hidden></div>
+  <aside id="report-toc" class="report-toc" aria-label="Report contents">
+    <div class="toc-sticky-head">
+      <button id="toc-collapse" class="toc-collapse-btn" type="button" aria-expanded="true" aria-controls="report-toc">
+        <span class="toc-collapse-icon" aria-hidden="true">&laquo;</span><span class="toc-collapse-label">Collapse</span>
+      </button>
+      <div class="toc-head">
+        <p class="toc-title" id="toc-title">Report Contents</p>
+        <button id="toc-close" class="toc-close" type="button" aria-label="Close report contents">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+    </div>
+    <div id="toc-scroll" class="toc-scroll">
+    <nav class="toc-nav" aria-labelledby="toc-title">
+      <ul class="toc-list">
+        <li class="toc-group">
+          <button class="toc-group-toggle" type="button" aria-expanded="true" aria-controls="toc-group-overview">Overview</button>
+          <ul id="toc-group-overview" class="toc-sublist"><li><a href="#overview" data-toc-link>Executive Overview</a></li></ul>
+        </li>
+        <li class="toc-group">
+          <button class="toc-group-toggle" type="button" aria-expanded="true" aria-controls="toc-group-architecture">Architecture</button>
+          <ul id="toc-group-architecture" class="toc-sublist"><li><a href="#architecture" data-toc-link>System Architecture</a></li></ul>
+        </li>
+        <li class="toc-group">
+          <button class="toc-group-toggle" type="button" aria-expanded="true" aria-controls="toc-group-matrix">Evaluation Matrix</button>
+          <ul id="toc-group-matrix" class="toc-sublist"><li><a href="#evaluation-matrix" data-toc-link>Five Evaluation Identities</a></li></ul>
+        </li>
+        <li class="toc-group">
+          <button class="toc-group-toggle" type="button" aria-expanded="true" aria-controls="toc-group-core">Core Evaluation</button>
+          <ul id="toc-group-core" class="toc-sublist">
+            <li><a href="#emotion-core" data-toc-link>Emotion Core Results</a></li>
+            <li><a href="#sentiment-core" data-toc-link>Sentiment Core Results</a></li>
+          </ul>
+        </li>
+        <li class="toc-group">
+          <button class="toc-group-toggle" type="button" aria-expanded="true" aria-controls="toc-group-additional">Additional Evaluation</button>
+          <ul id="toc-group-additional" class="toc-sublist"><li><a href="#oces" data-toc-link>OCES (Emotion &amp; Sentiment)</a></li></ul>
+        </li>
+        <li class="toc-group">
+          <button class="toc-group-toggle" type="button" aria-expanded="true" aria-controls="toc-group-remediation">Findings and Remediation</button>
+          <ul id="toc-group-remediation" class="toc-sublist"><li><a href="#remediation" data-toc-link>Evidence-Specific Remediation</a></li></ul>
+        </li>
+        <li class="toc-group">
+          <button class="toc-group-toggle" type="button" aria-expanded="true" aria-controls="toc-group-gate">CI Release Gate</button>
+          <ul id="toc-group-gate" class="toc-sublist"><li><a href="#ci-gate" data-toc-link>ci.emotion Evidence</a></li></ul>
+        </li>
+        <li class="toc-group">
+          <button class="toc-group-toggle" type="button" aria-expanded="true" aria-controls="toc-group-repro">Reproducibility</button>
+          <ul id="toc-group-repro" class="toc-sublist"><li><a href="#provenance" data-toc-link>Provenance &amp; Evidence Hashes</a></li></ul>
+        </li>
+        <li class="toc-group">
+          <button class="toc-group-toggle" type="button" aria-expanded="true" aria-controls="toc-group-historical">Historical Evidence</button>
+          <ul id="toc-group-historical" class="toc-sublist"><li><a href="#historical" data-toc-link>Archived Red Lab v5 Benchmark</a></li></ul>
+        </li>
+      </ul>
+    </nav>
+    </div>
+  </aside>
+
+  <main id="report-main">
+    <section class="hero" id="overview">
+      <p class="page-identity"><span>{{ creator_name }}</span><span class="sep">/</span><span>{{ product_version_label }}</span></p>
+      <h1 class="page-title">MASTER TECHNICAL REPORT</h1>
+      <p class="report-kicker">Multi-target adversarial evaluation &middot; Stage 3</p>
+      <p class="deck">{{ overview.what_it_does }}</p>
+      <p class="deck">{{ overview.who_for }}</p>
+      <p class="deck">{{ overview.adapt }}</p>
+      <p class="deck">{{ overview.judges_response }}</p>
+      <div class="notice">{{ overview.evidence_scope }}</div>
+    </section>
+
+    <section class="report-section" id="architecture">
+      <div class="section-heading"><span class="section-number">B</span><div><p class="eyebrow">SYSTEM ARCHITECTURE</p><h2>How the toolkit is built</h2></div></div>
+      <div class="v3-card-grid">
+      {% for card in architecture %}
+        <article class="v3-mini-card"><h4>{{ card.title }}</h4><p>{{ card.body }}</p></article>
+      {% endfor %}
+      </div>
+      <div class="notice">{{ architecture_distinctions }}</div>
+    </section>
+
+    <section class="report-section" id="evaluation-matrix">
+      <div class="section-heading"><span class="section-number">C</span><div><p class="eyebrow">EVALUATION MATRIX</p><h2>The five approved evaluation identities</h2></div></div>
+      <table class="category-table">
+        <thead><tr><th scope="col">Evaluation ID</th><th scope="col">Kind</th><th scope="col">Target ID(s)</th><th scope="col">Suite</th><th scope="col">Model identity</th><th scope="col">Purpose</th></tr></thead>
+        <tbody>
+        {% for row in evaluation_matrix %}
+        <tr><td><code>{{ row.evaluation_id }}</code></td><td>{{ row.kind }}</td><td>{% for t in row.target_ids %}<code>{{ t }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</td><td>{{ row.suite_id }}</td><td>{{ row.model }}</td><td>{{ row.purpose }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="report-section" id="emotion-core">
+      <div class="section-heading"><span class="section-number">D</span><div><p class="eyebrow">CORE EVALUATION &middot; PAIRED</p><h2>Emotion Core Results (historical, verified)</h2></div></div>
+      <p>{{ emotion_core.intro }}</p>
+      <div class="endpoint-pair">
+        <article class="panel endpoint-card v1">
+          <span class="version-id v1">emotion_v1 &mdash; Unhardened</span>
+          <div class="endpoint-metrics">
+            <div class="endpoint-metric"><strong>{{ emotion_core.v1.eligible }}</strong><span>eligible flip comparisons</span></div>
+            <div class="endpoint-metric"><strong>{{ emotion_core.v1.flips }}</strong><span>qualifying prediction flips</span></div>
+            <div class="endpoint-metric"><strong>{{ emotion_core.v1.findings }}</strong><span>finding groups</span></div>
+          </div>
+        </article>
+        <article class="panel endpoint-card v2">
+          <span class="version-id v2">emotion_v2 &mdash; Hardened</span>
+          <div class="endpoint-metrics">
+            <div class="endpoint-metric"><strong>{{ emotion_core.v2.eligible }}</strong><span>eligible flip comparisons</span></div>
+            <div class="endpoint-metric"><strong>{{ emotion_core.v2.flips }}</strong><span>qualifying prediction flips</span></div>
+            <div class="endpoint-metric"><strong>{{ emotion_core.v2.findings }}</strong><span>finding groups</span></div>
+          </div>
+        </article>
+      </div>
+      <div class="panel">
+        <p><strong>Same underlying model</strong> &mdash; {{ emotion_core.same_model_note }}</p>
+        <p><strong>Common eligible denominator</strong> &mdash; {{ emotion_core.common_denominator_note }}</p>
+        <p><strong>Findings resolved after hardening:</strong> {{ emotion_core.resolved }} &middot; <strong>Findings remaining on V2:</strong> {{ emotion_core.remaining }}</p>
+        <p>{{ emotion_core.controls_note }}</p>
+        <p>{{ emotion_core.persisted_note }}</p>
+      </div>
+      <p class="caption">This is the historical, previously verified V5 benchmark. It is not re-run or re-scored here. Full finding registers, per-case evidence and the rendered historical report are archived at <a href="/verified-full/report.html">/verified-full/</a> (see also <a href="#historical">Historical Evidence</a>).</p>
+    </section>
+
+    <section class="report-section" id="sentiment-core">
+      <div class="section-heading"><span class="section-number">E</span><div><p class="eyebrow">CORE EVALUATION &middot; SINGLE TARGET</p><h2>Sentiment Core Results</h2></div></div>
+      <div class="notice v3-single-note"><strong>Single-target evaluation.</strong> {{ sentiment_core.single_target_note }}</div>
+      <div class="two-up">
+        <div class="panel coverage-panel"><p class="eyebrow">RECORDED COVERAGE</p><p class="big-stat">{{ sentiment_core.completed }}<span> / {{ sentiment_core.planned }}</span></p><p>{{ sentiment_core.coverage_pct }} of planned cases recorded</p></div>
+        <div class="panel drift-panel"><p class="eyebrow">QUALIFYING PREDICTION FLIPS</p><p class="big-stat">{{ sentiment_core.flip_rate_pct }}</p><p>{{ sentiment_core.flips }} / {{ sentiment_core.eligible }} eligible prediction pairs</p></div>
+      </div>
+      <p>Model <code>{{ sentiment_core.model_id }}</code>@<code>{{ sentiment_core.model_revision }}</code>, labels {{ sentiment_core.labels }}. {{ sentiment_core.findings }} finding groups recorded. Operational: {{ sentiment_core.unhandled_5xx }} unhandled 5xx, {{ sentiment_core.timeouts }} timeouts, {{ sentiment_core.invalid_input_accepted }} invalid input accepted.</p>
+      {% for entry in sentiment_core.sample_findings %}{{ finding_card(entry, 'finding-sentiment-core-' ~ loop.index) }}{% endfor %}
+    </section>
+
+    <section class="report-section" id="oces">
+      <div class="section-heading"><span class="section-number">F</span><div><p class="eyebrow">ADDITIONAL EVALUATION</p><h2>OCES &mdash; Out-of-Coverage Evaluation Suite</h2></div></div>
+      <p>{{ oces.explainer }}</p>
+      <div class="notice warning">{{ oces.honesty_disclosure }}</div>
+      <div class="v3-card-grid">
+        <article class="v3-mini-card"><h4>Validity tiers (both targets combined)</h4><p>{{ oces.gold }} GOLD &middot; {{ oces.silver }} SILVER &middot; {{ oces.review }} REVIEW ({{ oces.total }} cases total)</p></article>
+        <article class="v3-mini-card"><h4>Case composition</h4><p>{{ oces.emotion_variants }} emotion variants &middot; {{ oces.sentiment_variants }} sentiment variants; exactly the approved <code>oces.paraphrase</code> and <code>oces.distractor</code> families.</p></article>
+      </div>
+      <h3>emotion.oces (paired: emotion_v1, emotion_v2)</h3>
+      <div class="two-up">
+        <div class="panel v1"><p class="eyebrow">EMOTION_V1</p><p>{{ emotion_oces.v1.completed }}/{{ emotion_oces.v1.planned }} completed &middot; {{ emotion_oces.v1.eligible }} eligible &middot; {{ emotion_oces.v1.flips }} flips &middot; {{ emotion_oces.v1.findings }} findings</p><p class="caption">{{ emotion_oces.v1.oces_scored_note }}</p></div>
+        <div class="panel v2"><p class="eyebrow">EMOTION_V2</p><p>{{ emotion_oces.v2.completed }}/{{ emotion_oces.v2.planned }} completed &middot; {{ emotion_oces.v2.eligible }} eligible &middot; {{ emotion_oces.v2.flips }} flips &middot; {{ emotion_oces.v2.findings }} findings</p><p class="caption">{{ emotion_oces.v2.oces_scored_note }}</p></div>
+      </div>
+      <p class="caption">{{ emotion_oces.note }}</p>
+      <h3>sentiment.oces (single target: sentiment_v1)</h3>
+      <div class="notice v3-single-note">{{ sentiment_oces.single_target_note }}</div>
+      <div class="panel"><p>{{ sentiment_oces.completed }}/{{ sentiment_oces.planned }} completed &middot; {{ sentiment_oces.eligible }} eligible &middot; {{ sentiment_oces.flips }} flips &middot; {{ sentiment_oces.findings }} findings</p><p class="caption">{{ sentiment_oces.oces_scored_note }}</p></div>
+      {% for entry in sentiment_oces.sample_findings %}{{ finding_card(entry, 'finding-sentiment-oces-' ~ loop.index) }}{% endfor %}
+    </section>
+
+    <section class="report-section" id="remediation">
+      <div class="section-heading"><span class="section-number">G</span><div><p class="eyebrow">FINDINGS AND REMEDIATION</p><h2>Evidence-specific remediation</h2></div></div>
+      <p>{{ remediation.intro }}</p>
+      <h3>Endpoint / application-layer problems</h3>
+      {% for entry in remediation.endpoint_layer %}{{ finding_card(entry.entry, 'finding-remediation-endpoint-' ~ loop.index) }}{% else %}<p class="caption">None recorded in the evidence used by this report.</p>{% endfor %}
+      <h3>Model-level sensitivity</h3>
+      {% for entry in remediation.model_sensitivity %}{{ finding_card(entry.entry, 'finding-remediation-model-' ~ loop.index) }}{% else %}<p class="caption">None recorded in the evidence used by this report.</p>{% endfor %}
+      <h3>Diagnostic observations</h3>
+      <p class="caption">{{ remediation.diagnostic_note }}</p>
+      <h3>Single-target sentiment observations</h3>
+      {% for entry in remediation.sentiment_single_target %}{{ finding_card(entry.entry, 'finding-remediation-sentiment-' ~ loop.index) }}{% else %}<p class="caption">None recorded in the evidence used by this report.</p>{% endfor %}
+    </section>
+
+    <section class="report-section" id="ci-gate">
+      <div class="section-heading"><span class="section-number">H</span><div><p class="eyebrow">CI RELEASE GATE</p><h2>ci.emotion release-gate evidence</h2></div></div>
+      <p>{{ ci_gate.explainer }}</p>
+      <div class="panel">
+        <p><strong>Candidate</strong> <code>{{ ci_gate.candidate }}</code> &middot; <strong>Reference</strong> <code>{{ ci_gate.reference }}</code> &middot; <strong>Policy</strong> <code>{{ ci_gate.policy_id }}</code> v{{ ci_gate.policy_version }}</p>
+        <p><strong>Outcome</strong> {{ ci_gate.outcome }} &middot; <strong>Exit code</strong> {{ ci_gate.exit_code }} &middot; {{ ci_gate.checks_passed }}/{{ ci_gate.checks_total }} checks passed</p>
+        <p>{{ ci_gate.exit_code_meaning }}</p>
+      </div>
+      <table class="category-table"><thead><tr><th scope="col">Check</th><th scope="col">Status</th></tr></thead><tbody>
+      {% for check in ci_gate.checks %}<tr><td><code>{{ check.check_id }}</code></td><td>{{ check.status }}</td></tr>{% endfor %}
+      </tbody></table>
+      <div class="notice">{{ ci_gate.github_run_note }}</div>
+      <p class="caption">{{ ci_gate.scope_note }}</p>
+    </section>
+
+    <section class="report-section" id="provenance">
+      <div class="section-heading"><span class="section-number">I</span><div><p class="eyebrow">REPRODUCIBILITY AND PROVENANCE</p><h2>What this report is built from</h2></div></div>
+      <dl class="v3-rate-grid">
+        <div><dt>Evidence-generation application commit</dt><dd><code>{{ provenance.app_commit }}</code></dd></div>
+        <div><dt>Emotion model / tokenizer</dt><dd><code>{{ provenance.emotion_model }}</code></dd></div>
+        <div><dt>Sentiment model / tokenizer</dt><dd><code>{{ provenance.sentiment_model }}</code></dd></div>
+        <div><dt>Contracts version</dt><dd>{{ provenance.contracts_version }}</dd></div>
+        <div><dt>CI policy identity</dt><dd><code>{{ provenance.policy_identity }}</code></dd></div>
+        <div><dt>Case-set identity</dt><dd><code>{{ provenance.case_set_identity }}</code></dd></div>
+        <div><dt>OCES generator version</dt><dd>{{ provenance.oces_generator_version }}</dd></div>
+        <div><dt>Report-generation identity</dt><dd>{{ provenance.report_generator_identity }}</dd></div>
+      </dl>
+      <p class="caption">{{ provenance.generation_distinction_note }}</p>
+      <h3>Evidence file hashes</h3>
+      <p class="caption">Every quantitative claim above is derived from these files, re-hashed and checked against <code>report/master_evidence/manifest.json</code> at generation time. A missing or modified file fails generation closed (no report is produced).</p>
+      <table class="category-table"><thead><tr><th scope="col">Evidence</th><th scope="col">Path</th><th scope="col">SHA-256</th><th scope="col">Evaluation</th></tr></thead><tbody>
+      {% for src in provenance.sources %}<tr><td>{{ src.description }}</td><td><code>{{ src.path }}</code></td><td><code>{{ src.sha256[:16] }}&hellip;</code></td><td>{{ src.evaluation_id or '—' }}</td></tr>{% endfor %}
+      </tbody></table>
+      <h3>External citations (not independently hashed)</h3>
+      {% for ext in provenance.external_citations %}<p>{{ ext.description }} Run <code>{{ ext.run_number }}</code>.</p>{% endfor %}
+      <h3>Explicitly not applicable</h3>
+      <ul>{% for na in provenance.not_applicable %}<li><strong>{{ na.field }}</strong> &mdash; {{ na.reason }}</li>{% endfor %}</ul>
+    </section>
+
+    <section class="report-section" id="historical">
+      <div class="section-heading"><p class="eyebrow">ARCHIVED EVIDENCE</p><h2>Historical Red Lab v5 benchmark</h2></div>
+      <div class="panel">
+        <p>{{ historical.note }}</p>
+        <p><a class="button" href="/verified-full/report.html">Open the archived Red Lab v5 report</a> &middot; <a href="/verified-full/analysis.json" target="_blank" rel="noopener">Source JSON</a></p>
+      </div>
+    </section>
+  </main>
+</div>
+<footer><span>{{ creator_name }} / {{ product_version_label }} / MASTER TECHNICAL REPORT</span><a class="home-link" href="/">&larr; Back to Red Lab</a><a href="#overview">Back to overview &uarr;</a></footer>
+<script>
+function rlGoBack(event) {
+  if (window.history.length > 1 && document.referrer &&
+      new URL(document.referrer).origin === window.location.origin) {
+    event.preventDefault();
+    window.history.back();
+  }
+  return true;
+}
+(function () {
+  "use strict";
+  var shell = document.getElementById("report-shell");
+  var toc = document.getElementById("report-toc");
+  var tocToggle = document.getElementById("toc-toggle");
+  var tocClose = document.getElementById("toc-close");
+  var tocBackdrop = document.getElementById("toc-backdrop");
+  var tocCollapse = document.getElementById("toc-collapse");
+  if (!shell || !toc) { return; }
+  // V6.5: matches style.css's drawer breakpoint (1024px), which is wider than the report's
+  // general text/table mobile breakpoint (760px) -- the sidebar collapses to a drawer at a
+  // narrower window or higher zoom well before body content would otherwise be considered
+  // "mobile", so this must not be conflated with the 760px used elsewhere in this file/CSS.
+  function isMobile() { return window.matchMedia("(max-width: 1024px)").matches; }
+  function openDrawer() {
+    toc.classList.add("is-open");
+    toc.inert = false;
+    document.body.style.overflow = "hidden";
+    if (tocBackdrop) tocBackdrop.hidden = false;
+    if (tocToggle) tocToggle.setAttribute("aria-expanded", "true");
+    if (tocClose) tocClose.focus();
+  }
+  function closeDrawer() {
+    toc.classList.remove("is-open");
+    toc.inert = isMobile();
+    document.body.style.overflow = "";
+    if (tocBackdrop) tocBackdrop.hidden = true;
+    if (tocToggle) tocToggle.setAttribute("aria-expanded", "false");
+    if (tocToggle) tocToggle.focus();
+  }
+  if (tocToggle) {
+    tocToggle.addEventListener("click", function () {
+      if (toc.classList.contains("is-open")) { closeDrawer(); } else { openDrawer(); }
+    });
+  }
+  if (tocClose) tocClose.addEventListener("click", closeDrawer);
+  if (tocBackdrop) tocBackdrop.addEventListener("click", closeDrawer);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && toc.classList.contains("is-open")) { closeDrawer(); }
+    if (e.key === "Tab" && isMobile() && toc.classList.contains("is-open")) {
+      var focusable = Array.prototype.filter.call(toc.querySelectorAll("a, button"), function (el) { return el.getClientRects().length; });
+      var first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  });
+  toc.inert = isMobile();
+  window.matchMedia("(max-width: 1024px)").addEventListener("change", function () {
+    closeDrawer();
+    toc.inert = isMobile();
+  });
+  window.rlOnInternalNav = function (hash) {
+    clickedLink = toc.querySelector('[data-toc-link][href="' + hash + '"]');
+    setActive(clickedLink);
+    if (isMobile() && toc.classList.contains("is-open")) { closeDrawer(); }
+  };
+  if (tocCollapse) {
+    tocCollapse.addEventListener("click", function () {
+      var collapsed = shell.classList.toggle("toc-collapsed");
+      tocCollapse.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      toc.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    });
+  }
+  toc.querySelectorAll(".toc-group-toggle").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var open = btn.getAttribute("aria-expanded") === "true";
+      btn.setAttribute("aria-expanded", open ? "false" : "true");
+      var target = document.getElementById(btn.getAttribute("aria-controls"));
+      if (target) target.hidden = open;
+    });
+  });
+  var tocLinks = Array.prototype.slice.call(toc.querySelectorAll("[data-toc-link]"));
+  var targets = tocLinks.map(function (link) {
+    var id = link.getAttribute("href").slice(1);
+    var el = document.getElementById(id);
+    return el ? { link: link, el: el } : null;
+  }).filter(Boolean);
+  targets.sort(function (a, b) {
+    var pos = a.el.compareDocumentPosition(b.el);
+    if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+    if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+    return 0;
+  });
+  var activeLink = null;
+  var clickedLink = null;
+  function releaseClickedLink(event) {
+    if (event.target.closest && event.target.closest("#report-toc")) return;
+    if (event.type === "keydown" && !["ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End", " "].includes(event.key)) return;
+    clickedLink = null;
+  }
+  ["wheel", "touchmove", "keydown", "pointerdown"].forEach(function (type) {
+    document.addEventListener(type, releaseClickedLink, { passive: true });
+  });
+  function setActive(link) {
+    if (link === activeLink) return;
+    activeLink = link;
+    tocLinks.forEach(function (l) { l.classList.remove("is-active"); l.removeAttribute("aria-current"); });
+    if (link) { link.classList.add("is-active"); link.setAttribute("aria-current", "location"); }
+  }
+  if (targets.length && "IntersectionObserver" in window) {
+    var navHeight = document.querySelector(".masthead").getBoundingClientRect().height;
+    var intersecting = new Map();
+    targets.forEach(function (t) { intersecting.set(t.el, false); });
+    function updateActive() {
+      if (clickedLink) { setActive(clickedLink); return; }
+      var activeTarget = null;
+      for (var i = 0; i < targets.length; i++) {
+        if (intersecting.get(targets[i].el)) { activeTarget = targets[i]; }
+      }
+      if (activeTarget) { setActive(activeTarget.link); }
+    }
+    var observer = null;
+    function observeSections() {
+      if (observer) observer.disconnect();
+      navHeight = document.querySelector(".masthead").getBoundingClientRect().height;
+      document.documentElement.style.setProperty("--report-nav-height", navHeight + "px");
+      targets.forEach(function (t) { intersecting.set(t.el, false); });
+      observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) { intersecting.set(entry.target, entry.isIntersecting); });
+        updateActive();
+      }, { rootMargin: "-" + navHeight + "px 0px -65% 0px", threshold: 0 });
+      targets.forEach(function (t) { observer.observe(t.el); });
+    }
+    observeSections();
+    new ResizeObserver(observeSections).observe(document.querySelector(".masthead"));
+  }
+})();
+</script>
+</body>
+</html>

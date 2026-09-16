@@ -583,7 +583,7 @@ def test_demo_hero_uses_functional_identity_not_marketing_copy(demo_data):
     assert "in one minute" not in result
     assert "V1" in result and "Unhardened Endpoint" in result
     assert "V2" in result and "Hardened Endpoint" in result
-    assert "Red Lab v5.0" in result and "Team Checkmate" in result
+    assert "Red Lab v7" in result and "Team Checkmate" in result
 
 
 def test_demo_crash_note_is_a_small_caption_not_a_warning_box(demo_data):
@@ -648,7 +648,7 @@ def test_reports_credit_team_checkmate_and_show_red_lab_version(demo_data):
     for mode in ("demo", "full"):
         result = html(demo_data, mode=mode)
         assert "Team Checkmate" in result
-        assert "Red Lab v5.0" in result
+        assert "Red Lab v7" in result
 
 
 # ----------------------------------------------------------------------------------------
@@ -722,7 +722,7 @@ def test_reports_masthead_brand_shows_version_label(demo_data):
         header = result[result.index("<header"):result.index("</header>")]
         assert "Team Checkmate" in header
         assert 'class="brand-creator"' in header
-        assert "Red Lab v5.0" in header
+        assert "Red Lab v7" in header
 
 
 def test_reports_masthead_brand_uses_shared_class_names_with_web_app(demo_data):
@@ -1030,7 +1030,7 @@ def test_full_report_analysis_schema_not_a_hero_badge(data):
     assert "Analysis schema" not in hero  # moved out of the hero entirely
     provenance = result[result.index('id="provenance"'):result.index("</section>", result.index('id="provenance"'))]
     assert "Analysis schema v2" in provenance
-    assert "Red Lab v5.0" in provenance  # product version, a distinct concept, still present
+    assert "Red Lab v7" in provenance  # product version, a distinct concept, still present
 
 
 def test_full_report_remediation_architecture_preserved(data):
@@ -1123,3 +1123,299 @@ def test_full_report_rubric_block_hidden_on_narrow_mobile_sidebar_drawer():
     css = (ROOT / "report" / "style.css").read_text(encoding="utf-8")
     mobile_block = css[css.index("@media (max-width: 760px)"):]
     assert ".rubric-block { display: none; }" in mobile_block
+
+
+def _stage3_document():
+    return json.loads((ROOT / "tests" / "fixtures" / "stage3" /
+                       "expected_analysis_v3.json").read_text(encoding="utf-8"))
+
+
+def test_v3_report_renders_targets_single_explanation_and_structured_remediation():
+    result = report.render_html(_stage3_document(), source_sha256="b" * 64, include_pdf=False)
+    assert "emotion_v1" in result and "sentiment_v1" in result
+    assert "No hardening comparison is available or implied" in result
+    assert "Observed evidence" in result
+    assert "Why it matters" in result
+    assert "Verification" in result
+    assert "Additional evaluation" in result
+
+
+def test_v3_evaluation_header_label_identity_and_detail_share_one_aligned_row():
+    """V6.5 requirement 3: the "CORE · PAIRED"-style eyebrow, the evaluation_id heading and
+    the task/target detail line must use the dedicated alignment class -- plain
+    .section-heading's default flex row (built for master_template's 2-child layout) puts
+    all three of these directly-nested children in an unwrapped row with no wrap, which
+    overflows or crowds at narrow widths instead of wrapping in order."""
+    result = report.render_html(_stage3_document(), source_sha256="c" * 64, include_pdf=False)
+    assert 'class="section-heading v3-eval-heading"' in result
+    assert ".v3-eval-heading" in result  # the CSS rule itself is embedded inline
+    assert "flex-wrap: wrap" in result
+    assert 'class="v3-eval-detail"' in result
+
+
+def test_v3_single_target_cannot_claim_a_comparison():
+    payload = _stage3_document()
+    payload["evaluations"][1]["comparison"] = {"common_denominator": 1}
+    with pytest.raises(ValueError, match="single-target comparison must be null"):
+        report.validate_report(payload)
+
+
+def test_v3_missing_required_core_coverage_is_not_rendered_as_success():
+    payload = _stage3_document()
+    payload["evaluations"][0]["coverage"] = None
+    with pytest.raises(ValueError, match="requires coverage evidence"):
+        report.validate_report(payload)
+
+
+def test_v3_zero_denominator_renders_na_not_zero():
+    payload = _stage3_document()
+    payload["evaluations"][0]["comparison"]["flip_rate_on_common"]["emotion_v1"] = {
+        "numerator": 0, "denominator": 0, "rate": None,
+    }
+    result = report.render_html(payload, source_sha256="c" * 64, include_pdf=False)
+    assert "N/A (0/0)" in result
+
+
+def test_v3_bundle_preserves_source_bytes_and_records_schema(tmp_path):
+    raw = (ROOT / "tests" / "fixtures" / "stage3" /
+           "expected_analysis_v3.json").read_bytes()
+    output = tmp_path / "v3"
+    report.generate_report(raw, output, html_only=True)
+    assert (output / "analysis.json").read_bytes() == raw
+    meta = json.loads((output / "export_meta.json").read_text(encoding="utf-8"))
+    assert meta["analysis_schema_version"] == 3
+    assert meta["source_sha256"] == hashlib.sha256(raw).hexdigest()
+
+
+def test_v3_demo_report_never_exposes_a_download_pdf_button():
+    # v6.1 Phase 4: a v3 (target-aware) Live Demo report -- the shape both emotion.core and
+    # sentiment.core actually render through -- must never carry a PDF download link.
+    payload = _stage3_document()
+    demo_html = report.render_html(payload, source_sha256="c" * 64, include_pdf=True, mode="demo")
+    assert "Download PDF" not in demo_html
+    assert "Source JSON" in demo_html
+    assert "Back to Red Lab" in demo_html
+
+
+def test_v3_full_report_still_offers_a_download_pdf_button():
+    # The archived/verified and any future master technical report must keep the PDF button --
+    # this milestone only removes it from Live Demo reports.
+    payload = _stage3_document()
+    full_html = report.render_html(payload, source_sha256="c" * 64, include_pdf=True, mode="full")
+    assert "Download PDF" in full_html
+
+
+def test_v3_demo_report_pdf_omitted_regardless_of_evaluation_kind():
+    # v6.1 Phase 4: neither the paired (emotion) nor the single-target (sentiment) evaluation
+    # block in a v3 demo report can expose a PDF link -- this is a mode-wide gate, not per-kind.
+    payload = _stage3_document()
+    kinds = {evaluation["kind"] for evaluation in payload["evaluations"]}
+    assert {"paired", "single"} <= kinds  # sanity: fixture actually covers both kinds
+    demo_html = report.render_html(payload, source_sha256="c" * 64, include_pdf=True, mode="demo")
+    assert "Download PDF" not in demo_html
+
+
+# ------------------------------------------------------------------------------------------
+# v6.2: application commit is real, consistent, and honestly explained when missing
+# ------------------------------------------------------------------------------------------
+
+_SYNTHETIC_SHA = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+
+
+def _application_commit_paragraph(html):
+    match = re.search(r"<p><strong>Application commit</strong>.*?</p>", html, re.S)
+    assert match, "expected an Application commit paragraph in the v3 report"
+    return match.group(0)
+
+
+def test_v3_report_shows_the_real_forty_char_application_commit():
+    assert len(_SYNTHETIC_SHA) == 40
+    payload = _stage3_document()
+    payload["run_identity"]["app_commit"] = _SYNTHETIC_SHA
+    html = report.render_html(payload, source_sha256="1" * 64, include_pdf=False)
+    paragraph = _application_commit_paragraph(html)
+    assert _SYNTHETIC_SHA in paragraph
+    assert "Not recorded" not in paragraph
+
+
+def test_v3_report_explains_missing_application_commit_not_bare_not_recorded():
+    payload = _stage3_document()
+    payload["run_identity"]["app_commit"] = None
+    payload["run_identity"].pop("code_provenance", None)
+    payload["run_identity"]["app_commit_unavailable_reason"] = (
+        "Git metadata was unavailable in this environment when the run started."
+    )
+    html = report.render_html(payload, source_sha256="2" * 64, include_pdf=False)
+    paragraph = _application_commit_paragraph(html)
+    assert "Not recorded" in paragraph
+    assert "Git metadata was unavailable" in paragraph
+
+
+def test_v3_report_never_substitutes_model_revision_or_branch_name_for_app_commit():
+    payload = _stage3_document()
+    model_revision = (
+        payload["evaluations"][0]["summaries"]["emotion_v1"]["identity"]["declared"]["model_revision"]
+    )
+    payload["run_identity"]["app_commit"] = None
+    payload["run_identity"].pop("code_provenance", None)
+    for branch_like in ("main", "stage3/ahsan", "HEAD", "origin/main"):
+        assert branch_like != model_revision  # sanity: fixture data really is distinct
+    html = report.render_html(payload, source_sha256="3" * 64, include_pdf=False)
+    paragraph = _application_commit_paragraph(html)
+    assert model_revision not in paragraph
+    assert "main" not in paragraph.lower()
+
+
+def test_v3_render_html_module_never_imports_subprocess_or_shells_out_to_git():
+    # The report renderer must remain pure -- provenance is threaded through existing run
+    # evidence, never (re-)derived by asking the template layer to run Git (v6.2).
+    source = (ROOT / "report" / "generate.py").read_text(encoding="utf-8")
+    assert "import subprocess" not in source
+    assert "git rev-parse" not in source
+    assert "GIT_" not in source
+
+
+# ------------------------------------------------------------------------------------------
+# v6.2: model/tokenizer identity must be read from the REAL analysis.analyze.
+# build_identity_block shape (identity.model.{model_id,revision,tokenizer_id,
+# tokenizer_revision}) -- not the unrelated identity.declared block (target_id/task_id/
+# suite_id only). A mismatch here crashes report rendering under Jinja's StrictUndefined on
+# any real analysis document, since tests/fixtures/stage3/expected_analysis_v3.json's
+# identity shape does not match analyze.build_identity_block's real output and must never be
+# trusted as a stand-in for it when adding new identity-reading template code.
+# ------------------------------------------------------------------------------------------
+
+
+def test_v3_model_identity_template_reads_the_real_build_identity_block_shape():
+    from analysis import analyze as analysis_mod
+    block = analysis_mod.build_identity_block(
+        {"target_id": "emotion_v1", "task_id": "emotion_7", "suite_id": "core",
+         "model": {"model_id": "m", "revision": "r",
+                   "tokenizer_id": "t", "tokenizer_revision": "tr"}},
+        None,
+    )
+    # This is exactly the path report/template_v3.html reads: identity.model.*, a sibling
+    # of "declared", never nested inside it.
+    assert block["model"] == {"model_id": "m", "revision": "r",
+                               "tokenizer_id": "t", "tokenizer_revision": "tr"}
+    assert "model_id" not in block["declared"]
+    assert "revision" not in block["declared"]
+
+
+def test_v3_report_shows_model_and_tokenizer_revision_from_real_identity_shape():
+    payload = _stage3_document()
+    target_summary = payload["evaluations"][0]["summaries"]["emotion_v1"]
+    target_summary["identity"]["model"] = {
+        "model_id": "j-hartmann/emotion-english-distilroberta-base",
+        "revision": "0e1cd914e3d46199ed785853e12b57304e04178b",
+        "tokenizer_id": "j-hartmann/emotion-english-distilroberta-base",
+        "tokenizer_revision": "0e1cd914e3d46199ed785853e12b57304e04178b",
+    }
+    html = report.render_html(payload, source_sha256="9" * 64, include_pdf=False)
+    assert "0e1cd914e3d46199ed785853e12b57304e04178b" in html
+    assert "j-hartmann/emotion-english-distilroberta-base" in html
+
+
+def test_v3_report_renders_without_crashing_when_identity_model_block_is_absent():
+    # The shared test fixture's identity shape has no "model" key at all -- this must
+    # render gracefully under StrictUndefined, never crash.
+    payload = _stage3_document()
+    assert "model" not in payload["evaluations"][0]["summaries"]["emotion_v1"]["identity"]
+    html = report.render_html(payload, source_sha256="a" * 64, include_pdf=False)
+    assert "<html" in html.lower()
+
+
+# ------------------------------------------------------------------------------------------
+# v6.2: paired common-eligible-denominator and single-target "not applicable" wording
+# ------------------------------------------------------------------------------------------
+
+
+def test_v3_paired_denominator_is_the_matched_intersection_not_either_side_alone():
+    payload = _stage3_document()
+    paired = next(e for e in payload["evaluations"] if e["kind"] == "paired")
+    comparison = paired["comparison"]
+    v1_denominator = paired["summaries"][paired["targets"][0]]["drift"]["eligible_comparisons"]
+    v2_denominator = paired["summaries"][paired["targets"][1]]["drift"]["eligible_comparisons"]
+    # Sanity: the fixture's per-target denominators actually differ from the common one, so
+    # this test cannot pass by accident if the template were showing either side alone.
+    assert comparison["common_denominator"] not in (0,)
+    html = report.render_html(payload, source_sha256="4" * 64, include_pdf=False)
+    assert f"Common eligible denominator: <strong>{comparison['common_denominator']}</strong>" in html
+    # The two per-target denominators, if different from the common one, must not appear
+    # mislabeled as *the* common eligible denominator.
+    if v1_denominator != comparison["common_denominator"]:
+        assert f"Common eligible denominator: <strong>{v1_denominator}</strong>" not in html
+    if v2_denominator != comparison["common_denominator"]:
+        assert f"Common eligible denominator: <strong>{v2_denominator}</strong>" not in html
+
+
+def test_v3_paired_comparison_withheld_shows_explicit_reason_not_bare_not_recorded():
+    payload = _stage3_document()
+    paired = next(e for e in payload["evaluations"] if e["kind"] == "paired")
+    paired["comparison"] = {"comparison_withheld_reason": "manifests differed between targets"}
+    html = report.render_html(payload, source_sha256="5" * 64, include_pdf=False)
+    section = html[html.index(paired["evaluation_id"]):]
+    section = section[:section.index("</section>")]
+    assert "manifests differed between targets" in section
+    assert "Common eligible denominator: <strong>Not recorded" not in section
+
+
+def test_v3_single_target_sentiment_shows_not_applicable_language_not_bare_not_recorded():
+    payload = _stage3_document()
+    single = next(e for e in payload["evaluations"] if e["kind"] == "single")
+    assert single["comparison"] is None
+    html = report.render_html(payload, source_sha256="6" * 64, include_pdf=False)
+    section = html[html.index(f'id="evaluation-{payload["evaluations"].index(single) + 1}"'):]
+    section = section[:section.index("</section>")]
+    assert "Single-target evaluation" in section
+    assert "No hardening comparison is available or implied" in section
+    assert "Common eligible denominator" not in section
+    assert "Not recorded" not in section
+
+
+def test_v3_single_target_sentiment_contains_no_v2_or_hardening_claims():
+    # v6.2 requirement 4: a sentiment (single-target) evaluation block must never *affirm* a
+    # V2/hardened counterpart exists, was tested, or that mitigation was measured. (A negated
+    # mention -- "no V1/V2 pair exists for this evaluation" -- is the correct, honest wording
+    # and is deliberately not in this forbidden list.)
+    payload = _stage3_document()
+    single = next(e for e in payload["evaluations"] if e["kind"] == "single")
+    idx = payload["evaluations"].index(single) + 1
+    html = report.render_html(payload, source_sha256="7" * 64, include_pdf=False)
+    section = html[html.index(f'id="evaluation-{idx}"'):]
+    section = section[:section.index("</section>")]
+    for forbidden in (
+        "sentiment_v2", "hardened endpoint", "Mitigated by V2",
+        "Persisting after hardening", "V2 — Hardened Endpoint", "Two endpoint configurations",
+    ):
+        assert forbidden.lower() not in section.lower()
+    # "mitigation"/"improvement" may appear only inside the honest negation already asserted
+    # by test_v3_single_target_sentiment_shows_not_applicable_language_not_bare_not_recorded;
+    # here, confirm no *positive* mitigation percentage or rate is rendered for this target.
+    assert "flip_rate_on_common" not in section
+    assert "Common eligible denominator" not in section
+
+
+def test_v3_report_has_no_limitations_section():
+    # V6.5 requirement 4: live-demo result reports (schema v3, both emotion and sentiment)
+    # no longer render a "Limitations" heading/section at all -- the analysis layer's
+    # `limitations` field (a frozen per-summary/per-report contract field analysis still
+    # writes; see the parametrized field-presence test above) is simply not rendered here
+    # any more. The facts a reader actually needs to interpret the evidence (single-target
+    # identity, no-V2/no-hardening-claim wording, OCES provenance) live in the sections
+    # that already carry them -- see the sibling v3_single_target_* tests.
+    payload = _stage3_document()
+    html = report.render_html(payload, source_sha256="8" * 64, include_pdf=False)
+    assert 'id="limitations"' not in html
+    assert "Known Limitations" not in html
+    assert "<h2>Limitations</h2>" not in html
+
+    sentiment_only = {
+        "schema_version": 3, "contracts_version": "3.0.0",
+        "run_identity": dict(payload["run_identity"]),
+        "evaluations": [next(e for e in payload["evaluations"] if e["kind"] == "single")],
+        "limitations": ["Single-target observations only."],
+    }
+    single_html = report.render_html(sentiment_only, source_sha256="9" * 64, include_pdf=False)
+    assert 'id="limitations"' not in single_html
+    assert "<h2>Limitations</h2>" not in single_html

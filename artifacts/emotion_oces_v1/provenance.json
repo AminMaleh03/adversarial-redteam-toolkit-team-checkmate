@@ -1,0 +1,82 @@
+{
+  "analysis.json": {
+    "bytes": 78331,
+    "path": "emotion_oces_v1/analysis/analysis.json",
+    "sha256": "cb6d9c3531d60b05a628ff2a5ca65ba5f74b203a4d4cd1990f484e265db55e57"
+  },
+  "emotion_v1/coverage_map.json": {
+    "bytes": 22316,
+    "path": "emotion_oces_v1/run/emotion_v1/coverage_map.json",
+    "sha256": "93f706e64d5b46da89f91cbf7a33bb8bcf32e27149a4dbbffe0d62f489a8a90c"
+  },
+  "emotion_v1/manifest.json": {
+    "bytes": 70224,
+    "path": "emotion_oces_v1/run/emotion_v1/manifest.json",
+    "sha256": "c156816529964fc51829a9a91e00298c20599fd9dcddffbe8450b10a7e1533b1"
+  },
+  "emotion_v1/results.jsonl": {
+    "bytes": 64808,
+    "path": "emotion_oces_v1/run/emotion_v1/results.jsonl",
+    "sha256": "70c06d99b6a80bfd8d4e15619b054482d9c7cc754259be1a26e6015a62f6b81c"
+  },
+  "emotion_v1/run_meta.json": {
+    "bytes": 12578,
+    "path": "emotion_oces_v1/run/emotion_v1/run_meta.json",
+    "sha256": "c41804e915dddf2f03ebb3f4803560603c25c3f326f6010ab11ea4bad5da8162"
+  },
+  "emotion_v2/coverage_map.json": {
+    "bytes": 22316,
+    "path": "emotion_oces_v1/run/emotion_v2/coverage_map.json",
+    "sha256": "93f706e64d5b46da89f91cbf7a33bb8bcf32e27149a4dbbffe0d62f489a8a90c"
+  },
+  "emotion_v2/manifest.json": {
+    "bytes": 70224,
+    "path": "emotion_oces_v1/run/emotion_v2/manifest.json",
+    "sha256": "c156816529964fc51829a9a91e00298c20599fd9dcddffbe8450b10a7e1533b1"
+  },
+  "emotion_v2/results.jsonl": {
+    "bytes": 64810,
+    "path": "emotion_oces_v1/run/emotion_v2/results.jsonl",
+    "sha256": "bf14b906eb4e51f954fe2cd80127b5cdd6d452781743085bc40706184965b017"
+  },
+  "emotion_v2/run_meta.json": {
+    "bytes": 12578,
+    "path": "emotion_oces_v1/run/emotion_v2/run_meta.json",
+    "sha256": "19b4f4eee55bf225602d9fc46f3e50dc7af81be0382fee482473442f3da26892"
+  },
+  "export_meta.json": {
+    "bytes": 338,
+    "path": "emotion_oces_v1/analysis/export_meta.json",
+    "sha256": "06cb847337e169af5529fa9a96ca969c2a6c8a576c2ba3c577fd04881f7aa80d"
+  },
+  "oces_freeze_content_hashes.json": {
+    "bytes": 1020,
+    "path": "emotion_oces_v1/run/oces_freeze_content_hashes.json",
+    "sha256": "f39fd296a49e3f02076a2b50b6496b1934d9ed693be3c52fd2adddc8ab695f09"
+  },
+  "registry.json": {
+    "bytes": 5840,
+    "path": "emotion_oces_v1/run/registry.json",
+    "sha256": "3212f30cde643ba6e53e8ef514ecce870f212b1a88bfa208876136cc9b8a0136"
+  },
+  "report.html": {
+    "bytes": 273596,
+    "path": "emotion_oces_v1/analysis/report.html",
+    "sha256": "f3f9ef96e82a6231e1ccd04afbc45ecd71b3c732287129210d14dead64a61b5f"
+  },
+  "run.json": {
+    "bytes": 1545,
+    "path": "emotion_oces_v1/run/run.json",
+    "sha256": "ea7ffbd51ef078f94917fa2a119df42eeeaa8504d7968c30a8071bfef745eb5b"
+  },
+  "source/emotion_seeds.json": {
+    "bytes": 4403,
+    "path": "emotion_oces_v1/source/emotion_seeds.json",
+    "sha256": "d5cc6011848ad5800fdfbb2b006a2cc77e7f8de0bd0d6cef3e5d012565951af3"
+  },
+  "verification_case_set.json": {
+    "bytes": 5148,
+    "path": "emotion_oces_v1/run/verification_case_set.json",
+    "sha256": "5bbdeaa87dc20b97f2be733080ec826b98c5f75819cc45dc3af5ca2165e1b02b"
+  }
+}

@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+  <meta name="description" content="Team Checkmate target-aware adversarial evaluation report.">
+  <title>Technical Report | Red Lab</title>
+  <style>{{ css|safe }}</style>
+</head>
+<body class="has-back">
+<a class="skip-link" href="#report-main">Skip to report content</a>
+<header class="masthead">
+  <a class="rl-back-btn" href="/" aria-label="Back" title="Back">&larr;</a>
+  <div class="masthead-inner">
+    <a class="brand" href="#overview"><img src="{{ logo_data_uri }}" alt="{{ creator_name }}" class="brand-logo"><span class="brand-text"><span class="brand-creator">{{ creator_name }}</span><span class="brand-product">{{ product_version_label }}</span></span></a>
+    <div class="downloads"><a class="home-link" href="/">Back to Red Lab</a><a href="analysis.json" target="_blank" rel="noopener">Source JSON</a>{% if include_pdf and mode == 'full' %}<a class="button" href="report.pdf" download>Download PDF <span aria-hidden="true">&darr;</span></a>{% endif %}</div>
+  </div>
+</header>
+
+<main id="report-main" class="v3-report">
+  <section class="hero" id="overview">
+    <p class="eyebrow">TARGET-AWARE EVIDENCE REPORT &middot; SCHEMA V3</p>
+    <h1 class="page-title">Adversarial evaluation</h1>
+    <p class="deck">Independent results for each configured text-classification target. Comparisons appear only where the recorded identities and evidence support one.</p>
+    <div class="panel v3-identity">
+      <p><strong>Run</strong> {{ data.run_identity.get('run_name') or data.run_identity.get('run_id') or 'Not recorded' }}</p>
+      <p><strong>Run ID</strong> <code>{{ data.run_identity.get('run_id') or 'Not recorded' }}</code></p>
+      {% set app_commit = data.run_identity.get('app_commit') or data.run_identity.get('code_provenance', {}).get('app_commit') %}
+      <p><strong>Application commit</strong> <code>{{ app_commit or 'Not recorded' }}</code>{% if not app_commit %} &mdash; {{ data.run_identity.get('app_commit_unavailable_reason') or 'no provenance reason was recorded for this run' }}{% endif %}</p>
+      <p><strong>Contracts</strong> {{ data.contracts_version }}</p>
+    </div>
+  </section>
+
+  {% for evaluation in data.evaluations %}
+  <section class="report-section v3-evaluation" id="evaluation-{{ loop.index }}">
+    <div class="section-heading v3-eval-heading">
+      <p class="eyebrow">{{ evaluation.suite_id|upper }} &middot; {{ evaluation.kind|upper }}</p>
+      <h2>{{ evaluation.evaluation_id }}</h2>
+      <p class="v3-eval-detail">{{ evaluation.task_id }} &middot; {{ evaluation.targets|join(', ') }}</p>
+    </div>
+
+    {% if evaluation.kind == 'single' %}
+    <div class="notice v3-single-note"><strong>Single-target evaluation.</strong> This is a single-target evaluation of {{ evaluation.targets|join(', ') }}; results below are observations for the pinned target only. No hardening comparison is available or implied, no V1/V2 pair exists for this evaluation, and no improvement percentage is reported. Any remediation must be based only on this single-target evidence.</div>
+    {% else %}
+    <div class="panel v3-comparison">
+      <h3>Paired comparison</h3>
+      {% set comparison = evaluation.comparison %}
+      {% if comparison.get('comparison_withheld_reason') %}
+      <p><strong>Withheld:</strong> {{ comparison.comparison_withheld_reason }}</p>
+      {% else %}
+      <p>Common eligible denominator: <strong>{{ comparison.get('common_denominator', 'Not recorded') }}</strong></p>
+      {% if comparison.get('flip_rate_on_common') %}
+      <dl class="v3-rate-grid">{% for target_id, value in comparison.flip_rate_on_common.items() %}<div><dt>{{ target_id }}</dt><dd>{{ value|rate_object }}</dd></div>{% endfor %}</dl>
+      {% endif %}
+      <p class="caption">{{ comparison.get('note', 'Paired results use only recorded comparable evidence.') }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if evaluation.coverage %}
+    <div class="panel v3-coverage">
+      <h3>Intended control coverage</h3>
+      {% if evaluation.coverage.get('interpretation') %}
+      {% for note in evaluation.coverage.interpretation.values() %}<p>{{ note }}</p>{% endfor %}
+      {% else %}
+      {% for note in evaluation.coverage.get('notes', []) %}<p>{{ note }}</p>{% endfor %}
+      {% endif %}
+      {% if evaluation.coverage.get('totals') %}<p>Selected {{ evaluation.coverage.totals.selected }} of {{ evaluation.coverage.totals.planned }} planned attacks; {{ evaluation.coverage.totals.not_executed }} not executed.</p>{% endif %}
+      {% if evaluation.coverage.get('by_target') %}
+      {% for coverage_target, target_coverage in evaluation.coverage.by_target.items() %}
+      <h4>{{ coverage_target }}</h4>
+      <p>Selected {{ target_coverage.totals.selected }} of {{ target_coverage.totals.planned }} planned attacks; {{ target_coverage.totals.not_executed }} not executed.</p>
+      <div class="v3-card-grid">{% for class_name, class_data in target_coverage.classes.items() %}<article class="v3-mini-card"><h4>{{ class_name|replace('_', ' ')|title }}</h4><p>{{ class_data.completed }}/{{ class_data.selected }} selected completed; {{ class_data.planned }} planned.</p><p>Failure rate: {{ class_data.failure_rate|rate_object }}</p></article>{% endfor %}</div>
+      {% endfor %}
+      {% endif %}
+      <div class="v3-card-grid">
+      {% for class_name, class_data in evaluation.coverage.get('classes', {}).items() %}
+        <article class="v3-mini-card"><h4>{{ class_name|replace('_', ' ')|title }}</h4>
+          {% if class_data.get('planned') is not none %}<p>{{ class_data.get('completed', 0) }}/{{ class_data.get('selected', 0) }} selected completed; {{ class_data.get('planned', 0) }} planned.</p>{% endif %}
+          {% if class_data.get('failure_rate') %}<p>Failure rate: {{ class_data.failure_rate|rate_object }}</p>{% endif %}
+          {% if class_data.get('controls_targeted') %}<p>Controls: {{ class_data.controls_targeted|join(', ') }}</p>{% endif %}
+        </article>
+      {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% for target_id in evaluation.targets %}
+    {% set summary = evaluation.summaries[target_id] %}
+    <article class="panel endpoint-card v3-target{% if evaluation.kind != 'single' %} {{ summary.version }}{% endif %}" id="target-{{ loop.index }}-{{ target_id }}">
+      <p class="eyebrow">{{ target_id }} &middot; {{ summary.version|upper }}</p>
+      <h3>{{ target_id|replace('_', ' ')|title }}</h3>
+      {% set model_ident = summary.get('identity', {}).get('model') %}
+      {% if model_ident %}
+      <p class="v3-model-identity">Model <code>{{ model_ident.get('model_id', 'not recorded') }}</code>@<code>{{ model_ident.get('revision', 'not recorded') }}</code> &middot; Tokenizer <code>{{ model_ident.get('tokenizer_id', 'not recorded') }}</code>@<code>{{ model_ident.get('tokenizer_revision', 'not recorded') }}</code> <span class="caption">({{ summary.get('identity', {}).get('provenance', 'provenance not recorded') }})</span></p>
+      {% endif %}
+      <p>{{ summary.coverage.completed }}/{{ summary.coverage.planned }} requests completed ({{ summary.coverage.coverage_rate|percent }}).</p>
+      <div class="v3-card-grid">
+      {% for family, stats in summary.category_stats.items() %}
+        <div class="v3-mini-card"><h4>{{ family|replace('_', ' ')|title }}</h4>
+          {% if stats.get('failed') is not none %}<p>{{ stats.failed }}/{{ stats.eligible }} eligible failures &middot; {{ stats.failure_rate|percent }}</p>
+          {% else %}<p>{{ stats.get('failures', 0) }} failures across {{ stats.get('completed', 0) }} completed of {{ stats.get('planned', 0) }} planned.</p>{% endif %}
+        </div>
+      {% endfor %}
+      </div>
+      <h4>Operational observations</h4>
+      <dl class="v3-rate-grid">{% for key, value in summary.operational.items() if value is number %}<div><dt>{{ key|replace('_', ' ') }}</dt><dd>{{ value }}</dd></div>{% endfor %}</dl>
+      <h4>Prediction consistency</h4>
+      <p>{{ summary.drift.qualifying_flips }} qualifying flips from {{ summary.drift.eligible_comparisons }} eligible comparisons ({% if summary.drift.flip_rate is mapping %}{{ summary.drift.flip_rate|rate_object }}{% else %}{{ summary.drift.flip_rate|percent }}{% endif %}).</p>
+
+      <h4>Findings</h4>
+      {% if not summary.findings %}<p>No scored finding groups were recorded for this target.</p>{% endif %}
+      {% for entry in summary.findings %}
+      <section class="finding v3-finding" id="finding-{{ evaluation.evaluation_id|replace('.', '-') }}-{{ target_id }}-{{ loop.index }}">
+        <p class="eyebrow">{{ entry.finding.severity_tier }} &middot; {{ entry.failure_mode }}</p>
+        <h5>{{ entry.finding.title }}</h5>
+        <p>{{ entry.finding.description }}</p>
+        <dl class="v3-remediation">
+          <dt>Observed evidence</dt><dd>{{ entry.remediation_detail.observed }}</dd>
+          <dt>Why it matters</dt><dd>{{ entry.remediation_detail.significance }}</dd>
+          <dt>Diagnosis confidence</dt><dd>{{ entry.remediation_detail.diagnosis_confidence }}</dd>
+          <dt>Fix</dt><dd>{{ entry.remediation_detail.fix }}</dd>
+          <dt>Verification</dt><dd><code>{{ entry.remediation_detail.verification.command }}</code><br>{{ entry.remediation_detail.verification.expected }}</dd>
+        </dl>
+        {% if entry.remediation_detail.unavailable_evidence %}<p><strong>Unavailable evidence:</strong> {{ entry.remediation_detail.unavailable_evidence|join(' ') }}</p>{% endif %}
+        <details class="evidence"><summary>Evidence cases &middot; {{ entry.finding.evidence|length }}</summary><div class="id-list">{% for case_id in entry.finding.evidence %}<code>{{ case_id }}</code>{% endfor %}</div></details>
+      </section>
+      {% endfor %}
+    </article>
+    {% endfor %}
+
+    {% if evaluation.oces %}
+    <div class="panel v3-oces">
+      <h3>Additional evaluation</h3>
+      <p><strong>{{ evaluation.oces.get('author_exposure') or evaluation.oces.get('exposure_statement') }}</strong></p>
+      <p>{{ evaluation.oces.get('separation_note') or evaluation.oces.get('note') }}</p>
+      {% set oces_targets = evaluation.oces.get('summaries') or evaluation.oces.get('by_target', {}) %}
+      <div class="v3-card-grid">{% for target_id, result in oces_targets.items() %}<article class="v3-mini-card"><h4>{{ target_id }}</h4>{% if result.get('violation_rate') %}<p>Violation rate: {{ result.violation_rate|rate_object }}</p>{% endif %}{% if result.get('statuses') %}<p>{{ result.statuses.get('excluded', 0) }} excluded &middot; {{ result.statuses.get('unevaluable', 0) }} unevaluable &middot; {{ result.statuses.get('not_executed', 0) }} not executed.</p>{% endif %}</article>{% endfor %}</div>
+      {% if evaluation.oces.get('freeze') %}<p class="caption">Freeze: <code>{{ evaluation.oces.freeze.get('defense_sha256', 'Not recorded') }}</code> &middot; {{ evaluation.oces.freeze.get('note', '') }}</p>{% endif %}
+    </div>
+    {% endif %}
+  </section>
+  {% endfor %}
+</main>
+<footer class="site-footer"><p>{{ creator_name }} &mdash; {{ product_name }}, {{ product_tagline }}</p><p>Source SHA-256 <code>{{ source_sha256 }}</code></p></footer>
+</body>
+</html>

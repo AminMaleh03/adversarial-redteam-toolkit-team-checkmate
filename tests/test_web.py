@@ -64,7 +64,21 @@ def test_index_returns_branded_welcome_page(client):
 
 def test_home_shows_red_lab_version_label(client):
     body = client.get("/").text
-    assert "Red Lab v5.0" in body
+    assert "Red Lab v7" in body
+
+
+def test_active_pages_use_centralized_version_source_not_a_hardcoded_string(client):
+    # v6.1: home, lab and generated report pages must all read the same PRODUCT_VERSION_LABEL
+    # constant rather than each carrying its own copy of the string.
+    from report.generate import PRODUCT_VERSION_LABEL
+    assert PRODUCT_VERSION_LABEL == "Red Lab v7"
+    home_body = client.get("/").text
+    lab_body = client.get("/lab").text
+    assert PRODUCT_VERSION_LABEL in home_body
+    assert PRODUCT_VERSION_LABEL in lab_body
+    # The archived, byte-frozen v5 report must not be affected by the active version bump.
+    assert "Red Lab v5.0" not in home_body
+    assert "Red Lab v5.0" not in lab_body
 
 
 def test_home_navigation_has_required_links(client):
@@ -79,11 +93,13 @@ def test_home_navigation_has_required_links(client):
 def test_home_technical_report_link_preserves_page_history(client):
     body = client.get("/").text
     if "Technical Report" not in body:
-        pytest.skip("verified_full_report artifact not present in this checkout")
+        pytest.skip("technical_report artifact not present in this checkout")
     idx = body.index("Technical Report")
     tag = body[body.rindex("<a", 0, idx):idx]
     assert 'target="_blank"' not in tag
-    assert 'href="/verified-full/report.html"' in tag
+    # V6.3: the "Technical Report" nav link now points at the new master report route,
+    # not the archived /verified-full/ historical benchmark (still linked from within it).
+    assert 'href="/technical-report/"' in tag
 
 
 def test_home_has_mobile_menu_toggle_markup(client):
@@ -98,6 +114,77 @@ def test_home_hero_has_secondary_cta_to_technical_report_when_available(client):
     if "View Technical Report" not in body:
         pytest.skip("verified_full_report artifact not present in this checkout")
     assert 'id="run"' in body
+
+
+def test_home_three_primary_actions_share_one_actions_row(client):
+    """V6.5: Run Live Demo, Try Your Own Input and View Technical Report are three
+    .hero-path children of the same #run actions row (not a separate button glued on
+    below), so they can lay out as one row on desktop and step down together."""
+    body = client.get("/").text
+    if "View Technical Report" not in body:
+        pytest.skip("verified_full_report artifact not present in this checkout")
+    row = body[body.index('id="run"'): body.index("</div>", body.index("View Technical Report"))]
+    assert row.count("hero-path") >= 3
+    assert "Run Live Demo" in row and "Try Your Own Input" in row and "View Technical Report" in row
+
+
+def test_home_hero_statement_rotates_among_multiple_accurate_messages(client):
+    """V6.5: the hero statement is a small rotator with >= 3 lines, one active by default,
+    distinguishing paired emotion, standalone sentiment and the release-candidate framing
+    -- never suggesting a sentiment_v2 or a sentiment hardening comparison."""
+    body = client.get("/").text
+    section = body[body.index('id="hero-statement"'): body.index("</div>", body.index('id="hero-statement"'))]
+    lines = section.count("hero-statement-line")
+    assert lines >= 3
+    assert section.count("is-active") == 1
+    assert "sentiment_v2" not in section.lower()
+    assert "challenge the standalone sentiment classifier" in section.lower()
+
+    js = client.get("/static/app.js").text
+    assert "hero-statement-line" in js
+    assert "prefers-reduced-motion: reduce" in js
+
+
+def test_home_hero_control_badges_switch_with_evaluation_selection(client):
+    """V6.5: the V1/V2 hardening badges (#hero-control-paired) only ever apply to emotion;
+    sentiment gets its own single-target indicator (#hero-control-single) instead of
+    inheriting a misleading paired-comparison badge row."""
+    body = client.get("/").text
+    assert 'id="hero-control-paired"' in body
+    assert 'id="hero-control-single"' in body
+    single = body[body.index('id="hero-control-single"'): body.index(">", body.index('id="hero-control-single"'))]
+    assert "hidden" in single
+
+    js = client.get("/static/app.js").text
+    assert "heroControlPaired" in js and "heroControlSingle" in js
+
+
+def test_lab_model_picker_is_left_aligned_with_the_rest_of_the_form(client):
+    """V6.5: the shared .model-picker centers itself for the Home hero's centered
+    composition -- on /lab, which is left-aligned, that made the selector look like a
+    disconnected, centered island. A scoped override removes the centering there."""
+    css = client.get("/static/app.css").text
+    assert ".lab-editor .model-picker" in css
+    picker_rule = css[css.index(".lab-editor .model-picker"):]
+    picker_rule = picker_rule[:picker_rule.index("}") + 1]
+    assert "margin: 0 auto" not in picker_rule
+
+
+def test_lab_intro_copy_and_badges_switch_for_sentiment_selection(client):
+    """V6.5 requirement 5: emotion may show V1/V2 paired-comparison language; sentiment
+    must show only sentiment_v1 and must not inherit it, in both the intro copy and the
+    hero-control badges."""
+    body = client.get("/lab").text
+    assert 'id="lab-intro-deck"' in body
+    assert 'id="lab-hero-control-paired"' in body
+    assert 'id="lab-hero-control-single"' in body
+    single = body[body.index('id="lab-hero-control-single"'): body.index(">", body.index('id="lab-hero-control-single"'))]
+    assert "hidden" in single
+
+    js = client.get("/static/lab.js").text
+    assert "introDeck" in js
+    assert "heroControlPaired" in js and "heroControlSingle" in js
+    assert "before/after hardening comparison is made or implied" in js
 
 
 # ------------------------------------------------------------------------------------------
@@ -122,12 +209,26 @@ def test_home_initially_shows_landing_view_only(client):
     assert "hidden" in exec_tag
 
 
-def test_execution_view_uses_real_stage_labels(client):
+def _extract_json_script(body, element_id):
+    start = body.index(f'id="{element_id}"')
+    open_tag_end = body.index(">", start) + 1
+    close = body.index("</script>", open_tag_end)
+    return json.loads(body[open_tag_end:close])
+
+
+def test_execution_view_descriptor_has_real_stage_labels(client):
+    # v6.1 Phase 2: the stage list is generated client-side from demo-descriptors, not
+    # server-rendered <li data-stage> markup -- assert against the embedded descriptor instead.
     body = client.get("/").text
-    exec_section = body[body.index('id="view-execution"'):body.index("</section>", body.index('id="view-execution"'))]
-    for stage in web_app.STAGE_ORDER:
-        assert f'data-stage="{stage}"' in exec_section
-        assert web_app.STAGE_LABELS[stage] in exec_section
+    emotion = _extract_json_script(body, "demo-descriptors")["emotion.core"]
+    assert emotion["kind"] == "paired"
+    labels = {s["id"]: s["label"] for s in emotion["stages"]}
+    assert labels["starting_v1"] == "Starting V1"
+    assert labels["attacking_v1"] == "Attacking unhardened endpoint"
+    assert labels["starting_v2"] == "Starting V2"
+    assert labels["attacking_v2"] == "Testing hardened endpoint"
+    for entry in emotion["stages"]:
+        assert entry["maps_to"] in emotion["stage_order"]
 
 
 def test_execution_view_has_progressbar_accessibility_semantics(client):
@@ -142,10 +243,33 @@ def test_execution_view_has_progressbar_accessibility_semantics(client):
 
 def test_execution_view_has_v1_v2_context_and_same_model_note(client):
     body = client.get("/").text
-    exec_section = body[body.index('id="view-execution"'):body.index("</section>", body.index('id="view-execution"'))]
-    assert "V1" in exec_section and "Unhardened Endpoint" in exec_section
-    assert "V2" in exec_section and "Hardened Endpoint" in exec_section
-    assert "Same underlying AI model" in exec_section
+    emotion = _extract_json_script(body, "demo-descriptors")["emotion.core"]
+    titles = " ".join(c["title"] for c in emotion["cards"])
+    assert "V1" in titles and "Unhardened Endpoint" in titles
+    assert "V2" in titles and "Hardened Endpoint" in titles
+    assert emotion["same_model_note"] == "Two endpoint configurations"
+    assert "Same underlying AI model" in emotion["footer_note"]
+
+
+def test_sentiment_demo_descriptor_is_single_target_with_no_paired_content(client):
+    # v6.1 Phase 2: sentiment.core must render a single configured-target card, no V1/V2
+    # cards, no "Two endpoint configurations", and no hardening-improvement language.
+    body = client.get("/").text
+    sentiment = _extract_json_script(body, "demo-descriptors")["sentiment.core"]
+    assert sentiment["kind"] == "single"
+    assert len(sentiment["cards"]) == 1
+    card = sentiment["cards"][0]
+    assert card["lane"] == "target"
+    assert "Sentiment" in card["title"] and "Configured Target" in card["title"]
+    assert "sentiment_v1" in card["note"]
+    assert sentiment["same_model_note"] is None
+    blob = json.dumps(sentiment)
+    for forbidden in (
+        "V1 — Unhardened Endpoint", "V2 — Hardened Endpoint",
+        "Two endpoint configurations", "Starting V1", "Attacking unhardened endpoint",
+        "Starting V2", "Testing hardened endpoint", "Analyzing differences",
+    ):
+        assert forbidden not in blob
 
 
 def test_execution_view_has_no_fake_cancel_button(client):
@@ -284,6 +408,61 @@ def test_status_starts_idle(client):
     assert resp.json()["status"] == "idle"
 
 
+def test_targets_api_exposes_only_trusted_core_choices(client):
+    body = client.get("/api/targets").json()
+    assert [item["target_id"] for item in body["targets"]] == [
+        "emotion_v1", "emotion_v2", "sentiment_v1",
+    ]
+    assert [item["evaluation_id"] for item in body["evaluations"]] == [
+        "emotion.core", "sentiment.core",
+    ]
+    assert all("url" not in item for item in body["targets"])
+
+
+def test_unknown_target_uses_frozen_422_shape(client):
+    response = client.post("/api/run", json={"target_id": "gpt_v9"})
+    assert response.status_code == 422
+    assert response.json() == {
+        "detail": [{
+            "loc": ["body", "target_id"],
+            "msg": "unknown target_id 'gpt_v9'; configured: ['emotion_v1', 'emotion_v2', 'sentiment_v1']",
+            "type": "value_error.unknown_target",
+        }]
+    }
+
+
+def test_sentiment_demo_carries_identity_and_calls_selected_evaluation(monkeypatch, client, tmp_path):
+    monkeypatch.setattr(run_all, "RESULTS_ROOT", tmp_path)
+    called = {}
+
+    def fake_run_experiment(mode, run_name=None, progress_callback=None, **kwargs):
+        called.update(mode=mode, **kwargs)
+        report = tmp_path / run_name / "report"
+        report.mkdir(parents=True)
+        (report / "report.html").write_text("ok", encoding="utf-8")
+        (report / "analysis.json").write_text("{}", encoding="utf-8")
+        return {"report_html": report / "report.html", "analysis_json": report / "analysis.json"}
+
+    monkeypatch.setattr(run_all, "run_experiment", fake_run_experiment)
+    started = client.post("/api/run", json={"evaluation_id": "sentiment.core"})
+    assert started.status_code == 202
+    body = started.json()
+    assert body["run_id"] and body["evaluation_id"] == "sentiment.core"
+    assert body["target_ids"] == ["sentiment_v1"]
+    final = _wait_until_not_running(client)
+    assert final["state"] == "complete"
+    assert final["report_url"].endswith("/report/report.html")
+    assert called["mode"] == "demo"
+    assert called["evaluation_ids"] == ["sentiment.core"]
+
+
+def test_frontend_discards_stale_run_or_evaluation_status(client):
+    js = client.get("/static/app.js").text
+    assert "state.run_id !== activeRunId" in js
+    assert "state.evaluation_id !== activeEvaluationId" in js
+    assert 'body: JSON.stringify({ evaluation_id: activeEvaluationId, mode: "demo" })' in js
+
+
 def test_start_run_returns_accepted_running_state(monkeypatch, client, tmp_path):
     monkeypatch.setattr(run_all, "RESULTS_ROOT", tmp_path)
     release = threading.Event()
@@ -307,7 +486,7 @@ def test_start_run_returns_accepted_running_state(monkeypatch, client, tmp_path)
         _wait_until_not_running(client)
 
 
-def test_second_start_during_active_run_returns_same_job_not_a_new_one(monkeypatch, client, tmp_path):
+def test_second_start_during_active_run_returns_contract_busy(monkeypatch, client, tmp_path):
     monkeypatch.setattr(run_all, "RESULTS_ROOT", tmp_path)
     release = threading.Event()
     calls = []
@@ -323,8 +502,10 @@ def test_second_start_during_active_run_returns_same_job_not_a_new_one(monkeypat
     monkeypatch.setattr(run_all, "run_experiment", fake_run_experiment)
     try:
         first = client.post("/api/run").json()
-        second = client.post("/api/run").json()
-        assert first["run_name"] == second["run_name"]
+        second_response = client.post("/api/run")
+        second = second_response.json()
+        assert second_response.status_code == 409
+        assert second == {"detail": "A run is already in progress.", "run_id": first["run_id"]}
         assert len(calls) == 1  # never a second run_experiment() call while one is active
     finally:
         release.set()
@@ -352,7 +533,36 @@ def test_status_reflects_real_progress_callback_stages(monkeypatch, client, tmp_
         time.sleep(0.02)
         state = client.get("/api/status").json()
     assert state["stage"] == "starting_v1"
-    assert state["stage_index"] == web_app.STAGE_ORDER.index("starting_v1")
+    paired_stage_order = web_app._demo_descriptor("emotion.core", [])["stage_order"]
+    assert state["stage_index"] == paired_stage_order.index("starting_v1")
+    release.set()
+    _wait_until_not_running(client)
+
+
+def test_sentiment_status_uses_single_target_stage_alias_not_paired(monkeypatch, client, tmp_path):
+    # v6.1 Phase 2: the raw orchestration stage for a single-target run ("starting_sentiment_v1")
+    # must resolve into the single-target descriptor's own stage id, never the paired "starting_v1".
+    monkeypatch.setattr(run_all, "RESULTS_ROOT", tmp_path)
+    release = threading.Event()
+
+    def fake_run_experiment(mode, run_name=None, progress_callback=None, **_):
+        progress_callback("starting_sentiment_v1", "Starting sentiment endpoint")
+        release.wait(timeout=5)
+        report_html = tmp_path / run_name / "report" / "report.html"
+        report_html.parent.mkdir(parents=True)
+        report_html.write_text("<html></html>", encoding="utf-8")
+        return {"report_html": report_html}
+
+    monkeypatch.setattr(run_all, "run_experiment", fake_run_experiment)
+    client.post("/api/run", json={"evaluation_id": "sentiment.core"})
+    deadline = time.monotonic() + 2.0
+    state = client.get("/api/status").json()
+    while state.get("stage") != "starting_target" and time.monotonic() < deadline:
+        time.sleep(0.02)
+        state = client.get("/api/status").json()
+    assert state["stage"] == "starting_target"
+    single_stage_order = web_app._demo_descriptor("sentiment.core", ["sentiment_v1"])["stage_order"]
+    assert state["stage_index"] == single_stage_order.index("starting_target")
     release.set()
     _wait_until_not_running(client)
 
@@ -487,7 +697,7 @@ def test_new_run_allowed_after_previous_job_completes(monkeypatch, client, tmp_p
 def test_home_page_has_landing_background_canvas_and_particles_script(client):
     body = client.get("/").text
     assert 'id="rl-bg-canvas"' in body
-    assert '<script src="/static/particles.js">' in body
+    assert re.search(r'<script src="/static/particles\.js\?v=[0-9a-f]+">', body)
     # The canvas lives inside #view-home only -- never inside the execution view.
     home_section = body[body.index('id="view-home"'):body.index('id="view-execution"')]
     assert 'id="rl-bg-canvas"' in home_section
@@ -536,9 +746,12 @@ def test_app_css_rl_back_btn_is_circular_and_focus_visible():
 
 
 def test_version_card_v1_v2_are_distinguished_by_text_and_color_not_color_alone():
-    body_text = (ROOT / "web" / "templates" / "index.html").read_text(encoding="utf-8")
-    assert "Unhardened Endpoint" in body_text
-    assert "Hardened Endpoint" in body_text
+    # v6.1 Phase 2: the V1/V2 card titles now come from the paired descriptor (web/app.py),
+    # not static template text -- the template only carries an empty skeleton container.
+    emotion = web_app._demo_descriptor("emotion.core", ["emotion_v1", "emotion_v2"])
+    titles = " ".join(c["title"] for c in emotion["cards"])
+    assert "Unhardened Endpoint" in titles
+    assert "Hardened Endpoint" in titles
     css = (ROOT / "web" / "static" / "app.css").read_text(encoding="utf-8")
     assert ".version-card.v1 { border-left-color: var(--rl-danger)" in css
     assert ".version-card.v2 { border-left-color: var(--rl-success)" in css
@@ -559,3 +772,106 @@ def test_verified_full_served_bytes_match_recorded_evidence_hashes(client):
         resp = client.get(f"/verified-full/{name}")
         assert resp.status_code == 200
         assert hashlib.sha256(resp.content).hexdigest() == recorded[name], name
+
+
+# ------------------------------------------------------------------------------------------
+# V6.3: the /technical-report/ master report route.
+# ------------------------------------------------------------------------------------------
+
+def test_technical_report_route_serves_master_report(client):
+    if not run_all.TECHNICAL_REPORT_DIR.exists():
+        pytest.skip("technical_report artifact not present in this checkout")
+    resp = client.get("/technical-report/")
+    assert resp.status_code == 200
+    assert "Red Lab v7" in resp.text
+    assert "MASTER TECHNICAL REPORT" in resp.text
+
+
+def test_technical_report_route_serves_downloadable_pdf(client):
+    """V6.4: the master report (only) now has a Download PDF link, served from disk."""
+    pdf_path = run_all.TECHNICAL_REPORT_DIR / "report.pdf"
+    if not pdf_path.exists():
+        pytest.skip("technical_report PDF not present in this checkout")
+    body = client.get("/technical-report/").text
+    assert 'href="report.pdf"' in body
+    assert "Download PDF" in body
+    resp = client.get("/technical-report/report.pdf")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/pdf"
+    assert resp.content[:5] == b"%PDF-"
+
+
+def test_live_demo_reports_still_have_no_pdf_button(client):
+    """The V6.4 master-report PDF button must never leak into live/demo report rendering.
+
+    demo_template.html/template_v3.html's own PDF-suppression logic is exercised directly
+    in tests/test_report.py; this is a narrow regression check that the master template's
+    new PDF link lives only in its own file, never shared with the demo templates.
+    """
+    master_template = (Path(__file__).resolve().parents[1] / "report" / "master_template.html").read_text(encoding="utf-8")
+    demo_template = (Path(__file__).resolve().parents[1] / "report" / "demo_template.html").read_text(encoding="utf-8")
+    v3_template = (Path(__file__).resolve().parents[1] / "report" / "template_v3.html").read_text(encoding="utf-8")
+    assert "report.pdf" in master_template
+    assert "report.pdf" not in demo_template
+    assert "{% if include_pdf and mode == 'full' %}" in v3_template
+
+
+def test_technical_report_verified_full_bytes_unmodified(client):
+    """Adding the master report route must never touch the archived V5 artifact."""
+    meta_path = run_all.VERIFIED_FULL_REPORT_DIR / "export_meta.json"
+    if not meta_path.exists() or not run_all.TECHNICAL_REPORT_DIR.exists():
+        pytest.skip("required artifacts not present in this checkout")
+    recorded = json.loads(meta_path.read_text(encoding="utf-8"))["files"]
+    for name in ("analysis.json", "report.html", "report.pdf"):
+        resp = client.get(f"/verified-full/{name}")
+        assert resp.status_code == 200
+        assert hashlib.sha256(resp.content).hexdigest() == recorded[name], name
+    verified_body = client.get("/verified-full/report.html").text
+    assert "Red Lab v5.0" in verified_body
+
+
+# ------------------------------------------------------------------------------------------
+# Static asset cache busting.
+#
+# The v7 deploy shipped correct dark CSS that visitors did not see: the templates linked
+# "/static/app.css" with no version and the platform sends no Cache-Control, so browsers
+# reused the previous release's stylesheet and rendered v7 markup in the superseded V5.5
+# light palette. The generated reports were unaffected because their CSS is inline, which
+# made it look like a partial deployment rather than a cache.
+# ------------------------------------------------------------------------------------------
+
+
+def test_static_assets_are_referenced_with_a_content_version(client):
+    for path in ("/", "/lab"):
+        body = client.get(path).text
+        for match in re.findall(r'(?:href|src)="(/static/[^"]+)"', body):
+            assert "?v=" in match, f"{path} links {match} with no cache-busting version"
+
+
+def test_asset_version_is_the_hash_of_the_file_actually_served(client):
+    url = web_app.asset_url("app.css")
+    name, _, query = url.partition("?")
+    served = client.get(name).content
+    expected = hashlib.sha256(served).hexdigest()[:12]
+    assert query == f"v={expected}"
+
+
+def test_asset_version_changes_when_the_file_changes():
+    before = web_app.asset_url("app.css")
+    original = (Path(web_app.HERE) / "static" / "app.css").read_bytes()
+    target = Path(web_app.HERE) / "static" / "app.css"
+    try:
+        target.write_bytes(original + b"\n/* cache-bust probe */\n")
+        web_app.ASSET_FINGERPRINTS = web_app._asset_fingerprints()
+        assert web_app.asset_url("app.css") != before
+    finally:
+        target.write_bytes(original)
+        web_app.ASSET_FINGERPRINTS = web_app._asset_fingerprints()
+    assert web_app.asset_url("app.css") == before
+
+
+def test_versioned_asset_still_serves_the_real_file(client):
+    url = web_app.asset_url("app.css")
+    r = client.get(url)
+    assert r.status_code == 200
+    assert b"--rl-base" in r.content

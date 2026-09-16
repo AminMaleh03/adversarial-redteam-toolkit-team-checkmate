@@ -10,6 +10,13 @@
 
   var form = document.getElementById("lab-form");
   var textarea = document.getElementById("lab-text");
+  var evaluationSelect = document.getElementById("lab-evaluation");
+  var modelDescription = document.getElementById("lab-model-description");
+  var introDeck = document.getElementById("lab-intro-deck");
+  var heroControlPaired = document.getElementById("lab-hero-control-paired");
+  var heroControlSingle = document.getElementById("lab-hero-control-single");
+  var execModelNote = document.getElementById("lab-exec-model-note");
+  var resultsModelNote = document.getElementById("lab-results-model-note");
   var counter = document.getElementById("lab-counter");
   var errorEl = document.getElementById("lab-error");
   var submitBtn = document.getElementById("lab-submit");
@@ -23,7 +30,33 @@
   var progressBar = document.getElementById("lab-progress-bar");
   var progressFill = document.getElementById("lab-progress-fill");
   var execPercent = document.getElementById("lab-exec-percent");
-  var stageItems = document.querySelectorAll("#lab-stage-list li");
+  var stageListEl = document.getElementById("lab-stage-list");
+  var comparisonLabelEl = document.getElementById("lab-comparison-label");
+  var comparisonNoteEl = document.getElementById("lab-comparison-note");
+  var endpointContextEl = document.getElementById("lab-endpoint-context");
+  var execConfigEl = document.getElementById("lab-exec-config");
+  var evaluationTagEl = document.getElementById("lab-evaluation-tag");
+
+  // v6.1 Phase 3: one descriptor per registry evaluation (emotion.core paired, sentiment.core
+  // single-target) -- the execution/progress DOM is generated from whichever one matches the
+  // job's real evaluation_id, the same rule Phase 2's Live Demo uses, so Lab can never show
+  // paired-only content ("Two endpoint configurations", V1/V2 cards) for a single-target run.
+  var descriptorsEl = document.getElementById("lab-descriptors");
+  var DESCRIPTORS = descriptorsEl ? JSON.parse(descriptorsEl.textContent) : {};
+  var renderedEvaluationId = null;
+
+  function descriptorFor(evaluationId) {
+    return DESCRIPTORS[evaluationId] || DESCRIPTORS["emotion.core"];
+  }
+
+  function renderProgressFor(evaluationId) {
+    renderedEvaluationId = evaluationId;
+    window.rlRenderProgress(descriptorFor(evaluationId), {
+      cardsEl: endpointContextEl, sameModelLabelEl: comparisonLabelEl,
+      sameModelNoteEl: comparisonNoteEl, stageListEl: stageListEl, footerNoteEl: execModelNote,
+      configEl: execConfigEl,
+    });
+  }
 
   var retryBtn = document.getElementById("lab-retry-btn");
   var editBtn = document.getElementById("lab-edit-btn");
@@ -39,6 +72,7 @@
   var generation = 0;
   var launching = false;
   var lastText = "";
+  var lastEvaluationId = "emotion.core";
 
   // ---- view switching -----------------------------------------------------------------
   // navTestAnother (the sticky masthead action) is visible ONLY while viewing results --
@@ -52,6 +86,7 @@
   }
 
   function showExecution() {
+    if (viewExecution) viewExecution.classList.remove("is-failed");
     if (viewInput) viewInput.hidden = true;
     if (viewExecution) viewExecution.hidden = false;
     if (viewResults) viewResults.hidden = true;
@@ -70,6 +105,8 @@
   }
 
   function showFailure(message) {
+    // Real terminal state: stop the loading motion for a run that is no longer in flight.
+    if (viewExecution) viewExecution.classList.add("is-failed");
     if (viewInput) viewInput.hidden = true;
     if (viewExecution) viewExecution.hidden = false;
     if (viewResults) viewResults.hidden = true;
@@ -82,6 +119,7 @@
   }
 
   function showBusy() {
+    if (viewExecution) viewExecution.classList.add("is-failed");
     if (viewInput) viewInput.hidden = true;
     if (viewExecution) viewExecution.hidden = false;
     if (viewResults) viewResults.hidden = true;
@@ -117,10 +155,12 @@
   }
 
   // ---- stage list / progress bar (mirrors app.js's pattern) ----------------------------
-  function setStageClasses(currentIndex) {
-    stageItems.forEach(function (item, index) {
-      item.classList.toggle("done", index < currentIndex);
-      item.classList.toggle("active", index === currentIndex);
+  function setStageClasses(evaluationId, currentIndex) {
+    var descriptor = descriptorFor(evaluationId);
+    stageListEl.querySelectorAll("li").forEach(function (item) {
+      var mappedIndex = descriptor.stage_order.indexOf(item.dataset.stage);
+      item.classList.toggle("done", mappedIndex < currentIndex);
+      item.classList.toggle("active", mappedIndex === currentIndex);
     });
   }
 
@@ -214,12 +254,37 @@
 
   function renderSummary(summary) {
     summaryEl.textContent = "";
+    if (summary.label_flips !== undefined) {
+      var singleRows = [
+        ["Variants tested", summary.variants_tested],
+        ["Label flips (scored)", summary.label_flips],
+        ["Diagnostic label changes", summary.diagnostic_label_changes],
+        ["Safe rejections", summary.safe_rejections],
+        ["Endpoint errors", summary.endpoint_errors]
+      ];
+      var singleList = document.createElement("dl");
+      singleList.className = "lab-summary-list";
+      singleRows.forEach(function (row) {
+        var metric = el("div", "lab-metric");
+        metric.appendChild(el("dt", null, row[0]));
+        metric.appendChild(el("dd", "lab-metric-value", row[1]));
+        singleList.appendChild(metric);
+      });
+      summaryEl.appendChild(singleList);
+      summaryEl.appendChild(el("p", "lab-summary-verdict",
+        "Single-target observations only; no hardening improvement is inferred." +
+        (summary.diagnostic_observations ? " " + summary.diagnostic_observations +
+          " diagnostic (no-fixed-oracle) case(s) are excluded from scored label flips." : "")));
+      return;
+    }
     var rows = [
       ["Variants tested", summary.variants_tested, "variants", "M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z"],
-      ["V1 label flips", summary.v1_flips, "v1", "M4 7h16m-4-4 4 4-4 4 M20 17H4m4-4-4 4 4 4"],
-      ["V2 label flips", summary.v2_flips, "v2", "M4 7h16m-4-4 4 4-4 4 M20 17H4m4-4-4 4 4 4"],
+      ["V1 label flips (scored)", summary.v1_flips, "v1", "M4 7h16m-4-4 4 4-4 4 M20 17H4m4-4-4 4 4 4"],
+      ["V2 label flips (scored)", summary.v2_flips, "v2", "M4 7h16m-4-4 4 4-4 4 M20 17H4m4-4-4 4 4 4"],
+      ["Diagnostic label changes", summary.diagnostic_label_changes, "diagnostic", "M12 2 4 5v6c0 5 4 8 8 11 4-3 8-6 8-11V5z M12 8v5 M12 16v.1"],
       ["Mitigated by V2", summary.mitigated_by_v2, "mitigated", "M12 2 4 5v6c0 5 4 8 8 11 4-3 8-6 8-11V5z M8 12l3 3 5-6"],
       ["Persisting after hardening", summary.persisting_after_hardening, "persisting", "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18 M12 8v5 M12 16v.1"],
+      ["Stable label, distribution shift", summary.stable_label_distribution_shift, "shift", "M4 12h4l3-8 4 16 3-8h4"],
       ["Safe rejections", summary.safe_rejections, "rejections", "M12 2 4 5v6c0 5 4 8 8 11 4-3 8-6 8-11V5z M8 12h8"],
       ["Endpoint errors", summary.endpoint_errors, "errors", "M12 3 2 21h20z M12 9v5 M12 17v.1"],
     ];
@@ -251,7 +316,9 @@
     summaryEl.appendChild(list);
     summaryEl.appendChild(el("p", "lab-summary-verdict",
       summary.mitigated_by_v2 + " variants mitigated by V2 \u00b7 " +
-      summary.persisting_after_hardening + " persist after hardening"));
+      summary.persisting_after_hardening + " persist after hardening" +
+      (summary.diagnostic_observations ? " \u00b7 " + summary.diagnostic_observations +
+        " diagnostic (no-fixed-oracle) case(s) excluded from scored flips" : "")));
   }
 
   function renderVersionOutcome(container, label, versionData) {
@@ -298,8 +365,12 @@
     card.appendChild(diffBlock);
 
     var versions = el("div", "lab-variant-versions");
-    renderVersionOutcome(versions, "V1 — Unhardened Endpoint", variant.v1);
-    renderVersionOutcome(versions, "V2 — Hardened Endpoint", variant.v2);
+    if (variant.target) {
+      renderVersionOutcome(versions, "Sentiment — Configured Target", variant.target);
+    } else {
+      renderVersionOutcome(versions, "V1 — Unhardened Endpoint", variant.v1);
+      renderVersionOutcome(versions, "V2 — Hardened Endpoint", variant.v2);
+    }
     card.appendChild(versions);
 
     return card;
@@ -312,8 +383,19 @@
     var inputLine = el("p", "lab-field", "Your input: " + data.original_text);
     cleanCardsEl.appendChild(inputLine);
     var pair = el("div", "version-context");
-    pair.appendChild(renderCleanCard("v1", data.v1_clean));
-    pair.appendChild(renderCleanCard("v2", data.v2_clean));
+    if (data.single_target) {
+      var card = el("div", "version-card v1");
+      card.appendChild(el("p", "version-card-title", "Sentiment — Configured Target"));
+      renderResultOutcome(card, data.clean);
+      pair.appendChild(card);
+      if (resultsModelNote) resultsModelNote.textContent =
+        "Single-target sentiment result; no V1/V2 comparison is available or implied.";
+    } else {
+      pair.appendChild(renderCleanCard("v1", data.v1_clean));
+      pair.appendChild(renderCleanCard("v2", data.v2_clean));
+      if (resultsModelNote) resultsModelNote.textContent =
+        "Same underlying AI model in both cases — only endpoint hardening differs.";
+    }
     cleanCardsEl.appendChild(pair);
 
     variantsEl.textContent = "";
@@ -326,10 +408,12 @@
 
   // ---- polling / reattachment -----------------------------------------------------------
   function applyRunningState(state) {
+    var evaluationId = state.evaluation_id || "emotion.core";
+    if (renderedEvaluationId !== evaluationId) renderProgressFor(evaluationId);
     if (execHeading) execHeading.textContent = state.message || "Running…";
     setProgress(state.percent, state.message || "");
-    setStageClasses(state.stage_index);
-    window.rlUpdateLanes(state.stage, stageItems, viewExecution);
+    setStageClasses(evaluationId, state.stage_index);
+    window.rlUpdateLanes(state.stage, descriptorFor(evaluationId).stage_order, endpointContextEl);
   }
 
   function pollLabStatus(jobId) {
@@ -368,16 +452,17 @@
   }
 
   // ---- starting a run ---------------------------------------------------------------------
-  function startLabRun(text) {
+  function startLabRun(text, evaluationId) {
     if (launching) return;
     launching = true;
     clearValidationError();
     if (submitBtn) submitBtn.disabled = true;
+    renderProgressFor(evaluationId || "emotion.core");
 
     fetch("/api/lab/run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: text }),
+      body: JSON.stringify({ text: text, evaluation_id: evaluationId || "emotion.core" }),
     })
       .then(function (response) {
         return response.json().then(function (data) { return { status: response.status, data: data }; });
@@ -423,15 +508,16 @@
         return;
       }
       lastText = text;
-      startLabRun(text);
+      lastEvaluationId = evaluationSelect ? evaluationSelect.value : "emotion.core";
+      startLabRun(text, lastEvaluationId);
     });
   }
 
   if (retryBtn) {
-    retryBtn.addEventListener("click", function () { startLabRun(lastText); });
+    retryBtn.addEventListener("click", function () { startLabRun(lastText, lastEvaluationId); });
   }
   if (busyRetryBtn) {
-    busyRetryBtn.addEventListener("click", function () { startLabRun(lastText); });
+    busyRetryBtn.addEventListener("click", function () { startLabRun(lastText, lastEvaluationId); });
   }
   if (editBtn) {
     editBtn.addEventListener("click", function () {
@@ -463,6 +549,34 @@
   if (navTestAnother) {
     navTestAnother.addEventListener("click", resetToInput);
   }
+
+  function updateModelJourney() {
+    // The execution view's comparison label/cards/footer note are owned by renderProgressFor
+    // (v6.1 Phase 3) and rebuilt from the descriptor whenever a run actually starts or is
+    // reattached to -- this only updates the input-form caption shown before that.
+    var sentiment = evaluationSelect && evaluationSelect.value === "sentiment.core";
+    if (modelDescription) modelDescription.textContent = sentiment ?
+      "Explore one pinned two-label sentiment target without a fabricated before/after comparison." :
+      "The same emotion model through two endpoint configurations.";
+    // V6.5: the intro copy and V1/V2 badges are paired-comparison language -- sentiment has
+    // no V2, so both must switch to single-target wording instead of inheriting emotion's.
+    if (introDeck) introDeck.textContent = sentiment ?
+      "Enter a sentence and Red Lab will generate controlled adversarial variants and test " +
+      "them against the single configured sentiment target. There is no sentiment_v2, so no " +
+      "before/after hardening comparison is made or implied." :
+      "Enter a sentence and Red Lab will generate controlled adversarial variants, test them " +
+      "against the same model through V1 and V2, and show which weaknesses are mitigated by " +
+      "endpoint hardening and which persist.";
+    if (heroControlPaired) heroControlPaired.hidden = sentiment;
+    if (heroControlSingle) heroControlSingle.hidden = !sentiment;
+    window.rlSelectorTag(evaluationTagEl, sentiment ? "sentiment.core" : "emotion.core");
+  }
+  if (evaluationSelect) evaluationSelect.addEventListener("change", function () {
+    generation++; clearTimeout(pollTimer); clearJobId(); lastText = "";
+    cleanCardsEl.textContent = ""; variantsEl.textContent = "";
+    updateModelJourney(); showInput();
+  });
+  updateModelJourney();
 
   window.addEventListener("pagehide", function () { generation++; clearTimeout(pollTimer); });
   window.addEventListener("pageshow", function (event) {

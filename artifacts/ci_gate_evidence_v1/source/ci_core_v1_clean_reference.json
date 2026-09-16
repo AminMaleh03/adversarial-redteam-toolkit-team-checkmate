@@ -1,0 +1,226 @@
+{
+  "reference_id": "ci_core_v1_clean_reference",
+  "case_set_id": "ci_core_v1",
+  "status": "regression_reference_not_ground_truth",
+  "note": "Top labels recorded by the verified emotion_v2 run. A mismatch means behaviour changed relative to the published benchmark; it is NOT a correctness certification.",
+  "source": {
+    "evidence_path": "artifacts/benchmark_v6/run/results_v2.jsonl",
+    "evidence_sha256": "0b37eb18b91521ea6bb0228462a1cf3fef85c2580e0d178a2502bac50a79273f",
+    "run_id": "28681d6c815f",
+    "model_repo_id": "j-hartmann/emotion-english-distilroberta-base",
+    "model_revision": "0e1cd914e3d46199ed785853e12b57304e04178b",
+    "endpoint_version": "v2"
+  },
+  "top_labels": {
+    "dataset-anger-0": {
+      "top_label": "anger",
+      "confidence": 0.991008460521698,
+      "status_code": 200
+    },
+    "dataset-anger-1": {
+      "top_label": "fear",
+      "confidence": 0.6179084181785583,
+      "status_code": 200
+    },
+    "dataset-anger-2": {
+      "top_label": "anger",
+      "confidence": 0.9791902303695679,
+      "status_code": 200
+    },
+    "dataset-anger-3": {
+      "top_label": "anger",
+      "confidence": 0.9945181012153625,
+      "status_code": 200
+    },
+    "dataset-anger-4": {
+      "top_label": "anger",
+      "confidence": 0.9953551292419434,
+      "status_code": 200
+    },
+    "dataset-anger-5": {
+      "top_label": "anger",
+      "confidence": 0.9752479791641235,
+      "status_code": 200
+    },
+    "dataset-fear-0": {
+      "top_label": "fear",
+      "confidence": 0.9959716200828552,
+      "status_code": 200
+    },
+    "dataset-fear-1": {
+      "top_label": "surprise",
+      "confidence": 0.930957019329071,
+      "status_code": 200
+    },
+    "dataset-fear-2": {
+      "top_label": "fear",
+      "confidence": 0.9956812858581543,
+      "status_code": 200
+    },
+    "dataset-fear-3": {
+      "top_label": "fear",
+      "confidence": 0.9670381546020508,
+      "status_code": 200
+    },
+    "dataset-fear-4": {
+      "top_label": "fear",
+      "confidence": 0.9946808218955994,
+      "status_code": 200
+    },
+    "dataset-fear-5": {
+      "top_label": "fear",
+      "confidence": 0.995412290096283,
+      "status_code": 200
+    },
+    "dataset-joy-0": {
+      "top_label": "joy",
+      "confidence": 0.8611872792243958,
+      "status_code": 200
+    },
+    "dataset-joy-1": {
+      "top_label": "joy",
+      "confidence": 0.9941797256469727,
+      "status_code": 200
+    },
+    "dataset-joy-2": {
+      "top_label": "joy",
+      "confidence": 0.9936656355857849,
+      "status_code": 200
+    },
+    "dataset-joy-3": {
+      "top_label": "joy",
+      "confidence": 0.9882264733314514,
+      "status_code": 200
+    },
+    "dataset-joy-4": {
+      "top_label": "joy",
+      "confidence": 0.9919158816337585,
+      "status_code": 200
+    },
+    "dataset-joy-5": {
+      "top_label": "joy",
+      "confidence": 0.9927259683609009,
+      "status_code": 200
+    },
+    "dataset-sadness-0": {
+      "top_label": "sadness",
+      "confidence": 0.9945713877677917,
+      "status_code": 200
+    },
+    "dataset-sadness-1": {
+      "top_label": "sadness",
+      "confidence": 0.9935218691825867,
+      "status_code": 200
+    },
+    "dataset-sadness-2": {
+      "top_label": "sadness",
+      "confidence": 0.9920377731323242,
+      "status_code": 200
+    },
+    "dataset-sadness-3": {
+      "top_label": "sadness",
+      "confidence": 0.9940454959869385,
+      "status_code": 200
+    },
+    "dataset-sadness-4": {
+      "top_label": "sadness",
+      "confidence": 0.9925242066383362,
+      "status_code": 200
+    },
+    "dataset-sadness-5": {
+      "top_label": "joy",
+      "confidence": 0.8096678256988525,
+      "status_code": 200
+    },
+    "dataset-surprise-0": {
+      "top_label": "fear",
+      "confidence": 0.4905828833580017,
+      "status_code": 200
+    },
+    "dataset-surprise-1": {
+      "top_label": "surprise",
+      "confidence": 0.983704149723053,
+      "status_code": 200
+    },
+    "dataset-surprise-2": {
+      "top_label": "surprise",
+      "confidence": 0.977319598197937,
+      "status_code": 200
+    },
+    "dataset-surprise-3": {
+      "top_label": "surprise",
+      "confidence": 0.8638097047805786,
+      "status_code": 200
+    },
+    "dataset-surprise-4": {
+      "top_label": "surprise",
+      "confidence": 0.9863120913505554,
+      "status_code": 200
+    },
+    "dataset-surprise-5": {
+      "top_label": "surprise",
+      "confidence": 0.548062801361084,
+      "status_code": 200
+    },
+    "handwritten-disgust-0": {
+      "top_label": "disgust",
+      "confidence": 0.9761650562286377,
+      "status_code": 200
+    },
+    "handwritten-disgust-1": {
+      "top_label": "disgust",
+      "confidence": 0.9865666031837463,
+      "status_code": 200
+    },
+    "handwritten-disgust-2": {
+      "top_label": "disgust",
+      "confidence": 0.522786021232605,
+      "status_code": 200
+    },
+    "handwritten-disgust-3": {
+      "top_label": "disgust",
+      "confidence": 0.9842819571495056,
+      "status_code": 200
+    },
+    "handwritten-disgust-4": {
+      "top_label": "disgust",
+      "confidence": 0.5071980953216553,
+      "status_code": 200
+    },
+    "handwritten-disgust-5": {
+      "top_label": "disgust",
+      "confidence": 0.9890488386154175,
+      "status_code": 200
+    },
+    "handwritten-neutral-0": {
+      "top_label": "fear",
+      "confidence": 0.4687827229499817,
+      "status_code": 200
+    },
+    "handwritten-neutral-1": {
+      "top_label": "neutral",
+      "confidence": 0.7553926110267639,
+      "status_code": 200
+    },
+    "handwritten-neutral-2": {
+      "top_label": "neutral",
+      "confidence": 0.837884247303009,
+      "status_code": 200
+    },
+    "handwritten-neutral-3": {
+      "top_label": "neutral",
+      "confidence": 0.757964551448822,
+      "status_code": 200
+    },
+    "handwritten-neutral-4": {
+      "top_label": "neutral",
+      "confidence": 0.4655289351940155,
+      "status_code": 200
+    },
+    "handwritten-neutral-5": {
+      "top_label": "neutral",
+      "confidence": 0.7871875762939453,
+      "status_code": 200
+    }
+  }
+}

@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "outcome": "pass",
+  "exit_code": 0,
+  "policy_id": "ci_emotion_v2_core_selection",
+  "policy_version": "1.0.0",
+  "policy_sha256": "e4cb0a86a3590037e92da5e568e4056ff098955f90ccc3a2c9703b4c06f0533d",
+  "candidate": "emotion_v2",
+  "reference": "ci_core_v1_clean_reference",
+  "suite_id": "core",
+  "case_set_id": "ci_core_v1",
+  "selection_sha256": "25573a71931259a3da4241af4ee507314544fd783f796c74c32d0fa88c56ec9d",
+  "checks": [
+    {
+      "check_id": "policy_valid",
+      "status": "pass",
+      "reason": "policy ci_emotion_v2_core_selection v1.0.0 is frozen and resolved",
+      "evidence_refs": [],
+      "observed": null,
+      "threshold": null,
+      "blocking": true
+    },
+    {
+      "check_id": "candidate_identity",
+      "status": "pass",
+      "reason": "candidate identity, model revision and hashes match the policy",
+      "evidence_refs": [],
+      "observed": null,
+      "threshold": null,
+      "blocking": true
+    },
+    {
+      "check_id": "selection_integrity",
+      "status": "pass",
+      "reason": "all 162 selected cases are uniquely recorded",
+      "evidence_refs": [],
+      "observed": null,
+      "threshold": null,
+      "blocking": true
+    },
+    {
+      "check_id": "selection_completion",
+      "status": "pass",
+      "reason": "all 162 selected cases completed",
+      "evidence_refs": [],
+      "observed": null,
+      "threshold": null,
+      "blocking": true
+    },
+    {
+      "check_id": "clean_responses_coherent",
+      "status": "pass",
+      "reason": "every selected baseline returned a coherent prediction in the declared label space",
+      "evidence_refs": [],
+      "observed": 0,
+      "threshold": 0,
+      "blocking": true
+    },
+    {
+      "check_id": "no_server_errors",
+      "status": "pass",
+      "reason": "no observed server-error responses among selected requests",
+      "evidence_refs": [],
+      "observed": 0,
+      "threshold": 0,
+      "blocking": true
+    },
+    {
+      "check_id": "no_timeouts_or_transport_failures",
+      "status": "pass",
+      "reason": "no timeouts or transport failures among selected requests",
+      "evidence_refs": [],
+      "observed": 0,
+      "threshold": 0,
+      "blocking": true
+    },
+    {
+      "check_id": "health_after_every_request",
+      "status": "pass",
+      "reason": "health answered after every selected request",
+      "evidence_refs": [],
+      "observed": 0,
+      "threshold": 0,
+      "blocking": true
+    },
+    {
+      "check_id": "no_leak_signatures",
+      "status": "pass",
+      "reason": "no leak signatures detected. Signature-based: it detects stack traces, absolute filesystem paths and internal module names. It does not prove the absence of disclosure, and ordinary validation output is deliberately not counted.",
+      "evidence_refs": [],
+      "observed": 0,
+      "threshold": 0,
+      "blocking": true
+    },
+    {
+      "check_id": "documented_rejection_behaviour",
+      "status": "pass",
+      "reason": "every case requiring rejection returned an allowed rejection status",
+      "evidence_refs": [],
+      "observed": 0,
+      "threshold": null,
+      "blocking": true
+    },
+    {
+      "check_id": "clean_label_agreement",
+      "status": "pass",
+      "reason": "clean labels agree with the approved reference on all 42 frozen ids",
+      "evidence_refs": [],
+      "observed": 0,
+      "threshold": 0,
+      "blocking": true
+    },
+    {
+      "check_id": "ground_truth_baseline_accuracy",
+      "status": "pass",
+      "reason": "no ground-truth labels supplied; accuracy not measured",
+      "evidence_refs": [],
+      "observed": null,
+      "threshold": null,
+      "blocking": false
+    },
+    {
+      "check_id": "slow_responses",
+      "status": "pass",
+      "reason": "1 slow response(s); informational in this policy",
+      "evidence_refs": [],
+      "observed": 1,
+      "threshold": null,
+      "blocking": false
+    }
+  ],
+  "summary": {
+    "selected_cases": 162,
+    "baselines_checked": 42,
+    "server_errors": 0,
+    "timeouts_or_transport": 0,
+    "health_failures": 0,
+    "leak_signatures": 0,
+    "reference_disagreements": 0,
+    "slow_responses": 1,
+    "claim": "This result states that the candidate met this named policy on this frozen selection. It is not comprehensive adversarial robustness and not production certification."
+  },
+  "artifacts": {
+    "analysis_json": "C:\\Users\\ahsan\\OneDrive\\Desktop\\stage3-ahsan\\results\\v63_gate_runs\\v63-local-78188ad_3dacde929d414d3b\\report\\analysis.json",
+    "report_html": "C:\\Users\\ahsan\\OneDrive\\Desktop\\stage3-ahsan\\results\\v63_gate_runs\\v63-local-78188ad_3dacde929d414d3b\\report\\report.html",
+    "report_pdf": null,
+    "raw_results": {
+      "emotion_v2": "C:\\Users\\ahsan\\OneDrive\\Desktop\\stage3-ahsan\\results\\v63_gate_runs\\v63-local-78188ad_3dacde929d414d3b\\runs\\ci_emotion\\emotion_v2\\results.jsonl"
+    },
+    "run_dir": "C:\\Users\\ahsan\\OneDrive\\Desktop\\stage3-ahsan\\results\\v63_gate_runs\\v63-local-78188ad_3dacde929d414d3b"
+  },
+  "exclusions": []
+}

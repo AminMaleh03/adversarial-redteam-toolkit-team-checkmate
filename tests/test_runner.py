@@ -2060,10 +2060,13 @@ def test_suite_and_task_id_forward_to_the_now_task_aware_attack_library(cli):
     What actually matters going forward is the contract this parameter pair now
     keeps: a known task_id is accepted and really is used (not silently ignored), an
     unknown suite or task_id is refused with the documented ContractError rather than
-    building the wrong thing anyway, and ``suite="oces"`` is refused with its own
-    specific message -- OCES is frozen authored data, never synthesised here. All of
-    it runs inside ``scoped_registry()``, and registration is checked empty again on
-    exit, so this test cannot leak state into whatever the process builds next.
+    building the wrong thing anyway, and ``suite="oces"`` genuinely loads the frozen
+    additional-evaluation data (never synthesises it) -- see
+    tests/test_oces_runtime.py for that loader's dedicated coverage -- while still
+    refusing loudly if the supplied baseline set is not that suite's real seed file.
+    All of it runs inside ``scoped_registry()``, and registration is checked empty
+    again on exit, so this test cannot leak state into whatever the process builds
+    next.
     """
     from attacks.metadata import scoped_registry, manifest
     from contract import SUITE_CORE
@@ -2098,9 +2101,12 @@ def test_suite_and_task_id_forward_to_the_now_task_aware_attack_library(cli):
     assert manifest() == {}, "a rejected task_id must not leave partial registrations behind"
 
     with scoped_registry():
-        with pytest.raises(ContractError, match="'oces' variants are authored"):
+        # suite="oces" now loads the real frozen data (see tests/test_oces_runtime.py for
+        # its dedicated coverage); a baseline set that is not the real OCES seed file for
+        # this task still fails loudly rather than silently building against the wrong seeds.
+        with pytest.raises(ContractError, match="not in the supplied seed set"):
             build_suite_once([baseline()], None, None, suite="oces", task_id="emotion_7")
-    assert manifest() == {}, "a refused suite='oces' build must not leave partial registrations behind"
+    assert manifest() == {}, "a rejected suite='oces' baseline mismatch must not leave partial registrations behind"
 
 
 def test_code_provenance_is_a_commit_or_an_honest_null():

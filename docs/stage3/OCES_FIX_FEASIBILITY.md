@@ -1,5 +1,14 @@
 # OCES baseline-link correction: feasibility verified
 
+> **Status update, 17 September 2026 (later the same day):** the correction described below
+> was applied, tested and deployed. It is commit `45c531c` on `fix/oces-baseline-link`,
+> merged to `main` at `dc80f86`, live on the Hugging Face Space at revision `efa68212`. The
+> corrected evidence is in `artifacts/oces_baseline_link_v1/` with its own `PROVENANCE.md`.
+> Corrected pass rates: `emotion_v1` 18/18 (100.0%), `emotion_v2` 18/18 (100.0%),
+> `sentiment_v1` 26/28 (92.9%) — meets-expectation over scored cases, excluding the
+> pre-declared REVIEW/low-confidence exclusions. Everything below this notice is the
+> original feasibility analysis, preserved as-is; it is no longer "not applied."
+
 17 September 2026, Codex. Diagnosis against committed `main` **724799c**. Active checkout remains `stage3/integration` **cf4c90a**. User asked why OCES scoring is incomplete and whether a fix is available. This is a verified repair preview, not an applied production change.
 
 ## Cause and candidate

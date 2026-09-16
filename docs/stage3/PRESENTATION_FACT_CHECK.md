@@ -1,5 +1,17 @@
 # Presentation fact check — 17 September 2026
 
+> **Status update, 17 September 2026 (later the same day):** this audit's "Material OCES
+> limitation" section below describes the state at `main` `724799c`, before the fix. The
+> baseline-association defect it found was corrected and deployed the same day (commit
+> `45c531c`, merged at `dc80f86`, live at Space revision `efa68212`). A real OCES semantic
+> pass rate is now available — it is **not** "unavailable in these saved runs" as this
+> section instructs the presentation to state. Corrected rates: `emotion_v1`/`emotion_v2`
+> 18/18 (100.0%) each, `sentiment_v1` 26/28 (92.9%), over scored cases only (pre-declared
+> REVIEW/low-confidence cases remain excluded, as before). See
+> `artifacts/oces_baseline_link_v1/PROVENANCE.md` and `docs/stage3/OCES_FIX_FEASIBILITY.md`.
+> Anyone using this document to brief a presentation tool should use the corrected numbers
+> above in place of every "semantic pass/fail rate unavailable" instruction below.
+
 Audited by Codex against committed `main` **724799c**, not the active older `stage3/integration` checkout (**cf4c90a**). Source presentation: `C:/Users/ahsan/Downloads/Checkmate_University of Wollongong in Dubai.pdf`. Extracted its text and visually inspected all five rendered slides. Application code, PDF and benchmark artifacts were not modified.
 
 The ready-to-use deliverable is [PRESENTATION_CLAUDE_PROMPT.md](PRESENTATION_CLAUDE_PROMPT.md). It reconciles all 20 requests, including the later instruction to remove the custom-input card rather than merely rewrite it.

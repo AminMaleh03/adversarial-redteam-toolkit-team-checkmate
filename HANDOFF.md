@@ -1,3 +1,69 @@
+# OCES baseline-link fix — DEPLOYED AND VERIFIED LIVE
+
+2026-09-17, Claude Sonnet 5, Asia/Dubai. Continuation of Codex's uncommitted fix in worktree
+`stage3-oces-fix` (branch `fix/oces-baseline-link`), per the user's explicit authorization to
+continue and deploy. See the entry above for the diagnosis, the verification I performed
+before touching anything, and the one mistake I made and caught during that verification
+(reverted a checkout of the wrong file, fixed by regenerating it deterministically).
+
+## What shipped
+
+- `45c531c` on `fix/oces-baseline-link` (pushed): the one-line `run_all._oces_block` fix,
+  the `artifacts/oces_baseline_link_v1/` corrected-evidence bundle, updated
+  `report/master_evidence/manifest.json` + regenerated `artifacts/technical_report/`, and
+  4 new/updated tests.
+- `752e02c`: Codex's `docs/stage3/OCES_FIX_FEASIBILITY.md` and the two presentation-prep docs,
+  cherry-picked from a safety commit (`ae5a728`) made on `stage3/integration` first so nothing
+  was lost.
+- Merged to `main` at `dc80f86` (`--no-ff`, clean merge, no conflicts). Full suite on merged
+  main: **1,138 passed, 27 skipped, 0 failed**. Pushed.
+
+## Deployment
+
+Operator `results/main_hf_release.py` (copy of the batched-delta operator used for the two
+prior deployments this week, gitignored). 285 files in the tree, 266 already current, **19
+uploaded** in one commit, final Space revision `efa68212`.
+
+**All 285 files verified by remote blob hash.** Build log: apt/pip/model layers cached, only
+`COPY . .` onward rebuilt. Run log: clean startup, no tracebacks. Stage transitions observed
+live: `RUNNING_BUILDING` 03:25:47 -> `RUNNING_APP_STARTING` 03:25:58 -> `RUNNING` 03:26:20.
+
+## Post-deploy verification (all against the live Space, not local)
+
+- `/technical-report/` serves 200, **343,803 bytes, SHA-256 byte-identical to the local
+  committed file**.
+- Corrected numbers and the disclosure sentence confirmed present in the live HTML:
+  `"24 excluded, 0 unevaluable"`, `"12 excluded, 0 unevaluable"`, and
+  `"baseline-association fix; no model requests or scoring rules changed"`. The old
+  `"0 of 0 cases produced"` framing is gone from the corrected sections (it remains,
+  correctly, only in the standalone zero-denominator regression test).
+- Visibility unchanged: authenticated `private: true`, unauthenticated Hub API 401 (not
+  publicly listed), anonymous app routes 200 (`/healthz`, `/`, `/lab`,
+  `/technical-report/`) -- Protected, exactly as before this deploy. Not touched.
+- **Real live cloud Demo run**, end to end on the deployed revision: `POST /api/run` -> 202,
+  all stages, **23.5s, `error: null`**, `report.html` served at
+  `/results/hf_demo_20260916_232723_b298a7_.../report/report.html`.
+
+## Not done, and deliberately so
+
+- Did not open a PR for `fix/oces-baseline-link` on GitHub -- merged directly to `main`
+  because the user is Ahsan and explicitly authorized applying this to the deployed site now,
+  the same standing exception used for the two prior direct-to-main merges this week.
+- Did not touch `report/master_report.py`'s missing `newline="\n"` on its HTML write (found
+  during my own verification, documented above). It's a real latent defect -- the same class
+  already fixed twice elsewhere in this repo -- but out of scope for "deploy Codex's fix," and
+  fixing it would have meant regenerating (and re-verifying) the technical report artifacts a
+  second time for no reason connected to this task.
+- Did not act on the presentation-prompt document beyond preserving it; the user's `ide_selection`
+  in this turn surfaced `docs/stage3/PRESENTATION_CLAUDE_PROMPT.md` but the actual instruction
+  was the OCES continuation, not the presentation. Flagging in case that's the next ask.
+
+## Temporary files
+
+`results/main-snapshot-dc80f86d/` and its `.zip` (the uploaded delta snapshot),
+`results/main_hf_release.py`, `results/main-hf-release.json`. All gitignored under `results/`.
+No processes left running; the cloud demo run above completed on its own.
+
 # OCES baseline-link fix - verified locally; deployment authorised and pending
 
 2026-09-17T02:58:36+04:00, Codex, Asia/Dubai. Branch fix/oces-baseline-link;

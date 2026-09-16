@@ -220,6 +220,33 @@ underlying model has become robust.
 | `emotion.oces` (both endpoints) | 18 | 0 | 0 | 0 |
 | `sentiment.oces` | 28 | 2 | 2 | 0 |
 
+**OCES expectation status** (whether the case's pre-declared oracle held, not a drift
+comparison) — corrected 17 September 2026; see below.
+
+| Target | Meets expectation | Violates expectation | Excluded (REVIEW / low-confidence) | Pass rate |
+|---|---:|---:|---:|---:|
+| `emotion_v1` | 18 | 0 | 24 | **100.0%** |
+| `emotion_v2` | 18 | 0 | 24 | **100.0%** |
+| `sentiment_v1` | 26 | 2 | 12 | **92.9%** |
+
+The pass rate is over *scored* cases only (excluded REVIEW/low-confidence cases are a
+pre-declared exclusion, not a denominator adjustment made after seeing results). This
+measures **prediction consistency** under meaning-preserving paraphrase/distractor
+variants — not ground-truth accuracy, and not a general robustness claim. OCES was
+authored by the team with knowledge of the frozen defenses; it is not a blind or
+externally authored holdout.
+
+> **A scoring defect was found and corrected on 17 September 2026.** `run_all._oces_block`
+> looked up each attack's clean baseline in the attack manifest, which does not carry that
+> field — the association lives on the recorded attack result instead. Every non-REVIEW
+> case was therefore scored as unevaluable rather than meets/violates. The one-line fix and
+> the corrected evidence (re-derived from the original, unmodified inference responses —
+> no new model requests were made) are in `artifacts/oces_baseline_link_v1/`, with full
+> before/after provenance in `artifacts/oces_baseline_link_v1/PROVENANCE.md` and the
+> diagnosis in `docs/stage3/OCES_FIX_FEASIBILITY.md`. The corrected denominators now agree
+> with the independently computed drift comparisons above (18/18 and 28/28 eligible), which
+> were never affected by this defect.
+
 > These measurements describe this fixed benchmark, these model revisions and this
 > deployment. They should not be interpreted as a general robustness guarantee.
 
@@ -617,6 +644,7 @@ The reported results therefore describe these experiments and this deployment; t
 | V5.x | Visual design passes (branding through final tuning) |
 | V6 | Deployment release: report-navigation fixes, byte-exact Hugging Face Space deployment |
 | **V7 (current)** | Model-free target/evaluation registry (emotion + sentiment), OCES additional evaluations, automated CI release gate, multi-target Master Technical Report, dark brand system across the app and generated reports |
+| V7, 17 Sep 2026 | Fixed an OCES scoring defect (baseline-association lookup) that had scored every non-REVIEW OCES case as unevaluable; corrected results published, no new model inference |
 
 ---
 

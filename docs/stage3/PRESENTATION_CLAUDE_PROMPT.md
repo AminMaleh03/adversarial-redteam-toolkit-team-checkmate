@@ -1,5 +1,17 @@
 # Claude prompt — revise the five-slide Red Lab presentation
 
+> **Status update, 17 September 2026 (after this prompt was written):** the OCES
+> baseline-association defect this prompt's fact sheet describes as unresolved was fixed
+> and deployed the same day (commit `45c531c`, merged to `main` at `dc80f86`, live at Space
+> revision `efa68212`). A real OCES semantic pass rate now exists: `emotion_v1`/`emotion_v2`
+> 18/18 (100.0%) each, `sentiment_v1` 26/28 (92.9%), over scored cases (pre-declared
+> REVIEW/low-confidence cases remain excluded). **Before pasting this prompt into another
+> tool, replace every instruction below that says the OCES semantic pass/fail rate is
+> unavailable, or that its dedicated status blocks have zero scored outcomes, with these
+> corrected numbers** — see `docs/stage3/PRESENTATION_FACT_CHECK.md`'s status note and
+> `artifacts/oces_baseline_link_v1/PROVENANCE.md` for the full detail. Nothing else in this
+> prompt is affected by the fix.
+
 Copy everything below the divider into Claude alongside the original presentation PDF and its editable source, if available. The fact sheet is included so this prompt also works without repository access.
 
 ---

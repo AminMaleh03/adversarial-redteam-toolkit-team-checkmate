@@ -783,3 +783,12 @@ Next: fetch origin and confirm `origin/stage3/ahsan` is still `78188ad` (unchang
 last v6.2 push) before pushing this commit, push normally (no force), observe the one
 automatically triggered gate run, confirm its deploy job is skipped, and leave PR #11 draft
 and unmerged. Do not touch Hugging Face.
+
+**v6.3 closed out.** Committed as `80bee02de661a9400f27fbeac90b67b8d853a3f2`
+(`feat(v6.3): add multi-target master technical report`). `origin/stage3/ahsan` had not
+advanced (still `78188ad`) at push time; pushed cleanly (`78188ad..80bee02`). GitHub
+Actions run `35075844725` ("Stage 3 release gate", PR #11) completed **success** (checked
+via the public, unauthenticated GitHub REST API — no `gh`/token available in this session);
+its "Deploy tested release to Hugging Face Space" job was `skipped`. PR #11 confirmed open,
+draft, unmerged via the same API. Hugging Face `space` remote was never touched at any
+point in this session.

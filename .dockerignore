@@ -1,0 +1,24 @@
+# Version control / local tooling -- never needed inside the image.
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.vscode
+.idea
+
+# Local run output only -- gigantic and gitignored; the verified full-report artifact the
+# deployment needs lives at artifacts/verified_full_report/, a separate tracked path, so
+# ignoring results/ here does not affect it.
+results/
+
+# OS/editor cruft.
+Thumbs.db
+.DS_Store
+*.log
+
+# Note: deliberately NOT excluded -- required by the running deployment:
+#   Team Checkmate Logo.png, contract.py, baseline/, attacks/, endpoint/, runner/,
+#   analysis/, report/ (templates + style.css), web/, artifacts/verified_full_report/

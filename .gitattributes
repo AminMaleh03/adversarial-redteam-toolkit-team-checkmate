@@ -1,0 +1,49 @@
+# Line-ending policy for files whose BYTES are hashed and checked.
+#
+# The project default (core.autocrlf) rewrites line endings on checkout. For ordinary
+# source that is harmless. For any file whose SHA-256 is recorded somewhere, it silently
+# invalidates the recording on every fresh clone, and the failure looks like data
+# corruption rather than like a checkout setting.
+#
+# Two different problems, two different attributes:
+#
+# `binary` (= -text -diff -merge) for preserved evidence. Those files genuinely contain
+# CRLF, written by the runner. Pinning the bytes is required; suppressing the diff also
+# stops `git diff --check` reading each preserved CR as trailing whitespace, which would
+# otherwise fail on every line of frozen evidence. They are never hand-edited.
+#
+# This was a live bug, not a hypothetical: on a fresh Windows clone of v6.0.0,
+# tests/test_web.py::test_verified_full_served_bytes_match_recorded_evidence_hashes
+# failed, because artifacts/verified_full_report/analysis.json checked out as CRLF
+# (8a950cad...) instead of the 12d47b35... recorded in its own export_meta.json. It
+# passed only in the working copy where the report generator had written the file.
+artifacts/** binary
+
+# `-text` for generated LF artifacts whose hashes are recorded and asserted: the fixture
+# pack indexes itself in MANIFEST.json, gate fixtures cite the real hashes of the frozen
+# CI inputs, and the registry snapshot cites the registry. These stay readable and
+# diffable -- they are LF already, so there is no CR for `git diff --check` to flag.
+# Without this, four foundation tests fail on any fresh Windows clone.
+tests/fixtures/stage3/** -text
+analysis/case_sets/*.json -text
+analysis/policies/*.json -text
+analysis/remediation_rules.json -text
+endpoint/targets.json -text
+
+# Task 4 (OCES) frozen evidence. attacks/data/oces/freeze_content_hashes.json and
+# freeze_provenance.json record a SHA-256 for each frozen artifact -- including the two
+# generator sources, which is why .py files appear here. baseline/oces/build_oces.py
+# regenerates that hash record from raw on-disk bytes, so without these entries a CRLF
+# checkout both fails the freeze-integrity tests and silently rewrites the freeze record
+# with environment-dependent hashes. The frozen content itself is unchanged and LF.
+attacks/data/oces/** -text
+baseline/oces/** -text
+
+# Other Stage 3 data whose SHA-256 is quoted as identity (coverage map version and its
+# historical overlay, the generated sentiment baseline and its provenance).
+attacks/coverage_map.json -text
+attacks/overlays/*.json -text
+baseline/sentiment_baseline.json -text
+baseline/sentiment_provenance.json -text
+
+# Everything else keeps the project's existing text rules, unchanged.

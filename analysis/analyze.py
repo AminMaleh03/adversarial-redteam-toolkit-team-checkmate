@@ -17,9 +17,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from contract import Finding, RunResult
+from contract import (
+    CONTRACTS_VERSION,
+    EVAL_KIND_PAIRED,
+    EVAL_KIND_SINGLE,
+    SUITE_CORE,
+    Finding,
+    RunResult,
+)
 
-from analysis import compare, drift, severity
+from analysis import compare, drift, severity, validation
 from analysis.validation import validate_manifest, validate_rows, validate_run
 from analysis.compare import FindingGroupRef
 from analysis.drift import (
@@ -36,6 +43,23 @@ from analysis.drift import (
 CATEGORIES = ("malformed", "boundary", "perturbation", "encoding", "whitespace", "truncation")
 
 DEFAULT_MANIFEST_NAME = "manifest.json"
+
+# Analysis document schema. v2 documents stay readable and v2 bytes already written to
+# disk are never rewritten; this is the version emitted for new analyses.
+SCHEMA_VERSION = 3
+
+TASK_EMOTION = "emotion_7"
+
+# Canonical evaluation ids are "<task>.<suite>" using the short task name, per
+# CONTRACTS section 1 -- "emotion.core", not "emotion_7.core".
+TASK_EVALUATION_PREFIX = {"emotion_7": "emotion", "sentiment_2": "sentiment"}
+
+
+def evaluation_id_for(task_id: str, suite_id: str) -> str:
+    prefix = TASK_EVALUATION_PREFIX.get(task_id)
+    if prefix is None:
+        raise ValueError(f"no canonical evaluation prefix for task {task_id!r}")
+    return f"{prefix}.{suite_id}"
 
 # Standing limitations the report must carry. These are method caveats, not findings, and
 # they are emitted unconditionally so they cannot be quietly omitted from the write-up.
@@ -503,10 +527,16 @@ def comparison_evidence(
     return by_mode
 
 
-def analyze_version(results: list[RunResult], manifest: dict[str, dict]) -> VersionAnalysis:
+def analyze_version(
+    results: list[RunResult],
+    manifest: dict[str, dict],
+    *,
+    labels=None,
+    identity=None,
+) -> VersionAnalysis:
     validate_manifest(manifest)
-    version = validate_rows(results)
-    drift_summary = drift.compute_drift(results, manifest)
+    version = validate_rows(results, labels=labels, identity=identity)
+    drift_summary = drift.compute_drift(results, manifest, labels=labels, identity=identity)
     drift_by_attack = {record.attack_id: record for record in drift_summary.records}
 
     evaluations: list[CaseEvaluation] = []
@@ -605,9 +635,52 @@ def validity_tier_census(analysis: VersionAnalysis) -> dict:
     return census
 
 
-def build_version_summary(analysis: VersionAnalysis, run_meta: dict) -> dict:
+def build_identity_block(run_meta: dict, identity=None) -> dict:
+    """Distinguish declared identity from inferred legacy provenance.
+
+    A recognised historical artifact has no recorded target or task; the v1/v2 -> emotion
+    mapping applied to it is an inference this block records as such, so a reader can
+    never mistake it for something the run itself declared.
+    """
+    declared_target = run_meta.get("target_id") or ""
+    declared_task = run_meta.get("task_id") or ""
+    declared_suite = run_meta.get("suite_id") or ""
+    provenance = validation.PROVENANCE_DECLARED if declared_target else validation.PROVENANCE_INFERRED_LEGACY
+    if identity is not None:
+        provenance = identity.provenance
+    block = {
+        "target_id": declared_target or (identity.target_id if identity else ""),
+        "task_id": declared_task or ("" if provenance == validation.PROVENANCE_DECLARED else TASK_EMOTION),
+        "suite_id": declared_suite or (identity.suite_id if identity else SUITE_CORE),
+        "provenance": provenance,
+        "declared": {
+            "target_id": declared_target or None,
+            "task_id": declared_task or None,
+            "suite_id": declared_suite or None,
+        },
+        "model": run_meta.get("model"),
+        "baseline": run_meta.get("baseline"),
+        "evaluation_run_id": run_meta.get("evaluation_run_id"),
+        "evaluation_id": run_meta.get("evaluation_id"),
+        "case_set_id": run_meta.get("case_set_id"),
+    }
+    if provenance == validation.PROVENANCE_INFERRED_LEGACY:
+        block["inferred"] = {
+            "reason": "recognised historical emotion artifact: no target_id on any row",
+            "rule": "version v1 -> emotion_v1, v2 -> emotion_v2",
+            "label_space": "emotion_7 (not recorded by the run itself)",
+        }
+    return block
+
+
+def build_version_summary(analysis: VersionAnalysis, run_meta: dict, identity=None) -> dict:
+    identity_block = build_identity_block(run_meta, identity)
     return {
         "version": analysis.version,
+        "target_id": identity_block["target_id"],
+        "task_id": identity_block["task_id"],
+        "suite_id": identity_block["suite_id"],
+        "identity": identity_block,
         "coverage": run_meta.get("coverage", {}),
         "category_stats": {
             category: {**stats, "failure_rate": format_rate(stats["failure_rate"])}
@@ -652,11 +725,18 @@ def build_comparison_summary(
         v1_evaluable_attack_ids_by_mode=v1_analysis.evaluable_attack_ids_by_mode,
     )
 
+    pairing = compare.check_pairing_identity(meta_v1, meta_v2)
     summary = {
         "fingerprints": {
             "planned_match": result.fingerprints.planned_match,
             "manifest_match": result.fingerprints.manifest_match,
             "whole_suite_comparable": result.fingerprints.whole_suite_comparable,
+        },
+        "pairing_identity": {
+            "comparable": pairing.comparable,
+            "corrupt_metadata": pairing.corrupt,
+            "checked": pairing.checked,
+            "reasons": pairing.reasons,
         },
         "coverage": {
             "v1": result.coverage.v1_coverage,
@@ -674,11 +754,20 @@ def build_comparison_summary(
         "limitations": list(LIMITATION_NOTES),
     }
 
-    if not result.fingerprints.whole_suite_comparable:
+    if pairing.corrupt:
+        raise ValueError(
+            "run metadata is corrupt, so the runs cannot be compared: "
+            + "; ".join(pairing.reasons)
+        )
+    if not result.fingerprints.whole_suite_comparable or not pairing.comparable:
+        causes = list(pairing.reasons)
+        if not result.fingerprints.whole_suite_comparable:
+            causes.insert(0, "planned-suite fingerprint or manifest hash differs")
         summary["comparison_withheld_reason"] = (
-            "planned-suite fingerprint or manifest hash differs between V1 and V2; "
-            "whole-suite equivalence claims (resolved/remaining/newly-appearing findings, "
-            "paired category failure-rate deltas) are withheld rather than reported"
+            "these runs do not share the identity a paired claim requires ("
+            + "; ".join(causes)
+            + "); whole-suite equivalence claims (resolved/remaining/newly-appearing "
+            "findings, paired category failure-rate deltas) are withheld rather than reported"
         )
         return summary
 
@@ -760,7 +849,30 @@ def _unique_object(pairs):
     return result
 
 
-def load_results(path) -> list[RunResult]:
+def labels_from_meta(meta: dict):
+    """Read a run's declared label space out of its own recorded model block.
+
+    This is the source ``validation.resolve_identity`` names: rows that carry a
+    ``target_id`` must be scored against the label space that run actually recorded, never
+    against a fallback. run_meta is already an artifact analysis reads, so this adds no
+    import edge -- in particular analysis still does not read the target registry.
+
+    Returns ``None`` for a historical artifact with no model block, which is what keeps
+    the legacy path (rows with no ``target_id``) behaving exactly as before.
+    """
+    model = meta.get("model") if isinstance(meta, dict) else None
+    if not isinstance(model, dict) or "labels" not in model:
+        return None
+    labels = model["labels"]
+    if (not isinstance(labels, list) or not labels
+            or not all(isinstance(label, str) and label for label in labels)):
+        raise ValueError("run metadata model.labels is not a non-empty list of label names")
+    if len(set(labels)) != len(labels):
+        raise ValueError("run metadata model.labels contains duplicates")
+    return labels
+
+
+def load_results(path, *, labels=None, identity=None) -> list[RunResult]:
     """Read one version's JSONL result rows.
 
     A malformed line is raised, never skipped. Silently dropping a row would quietly
@@ -769,6 +881,10 @@ def load_results(path) -> list[RunResult]:
     failure the comparison is built to prevent. The error names the file, the line and
     the offending text, because a bare JSONDecodeError gives the reader nothing to act on
     -- a truncated or half-written results file is the realistic cause.
+
+    ``labels``/``identity`` carry the run's declared label space through to the row check.
+    Rows that declare a ``target_id`` cannot be validated without one, so a caller that
+    has read the run's model block passes it here.
     """
     results = []
     with open(path, encoding="utf-8") as handle:
@@ -788,13 +904,142 @@ def load_results(path) -> list[RunResult]:
                 results.append(RunResult(**row))
             except TypeError as exc:
                 raise ValueError(f"{path} line {line_number} does not match RunResult: {exc}") from exc
-    validate_rows(results)
+    validate_rows(results, labels=labels, identity=identity)
     return results
 
 
 def load_run_meta(path) -> dict:
     with open(path, encoding="utf-8") as handle:
         return json.load(handle, object_pairs_hook=_unique_object)
+
+
+def build_evaluation_block(
+    *,
+    evaluation_id: str,
+    kind: str,
+    task_id: str,
+    suite_id: str,
+    targets: list[str],
+    summaries: dict,
+    comparison,
+    coverage=None,
+    oces=None,
+) -> dict:
+    """One evaluation block of the v3 envelope.
+
+    ``comparison`` is null for every single-target evaluation -- always present, never
+    omitted, never an empty object, never a fabricated improvement figure. A single target
+    has nothing to compare against, and saying so explicitly is what stops a renderer from
+    showing an empty before/after table as though it were a result.
+    """
+    if kind == EVAL_KIND_SINGLE and comparison is not None:
+        raise ValueError(f"{evaluation_id}: a single-target evaluation cannot carry a comparison")
+    if kind == EVAL_KIND_PAIRED and len(targets) != 2:
+        raise ValueError(f"{evaluation_id}: a paired evaluation needs exactly two targets")
+    if kind == EVAL_KIND_SINGLE and len(targets) != 1:
+        raise ValueError(f"{evaluation_id}: a single evaluation needs exactly one target")
+    if sorted(summaries) != sorted(targets):
+        raise ValueError(f"{evaluation_id}: summaries keys must match the target list")
+    return {
+        "evaluation_id": evaluation_id,
+        "kind": kind,
+        "task_id": task_id,
+        "suite_id": suite_id,
+        "targets": list(targets),
+        "summaries": summaries,
+        "comparison": comparison,
+        "coverage": coverage,
+        "oces": oces,
+    }
+
+
+def build_run_identity(metas: list[dict], *, provenance: str) -> dict:
+    """Run-level identity for the v3 envelope."""
+    first = metas[0] if metas else {}
+    return {
+        "run_id": first.get("evaluation_run_id") or first.get("run_id") or "",
+        "contracts_version": CONTRACTS_VERSION,
+        "provenance": provenance,
+        "run_type": first.get("run_type"),
+        "started_at": first.get("started_at"),
+        "ended_at": metas[-1].get("ended_at") if metas else None,
+        "code_provenance": first.get("code_provenance"),
+    }
+
+
+def legacy_v2_view(document: dict) -> dict:
+    """Project a v3 document back onto the v2 shape for consumers not yet migrated.
+
+    Provided so the report and orchestrator have a one-line migration path rather than a
+    private reshaping of the contract in the renderer. It reads the emotion paired block;
+    a document without one cannot be expressed as v2 and raises instead of inventing keys.
+    """
+    for block in document.get("evaluations", []):
+        if block["kind"] != EVAL_KIND_PAIRED:
+            continue
+        targets = block["targets"]
+        summaries = block["summaries"]
+        return {
+            "schema_version": 2,
+            "summary_v1": summaries[targets[0]],
+            "summary_v2": summaries[targets[1]],
+            "comparison": block["comparison"],
+        }
+    raise ValueError("no paired evaluation in this document; it has no v2 representation")
+
+
+def run_single_target_analysis(
+    *,
+    manifest_path,
+    results_path,
+    meta_path,
+    labels,
+    evaluation_id=None,
+) -> dict:
+    """Analyse one target that has no counterpart to compare against.
+
+    Emits the same v3 envelope with ``comparison`` explicitly null. There is no second
+    target here, so a before/after figure would have to be invented; the null says so.
+    """
+    manifest_bytes = Path(manifest_path).read_bytes()
+    manifest = json.loads(manifest_bytes.decode("utf-8"), object_pairs_hook=_unique_object)
+    validate_manifest(manifest)
+    manifest_sha = hashlib.sha256(manifest_bytes).hexdigest()
+
+    # Same ordering reason as run_analysis: the row check needs the label space first.
+    # Here the caller states it explicitly, so it is passed straight through.
+    results = load_results(results_path, labels=labels)
+    meta = load_run_meta(meta_path)
+    identity = validation.resolve_identity(results, labels=labels)
+    validate_run(results, meta, manifest, identity.version, manifest_sha, identity=identity)
+
+    analysis = analyze_version(results, manifest, labels=labels, identity=identity)
+    analysis.version = identity.version
+    summary = build_version_summary(analysis, meta, identity)
+    target_id = summary["target_id"]
+    resolved_id = evaluation_id or meta.get("evaluation_id") or evaluation_id_for(
+        summary["task_id"], summary["suite_id"]
+    )
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "contracts_version": CONTRACTS_VERSION,
+        "run_identity": build_run_identity([meta], provenance=identity.provenance),
+        "evaluations": [
+            build_evaluation_block(
+                evaluation_id=resolved_id,
+                kind=EVAL_KIND_SINGLE,
+                task_id=summary["task_id"],
+                suite_id=summary["suite_id"],
+                targets=[target_id],
+                summaries={target_id: summary},
+                comparison=None,
+                coverage=None,
+                oces=None,
+            )
+        ],
+        "limitations": list(LIMITATION_NOTES),
+        "findings_by_target": {target_id: analysis.findings},
+    }
 
 
 def run_analysis(
@@ -818,13 +1063,30 @@ def run_analysis(
         manifest_v2_sha = hashlib.sha256(v2_bytes).hexdigest()
         if v2_bytes != manifest_bytes:
             raise ValueError("V1 and V2 manifest files differ; cannot score both with one oracle set")
-    results_v1 = load_results(results_v1_path)
-    results_v2 = load_results(results_v2_path)
+    # Metadata is read before the rows, because the rows cannot be validated without the
+    # label space each run recorded in its own model block. Every recorded run now stamps
+    # target_id on its rows, and resolve_identity refuses to guess a label space for those
+    # -- correctly, since guessing is how an emotion oracle ends up scoring a sentiment
+    # run. Historical artifacts have no model block; labels stay None and the legacy path
+    # is untouched.
     meta_v1 = load_run_meta(meta_v1_path)
     meta_v2 = load_run_meta(meta_v2_path)
+    labels_v1 = labels_from_meta(meta_v1)
+    labels_v2 = labels_from_meta(meta_v2)
+    if labels_v1 is not None and labels_v2 is not None and list(labels_v1) != list(labels_v2):
+        raise ValueError(
+            "paired runs recorded different label spaces "
+            f"(v1={list(labels_v1)}, v2={list(labels_v2)}); they cannot be compared"
+        )
 
-    validate_run(results_v1, meta_v1, manifest, "v1", manifest_sha)
-    validate_run(results_v2, meta_v2, manifest, "v2", manifest_v2_sha)
+    results_v1 = load_results(results_v1_path, labels=labels_v1)
+    results_v2 = load_results(results_v2_path, labels=labels_v2)
+
+    identity_v1 = validation.resolve_identity(results_v1, labels=labels_v1, expected_version="v1")
+    identity_v2 = validation.resolve_identity(results_v2, labels=labels_v2, expected_version="v2")
+
+    validate_run(results_v1, meta_v1, manifest, "v1", manifest_sha, identity=identity_v1)
+    validate_run(results_v2, meta_v2, manifest, "v2", manifest_v2_sha, identity=identity_v2)
     if (meta_v1["fingerprints"]["planned_suite_sha256"] == meta_v2["fingerprints"]["planned_suite_sha256"]
             and meta_v1["case_ids"]["planned"] != meta_v2["case_ids"]["planned"]):
         raise ValueError("matching planned fingerprints have inconsistent planned case IDs/order")
@@ -834,18 +1096,47 @@ def run_analysis(
             if row.baseline_id != v1_attacks[row.attack_id].baseline_id:
                 raise ValueError(f"{row.attack_id}: baseline association differs across versions")
 
-    analysis_v1 = analyze_version(results_v1, manifest)
-    analysis_v2 = analyze_version(results_v2, manifest)
+    analysis_v1 = analyze_version(results_v1, manifest, labels=labels_v1, identity=identity_v1)
+    analysis_v2 = analyze_version(results_v2, manifest, labels=labels_v2, identity=identity_v2)
     analysis_v1.version = "v1"
     analysis_v2.version = "v2"
 
+    summary_v1 = build_version_summary(analysis_v1, meta_v1, identity_v1)
+    summary_v2 = build_version_summary(analysis_v2, meta_v2, identity_v2)
+    target_v1 = summary_v1["target_id"]
+    target_v2 = summary_v2["target_id"]
+    comparison = build_comparison_summary(analysis_v1, analysis_v2, meta_v1, meta_v2)
+
+    provenance = (
+        validation.PROVENANCE_DECLARED
+        if identity_v1.provenance == validation.PROVENANCE_DECLARED
+        and identity_v2.provenance == validation.PROVENANCE_DECLARED
+        else validation.PROVENANCE_INFERRED_LEGACY
+    )
+    evaluation_id = meta_v1.get("evaluation_id") or evaluation_id_for(
+        summary_v1["task_id"], summary_v1["suite_id"]
+    )
     return {
-        "schema_version": 2,
-        "findings_v1": analysis_v1.findings,
-        "findings_v2": analysis_v2.findings,
-        "summary_v1": build_version_summary(analysis_v1, meta_v1),
-        "summary_v2": build_version_summary(analysis_v2, meta_v2),
-        "comparison": build_comparison_summary(analysis_v1, analysis_v2, meta_v1, meta_v2),
+        "schema_version": SCHEMA_VERSION,
+        "contracts_version": CONTRACTS_VERSION,
+        "run_identity": build_run_identity([meta_v1, meta_v2], provenance=provenance),
+        "evaluations": [
+            build_evaluation_block(
+                evaluation_id=evaluation_id,
+                kind=EVAL_KIND_PAIRED,
+                task_id=summary_v1["task_id"],
+                suite_id=summary_v1["suite_id"],
+                targets=[target_v1, target_v2],
+                summaries={target_v1: summary_v1, target_v2: summary_v2},
+                comparison=comparison,
+                coverage=None,
+                oces=None,
+            )
+        ],
+        "limitations": list(LIMITATION_NOTES),
+        # Findings stay reachable as objects for in-process consumers; the serialised
+        # copies live inside each target summary.
+        "findings_by_target": {target_v1: analysis_v1.findings, target_v2: analysis_v2.findings},
     }
 
 
@@ -874,6 +1165,7 @@ if __name__ == "__main__":
     import sys
 
     output = run_analysis_from_dir(sys.argv[1] if len(sys.argv) > 1 else "results")
-    print(json.dumps({"schema_version": output["schema_version"],
-                     "summary_v1": output["summary_v1"], "summary_v2": output["summary_v2"],
-                     "comparison": output["comparison"]}, indent=2, allow_nan=False))
+    # findings_by_target holds live Finding objects for in-process callers; the serialised
+    # copies already live inside each target summary, so the document stays JSON-clean.
+    print(json.dumps({k: v for k, v in output.items() if k != "findings_by_target"},
+                     indent=2, allow_nan=False))

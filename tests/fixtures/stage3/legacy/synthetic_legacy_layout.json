@@ -1,0 +1,23 @@
+{
+  "schema_version": 2,
+  "layout": "flat",
+  "summary_v1": {
+    "version": "v1",
+    "findings": []
+  },
+  "summary_v2": {
+    "version": "v2",
+    "findings": []
+  },
+  "comparison": {
+    "fingerprints": {
+      "planned_match": true
+    }
+  },
+  "_legacy_adapter_note": "Recognised legacy v2 layout. Route through the emotion legacy adapter with target_id emotion_v1/emotion_v2 recorded as INFERRED, never as declared. Upcast in memory only; the stored bytes stay as they are.",
+  "_synthetic": {
+    "is_synthetic": true,
+    "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+    "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+  }
+}

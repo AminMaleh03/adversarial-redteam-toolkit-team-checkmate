@@ -25,9 +25,14 @@ reach this file at all; it rejects it before calling predict().
 
 MODEL_NAME = "j-hartmann/emotion-english-distilroberta-base"
 
+# Exact commit pinned so V1, V2, and every teammate's cache resolve to the identical
+# weights/config regardless of what "main" points to later. Verified against the actual
+# Hugging Face cache (huggingface_hub.scan_cache_dir): refs/main -> this commit.
+MODEL_REVISION = "0e1cd914e3d46199ed785853e12b57304e04178b"
+
 # Loaded once at import time.
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-_model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, revision=MODEL_REVISION)
+_model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME, revision=MODEL_REVISION)
 
 # top_k=None -> return all label scores, not just the winner.
 # truncation=False -> never silently trim input. See module docstring.

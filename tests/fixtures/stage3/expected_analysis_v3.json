@@ -1,0 +1,1265 @@
+{
+  "schema_version": 3,
+  "contracts_version": "3.0.0",
+  "run_identity": {
+    "run_id": "fixturerun0001",
+    "run_name": "stage3-fixture-run",
+    "created_at_utc": "2026-09-15T00:00:00+00:00",
+    "app_commit": "9386d75a535ed26007379c3e2af5b930d6698015",
+    "dirty": false,
+    "registry_sha256": "3212f30cde643ba6e53e8ef514ecce870f212b1a88bfa208876136cc9b8a0136"
+  },
+  "evaluations": [
+    {
+      "evaluation_id": "emotion.core",
+      "kind": "paired",
+      "task_id": "emotion_7",
+      "suite_id": "core",
+      "targets": [
+        "emotion_v1",
+        "emotion_v2"
+      ],
+      "baseline_file": "baseline/baseline.json",
+      "baseline_file_sha256": "ac9be3d4ab4e6cec9070ded7576a28636c617ac07f30b6f7e8278e2bfb1e3c21",
+      "summaries": {
+        "emotion_v1": {
+          "target_id": "emotion_v1",
+          "version": "v1",
+          "task_id": "emotion_7",
+          "suite_id": "core",
+          "identity": {
+            "declared": {
+              "model_id": "j-hartmann/emotion-english-distilroberta-base",
+              "model_revision": "0e1cd914e3d46199ed785853e12b57304e04178b",
+              "tokenizer_id": "j-hartmann/emotion-english-distilroberta-base",
+              "tokenizer_revision": "0e1cd914e3d46199ed785853e12b57304e04178b",
+              "label_space": [
+                "anger",
+                "disgust",
+                "fear",
+                "joy",
+                "neutral",
+                "sadness",
+                "surprise"
+              ]
+            },
+            "provenance": "declared_by_run_meta"
+          },
+          "coverage": {
+            "planned": 10,
+            "skipped": 0,
+            "limit_excluded": 0,
+            "selected": 10,
+            "completed": 10,
+            "missing": 0,
+            "coverage_rate": 1.0
+          },
+          "category_stats": {
+            "malformed": {
+              "planned": 1,
+              "completed": 1,
+              "failures": 1
+            },
+            "boundary": {
+              "planned": 0,
+              "completed": 0,
+              "failures": 0
+            },
+            "perturbation": {
+              "planned": 3,
+              "completed": 3,
+              "failures": 0
+            },
+            "encoding": {
+              "planned": 3,
+              "completed": 3,
+              "failures": 0
+            },
+            "whitespace": {
+              "planned": 0,
+              "completed": 0,
+              "failures": 0
+            },
+            "truncation": {
+              "planned": 0,
+              "completed": 0,
+              "failures": 0
+            }
+          },
+          "operational": {
+            "unhandled_5xx": 1,
+            "timeouts": 0,
+            "connection_failures": 0,
+            "service_unavailable": 0,
+            "slow_responses": 0,
+            "info_leaks": 0,
+            "invalid_input_accepted": 0
+          },
+          "drift": {
+            "eligible_comparisons": 6,
+            "qualifying_flips": 1,
+            "flip_rate": {
+              "numerator": 1,
+              "denominator": 6,
+              "rate": 0.166667
+            },
+            "baseline_denominator": {
+              "eligible": 3,
+              "total": 3,
+              "threshold": 0.6,
+              "statement": "3 of 3 baselines eligible for flip scoring"
+            },
+            "note": "Measures prediction consistency against this target's own clean prediction. It is not an accuracy measurement; clean-label correctness is reported separately."
+          },
+          "clean_label_agreement": {
+            "numerator": 3,
+            "denominator": 3,
+            "rate": 1.0
+          },
+          "findings": [
+            {
+              "finding": {
+                "finding_id": "emotion_v1-unhandled-5xx-malformed",
+                "title": "Oversized payload produces an unhandled server error",
+                "category": "malformed",
+                "severity_score": 72.0,
+                "severity_tier": "High",
+                "description": "The oversized standalone payload returned HTTP 500. The service answered the following health probe, so this is an observed server-error response, not a demonstrated process death.",
+                "remediation": "Reject request bodies above a configured size limit before JSON parsing and before any tokenization or inference work begins.",
+                "evidence": [
+                  "malformed.oversized_100kb"
+                ]
+              },
+              "subfamily": "oversized_100kb",
+              "failure_mode": "unhandled_5xx",
+              "validity_tiers": [
+                "GOLD"
+              ],
+              "affected_cases": [
+                "attack:malformed.oversized_100kb"
+              ],
+              "remediation_detail": {
+                "rule_id": "malformed.oversized.body_limit",
+                "rule_version": "1.0.0",
+                "rule_sha256": "02ba76dc447ace141598c7672b86daddbef14054874297b02468e0aeebcb7863",
+                "observed": "1 selected case(s) returned HTTP 500 with request_body_bytes recorded by the sender; endpoint_alive_after was true for every one of them.",
+                "significance": "An unguarded body size reaches parsing and inference, so a single client can spend server work at will.",
+                "diagnosis_confidence": "supported",
+                "fix": "Add a request body size limit at the ASGI or framework layer, ahead of JSON parsing. A token-count check does not help here: tokenization happens after the body has already been read and parsed.",
+                "verification": {
+                  "target_id": "emotion_v1",
+                  "command": "python -m runner.run --target http://127.0.0.1:8001 --target-id emotion_v2 --suite core --case-set analysis/case_sets/ci_core_v1.json --out results/verify",
+                  "case_set_file": "analysis/case_sets/ci_core_v1.json",
+                  "includes_baselines": true,
+                  "expected": "malformed.oversized_100kb returns a 4xx rejection status and no selected case returns 5xx."
+                },
+                "unavailable_evidence": []
+              }
+            },
+            {
+              "finding": {
+                "finding_id": "emotion_v1-prediction-flip-homoglyph",
+                "title": "Homoglyph substitution changes the predicted label",
+                "category": "encoding",
+                "severity_score": 48.0,
+                "severity_tier": "Medium",
+                "description": "A confident clean prediction changed label after cross-script homoglyph substitution. Prediction consistency failed; whether the new label is wrong is a separate question from whether it changed.",
+                "remediation": "Treat this as a model-level robustness gap. Application-layer input controls do not close it; NFKC normalization does not fold cross-script homoglyphs.",
+                "evidence": [
+                  "fx-emotion-0.encoding.homoglyph"
+                ]
+              },
+              "subfamily": "homoglyph",
+              "failure_mode": "prediction_flip",
+              "validity_tiers": [
+                "SILVER"
+              ],
+              "affected_cases": [
+                "attack:fx-emotion-0.encoding.homoglyph"
+              ],
+              "remediation_detail": {
+                "rule_id": "encoding.homoglyph.model_level",
+                "rule_version": "1.0.0",
+                "rule_sha256": "46f9b409646fd8f7dae2d244c6ffa04ef80311021168b567774f499b71808227",
+                "observed": "1 eligible comparison(s) changed top label while the clean prediction was at or above the 0.60 confidence threshold.",
+                "significance": "The decision is not stable under a perturbation that leaves the text readable to a person.",
+                "diagnosis_confidence": "supported",
+                "fix": "This needs perturbation-aware evaluation, training-data augmentation with this family, or robustness fine-tuning. Adding an endpoint-level exception handler would not change it, and a confusable-folding filter would change the input rather than the model's sensitivity to it.",
+                "verification": {
+                  "target_id": "emotion_v1",
+                  "command": "python -m runner.run --target http://127.0.0.1:8001 --target-id emotion_v2 --suite core --case-set analysis/case_sets/ci_core_v1.json --out results/verify",
+                  "case_set_file": "analysis/case_sets/ci_core_v1.json",
+                  "includes_baselines": true,
+                  "expected": "The listed attack ids keep the clean top label. Because this is a model-level gap, a passing run means the model changed, not that an endpoint control was added."
+                },
+                "unavailable_evidence": [
+                  "No ground-truth annotation for the attacked text, so this is a consistency failure and is not reported as a new misclassification."
+                ]
+              }
+            }
+          ],
+          "validity_tier_census": {
+            "GOLD": 1,
+            "SILVER": 1
+          },
+          "diagnostic_observations": [],
+          "review_cases": [],
+          "limitations": [
+            "Synthetic fixture. Authored numbers, not measurements.",
+            "An HTTP 500 is an observed server-error response. It does not establish an internal model crash, process death or an information leak."
+          ],
+          "_synthetic": {
+            "is_synthetic": true,
+            "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+            "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+          }
+        },
+        "emotion_v2": {
+          "target_id": "emotion_v2",
+          "version": "v2",
+          "task_id": "emotion_7",
+          "suite_id": "core",
+          "identity": {
+            "declared": {
+              "model_id": "j-hartmann/emotion-english-distilroberta-base",
+              "model_revision": "0e1cd914e3d46199ed785853e12b57304e04178b",
+              "tokenizer_id": "j-hartmann/emotion-english-distilroberta-base",
+              "tokenizer_revision": "0e1cd914e3d46199ed785853e12b57304e04178b",
+              "label_space": [
+                "anger",
+                "disgust",
+                "fear",
+                "joy",
+                "neutral",
+                "sadness",
+                "surprise"
+              ]
+            },
+            "provenance": "declared_by_run_meta"
+          },
+          "coverage": {
+            "planned": 10,
+            "skipped": 0,
+            "limit_excluded": 0,
+            "selected": 10,
+            "completed": 10,
+            "missing": 0,
+            "coverage_rate": 1.0
+          },
+          "category_stats": {
+            "malformed": {
+              "planned": 1,
+              "completed": 1,
+              "failures": 0
+            },
+            "boundary": {
+              "planned": 0,
+              "completed": 0,
+              "failures": 0
+            },
+            "perturbation": {
+              "planned": 3,
+              "completed": 3,
+              "failures": 0
+            },
+            "encoding": {
+              "planned": 3,
+              "completed": 3,
+              "failures": 0
+            },
+            "whitespace": {
+              "planned": 0,
+              "completed": 0,
+              "failures": 0
+            },
+            "truncation": {
+              "planned": 0,
+              "completed": 0,
+              "failures": 0
+            }
+          },
+          "operational": {
+            "unhandled_5xx": 0,
+            "timeouts": 0,
+            "connection_failures": 0,
+            "service_unavailable": 0,
+            "slow_responses": 0,
+            "info_leaks": 0,
+            "invalid_input_accepted": 0
+          },
+          "drift": {
+            "eligible_comparisons": 6,
+            "qualifying_flips": 0,
+            "flip_rate": {
+              "numerator": 0,
+              "denominator": 6,
+              "rate": 0.0
+            },
+            "baseline_denominator": {
+              "eligible": 3,
+              "total": 3,
+              "threshold": 0.6,
+              "statement": "3 of 3 baselines eligible for flip scoring"
+            },
+            "note": "Measures prediction consistency against this target's own clean prediction. It is not an accuracy measurement; clean-label correctness is reported separately."
+          },
+          "clean_label_agreement": {
+            "numerator": 3,
+            "denominator": 3,
+            "rate": 1.0
+          },
+          "findings": [],
+          "validity_tier_census": {
+            "GOLD": 0,
+            "SILVER": 0
+          },
+          "diagnostic_observations": [],
+          "review_cases": [],
+          "limitations": [
+            "Synthetic fixture. Authored numbers, not measurements.",
+            "An HTTP 500 is an observed server-error response. It does not establish an internal model crash, process death or an information leak."
+          ],
+          "_synthetic": {
+            "is_synthetic": true,
+            "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+            "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+          }
+        }
+      },
+      "comparison": {
+        "fingerprints": {
+          "planned_match": true,
+          "manifest_match": true,
+          "whole_suite_comparable": true
+        },
+        "common_eligible_case_ids": [
+          "fx-emotion-0.encoding.homoglyph",
+          "fx-emotion-0.perturbation.keyboard_typo",
+          "fx-emotion-1.encoding.homoglyph",
+          "fx-emotion-1.perturbation.keyboard_typo",
+          "fx-emotion-2.encoding.homoglyph",
+          "fx-emotion-2.perturbation.keyboard_typo"
+        ],
+        "common_denominator": 6,
+        "flips_on_common": {
+          "emotion_v1": 1,
+          "emotion_v2": 0
+        },
+        "flip_rate_on_common": {
+          "emotion_v1": {
+            "numerator": 1,
+            "denominator": 6,
+            "rate": 0.166667
+          },
+          "emotion_v2": {
+            "numerator": 0,
+            "denominator": 6,
+            "rate": 0.0
+          }
+        },
+        "operational": {
+          "emotion_v1": {
+            "unhandled_5xx": 1,
+            "timeouts": 0,
+            "connection_failures": 0,
+            "service_unavailable": 0,
+            "slow_responses": 0,
+            "info_leaks": 0,
+            "invalid_input_accepted": 0
+          },
+          "emotion_v2": {
+            "unhandled_5xx": 0,
+            "timeouts": 0,
+            "connection_failures": 0,
+            "service_unavailable": 0,
+            "slow_responses": 0,
+            "info_leaks": 0,
+            "invalid_input_accepted": 0
+          }
+        },
+        "findings_resolved": [
+          "emotion_v1-unhandled-5xx-malformed",
+          "emotion_v1-prediction-flip-homoglyph"
+        ],
+        "findings_remaining": [],
+        "findings_unavailable": [],
+        "findings_newly_appearing": [],
+        "note": "Deltas are computed over the intersection of eligible case ids in both targets. Each target's individual eligible denominator is kept in its own summary and is not interchangeable with this one."
+      },
+      "coverage": {
+        "coverage_map_version": "fixture-1",
+        "classes": {
+          "in_scope": {
+            "controls_targeted": [
+              "length",
+              "strict_type_schema",
+              "normalization"
+            ],
+            "attack_ids": [
+              "malformed.oversized_100kb"
+            ]
+          },
+          "not_targeted": {
+            "controls_targeted": [],
+            "attack_ids": [
+              "fx-emotion-0.encoding.homoglyph",
+              "fx-emotion-0.perturbation.keyboard_typo",
+              "fx-emotion-1.encoding.homoglyph",
+              "fx-emotion-1.perturbation.keyboard_typo",
+              "fx-emotion-2.encoding.homoglyph",
+              "fx-emotion-2.perturbation.keyboard_typo"
+            ]
+          },
+          "out_of_scope": {
+            "controls_targeted": [],
+            "attack_ids": []
+          },
+          "mixed": {
+            "controls_targeted": [],
+            "attack_ids": []
+          }
+        },
+        "buckets": {
+          "eligible_pass": [
+            "attack:fx-emotion-0.perturbation.keyboard_typo",
+            "attack:fx-emotion-1.encoding.homoglyph",
+            "attack:fx-emotion-1.perturbation.keyboard_typo",
+            "attack:fx-emotion-2.encoding.homoglyph",
+            "attack:fx-emotion-2.perturbation.keyboard_typo"
+          ],
+          "eligible_fail": [
+            "attack:fx-emotion-0.encoding.homoglyph",
+            "attack:malformed.oversized_100kb"
+          ],
+          "review": [],
+          "diagnostic": [],
+          "unevaluable": []
+        },
+        "counts": {
+          "eligible_pass": 5,
+          "eligible_fail": 2,
+          "review": 0,
+          "diagnostic": 0,
+          "unevaluable": 0
+        },
+        "not_selected": 0,
+        "not_executed": 0,
+        "selected_attacks": 7,
+        "notes": [
+          "Classes describe INTENDED input-control coverage. They are not a claim that a control caused any observed result, and not a measure of effectiveness.",
+          "C3 error handling is cross-cutting: its observable responses are evaluated, but no isolated causal proof is claimed.",
+          "Within-control counts may overlap and must not be summed as if disjoint."
+        ],
+        "_synthetic": {
+          "is_synthetic": true,
+          "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+          "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+        }
+      },
+      "oces": null
+    },
+    {
+      "evaluation_id": "sentiment.core",
+      "kind": "single",
+      "task_id": "sentiment_2",
+      "suite_id": "core",
+      "targets": [
+        "sentiment_v1"
+      ],
+      "baseline_file": "baseline/sentiment_baseline.json",
+      "baseline_file_sha256": "5d680b450d9e01a73214e47c2c4894ea533d8e56cc81a8c517c863af6056fda6",
+      "summaries": {
+        "sentiment_v1": {
+          "target_id": "sentiment_v1",
+          "version": "v1",
+          "task_id": "sentiment_2",
+          "suite_id": "core",
+          "identity": {
+            "declared": {
+              "model_id": "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+              "model_revision": "714eb0fa89d2f80546fda750413ed43d93601a13",
+              "tokenizer_id": "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+              "tokenizer_revision": "714eb0fa89d2f80546fda750413ed43d93601a13",
+              "label_space": [
+                "NEGATIVE",
+                "POSITIVE"
+              ]
+            },
+            "provenance": "declared_by_run_meta"
+          },
+          "coverage": {
+            "planned": 10,
+            "skipped": 0,
+            "limit_excluded": 0,
+            "selected": 10,
+            "completed": 10,
+            "missing": 0,
+            "coverage_rate": 1.0
+          },
+          "category_stats": {
+            "malformed": {
+              "planned": 1,
+              "completed": 1,
+              "failures": 1
+            },
+            "boundary": {
+              "planned": 0,
+              "completed": 0,
+              "failures": 0
+            },
+            "perturbation": {
+              "planned": 3,
+              "completed": 3,
+              "failures": 0
+            },
+            "encoding": {
+              "planned": 3,
+              "completed": 3,
+              "failures": 0
+            },
+            "whitespace": {
+              "planned": 0,
+              "completed": 0,
+              "failures": 0
+            },
+            "truncation": {
+              "planned": 0,
+              "completed": 0,
+              "failures": 0
+            }
+          },
+          "operational": {
+            "unhandled_5xx": 1,
+            "timeouts": 0,
+            "connection_failures": 0,
+            "service_unavailable": 0,
+            "slow_responses": 0,
+            "info_leaks": 0,
+            "invalid_input_accepted": 0
+          },
+          "drift": {
+            "eligible_comparisons": 6,
+            "qualifying_flips": 0,
+            "flip_rate": {
+              "numerator": 0,
+              "denominator": 6,
+              "rate": 0.0
+            },
+            "baseline_denominator": {
+              "eligible": 3,
+              "total": 3,
+              "threshold": 0.6,
+              "statement": "3 of 3 baselines eligible for flip scoring"
+            },
+            "note": "Measures prediction consistency against this target's own clean prediction. It is not an accuracy measurement; clean-label correctness is reported separately."
+          },
+          "clean_label_agreement": {
+            "numerator": 3,
+            "denominator": 3,
+            "rate": 1.0
+          },
+          "findings": [
+            {
+              "finding": {
+                "finding_id": "sentiment_v1-unhandled-5xx-malformed",
+                "title": "Oversized payload produces an unhandled server error",
+                "category": "malformed",
+                "severity_score": 72.0,
+                "severity_tier": "High",
+                "description": "The oversized standalone payload returned HTTP 500. The service answered the following health probe, so this is an observed server-error response, not a demonstrated process death.",
+                "remediation": "Reject request bodies above a configured size limit before JSON parsing and before any tokenization or inference work begins.",
+                "evidence": [
+                  "malformed.oversized_100kb"
+                ]
+              },
+              "subfamily": "oversized_100kb",
+              "failure_mode": "unhandled_5xx",
+              "validity_tiers": [
+                "GOLD"
+              ],
+              "affected_cases": [
+                "attack:malformed.oversized_100kb"
+              ],
+              "remediation_detail": {
+                "rule_id": "malformed.oversized.body_limit",
+                "rule_version": "1.0.0",
+                "rule_sha256": "02ba76dc447ace141598c7672b86daddbef14054874297b02468e0aeebcb7863",
+                "observed": "1 selected case(s) returned HTTP 500 with request_body_bytes recorded by the sender; endpoint_alive_after was true for every one of them.",
+                "significance": "An unguarded body size reaches parsing and inference, so a single client can spend server work at will.",
+                "diagnosis_confidence": "supported",
+                "fix": "Add a request body size limit at the ASGI or framework layer, ahead of JSON parsing. A token-count check does not help here: tokenization happens after the body has already been read and parsed.",
+                "verification": {
+                  "target_id": "sentiment_v1",
+                  "command": "python -m runner.run --target http://127.0.0.1:8001 --target-id emotion_v2 --suite core --case-set analysis/case_sets/ci_core_v1.json --out results/verify",
+                  "case_set_file": "analysis/case_sets/ci_core_v1.json",
+                  "includes_baselines": true,
+                  "expected": "malformed.oversized_100kb returns a 4xx rejection status and no selected case returns 5xx."
+                },
+                "unavailable_evidence": []
+              }
+            }
+          ],
+          "validity_tier_census": {
+            "GOLD": 1,
+            "SILVER": 0
+          },
+          "diagnostic_observations": [],
+          "review_cases": [],
+          "limitations": [
+            "Synthetic fixture. Authored numbers, not measurements.",
+            "An HTTP 500 is an observed server-error response. It does not establish an internal model crash, process death or an information leak."
+          ],
+          "_synthetic": {
+            "is_synthetic": true,
+            "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+            "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+          }
+        }
+      },
+      "comparison": null,
+      "coverage": {
+        "coverage_map_version": "fixture-1",
+        "classes": {
+          "in_scope": {
+            "controls_targeted": [
+              "length",
+              "strict_type_schema",
+              "normalization"
+            ],
+            "attack_ids": [
+              "malformed.oversized_100kb"
+            ]
+          },
+          "not_targeted": {
+            "controls_targeted": [],
+            "attack_ids": [
+              "fx-sentiment-0.encoding.homoglyph",
+              "fx-sentiment-0.perturbation.keyboard_typo",
+              "fx-sentiment-1.encoding.homoglyph",
+              "fx-sentiment-1.perturbation.keyboard_typo",
+              "fx-sentiment-2.encoding.homoglyph",
+              "fx-sentiment-2.perturbation.keyboard_typo"
+            ]
+          },
+          "out_of_scope": {
+            "controls_targeted": [],
+            "attack_ids": []
+          },
+          "mixed": {
+            "controls_targeted": [],
+            "attack_ids": []
+          }
+        },
+        "buckets": {
+          "eligible_pass": [
+            "attack:fx-sentiment-0.encoding.homoglyph",
+            "attack:fx-sentiment-0.perturbation.keyboard_typo",
+            "attack:fx-sentiment-1.encoding.homoglyph",
+            "attack:fx-sentiment-1.perturbation.keyboard_typo",
+            "attack:fx-sentiment-2.encoding.homoglyph",
+            "attack:fx-sentiment-2.perturbation.keyboard_typo"
+          ],
+          "eligible_fail": [
+            "attack:malformed.oversized_100kb"
+          ],
+          "review": [],
+          "diagnostic": [],
+          "unevaluable": []
+        },
+        "counts": {
+          "eligible_pass": 6,
+          "eligible_fail": 1,
+          "review": 0,
+          "diagnostic": 0,
+          "unevaluable": 0
+        },
+        "not_selected": 0,
+        "not_executed": 0,
+        "selected_attacks": 7,
+        "notes": [
+          "Classes describe INTENDED input-control coverage. They are not a claim that a control caused any observed result, and not a measure of effectiveness.",
+          "C3 error handling is cross-cutting: its observable responses are evaluated, but no isolated causal proof is claimed.",
+          "Within-control counts may overlap and must not be summed as if disjoint."
+        ],
+        "_synthetic": {
+          "is_synthetic": true,
+          "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+          "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+        }
+      },
+      "oces": null
+    },
+    {
+      "evaluation_id": "emotion.oces",
+      "kind": "paired",
+      "task_id": "emotion_7",
+      "suite_id": "oces",
+      "targets": [
+        "emotion_v1",
+        "emotion_v2"
+      ],
+      "baseline_file": "baseline/oces/emotion_seeds.json",
+      "baseline_file_sha256": "d136da1a12ea8d42e70b109c9767d6d206213f5ea4a0b218387af9b1beafbbb2",
+      "summaries": {
+        "emotion_v1": {
+          "target_id": "emotion_v1",
+          "version": "v1",
+          "task_id": "emotion_7",
+          "suite_id": "oces",
+          "identity": {
+            "declared": {
+              "model_id": "j-hartmann/emotion-english-distilroberta-base",
+              "model_revision": "0e1cd914e3d46199ed785853e12b57304e04178b",
+              "tokenizer_id": "j-hartmann/emotion-english-distilroberta-base",
+              "tokenizer_revision": "0e1cd914e3d46199ed785853e12b57304e04178b",
+              "label_space": [
+                "anger",
+                "disgust",
+                "fear",
+                "joy",
+                "neutral",
+                "sadness",
+                "surprise"
+              ]
+            },
+            "provenance": "declared_by_run_meta"
+          },
+          "coverage": {
+            "planned": 6,
+            "skipped": 0,
+            "limit_excluded": 0,
+            "selected": 6,
+            "completed": 6,
+            "missing": 0,
+            "coverage_rate": 1.0
+          },
+          "category_stats": {
+            "oces.paraphrase": {
+              "planned": 2,
+              "completed": 2,
+              "failures": 0
+            },
+            "oces.distractor": {
+              "planned": 2,
+              "completed": 2,
+              "failures": 0
+            }
+          },
+          "operational": {
+            "unhandled_5xx": 0,
+            "timeouts": 0,
+            "connection_failures": 0,
+            "service_unavailable": 0,
+            "slow_responses": 0,
+            "info_leaks": 0,
+            "invalid_input_accepted": 0
+          },
+          "drift": {
+            "eligible_comparisons": 4,
+            "qualifying_flips": 1,
+            "flip_rate": {
+              "numerator": 1,
+              "denominator": 4,
+              "rate": 0.25
+            },
+            "baseline_denominator": {
+              "eligible": 2,
+              "total": 2,
+              "threshold": 0.6,
+              "statement": "2 of 2 baselines eligible for flip scoring"
+            },
+            "note": "Measures prediction consistency against this target's own clean prediction. It is not an accuracy measurement; clean-label correctness is reported separately."
+          },
+          "clean_label_agreement": {
+            "numerator": 2,
+            "denominator": 2,
+            "rate": 1.0
+          },
+          "findings": [
+            {
+              "finding": {
+                "finding_id": "emotion_v1-prediction-flip-homoglyph",
+                "title": "Homoglyph substitution changes the predicted label",
+                "category": "encoding",
+                "severity_score": 48.0,
+                "severity_tier": "Medium",
+                "description": "A confident clean prediction changed label after cross-script homoglyph substitution. Prediction consistency failed; whether the new label is wrong is a separate question from whether it changed.",
+                "remediation": "Treat this as a model-level robustness gap. Application-layer input controls do not close it; NFKC normalization does not fold cross-script homoglyphs.",
+                "evidence": [
+                  "fx-emotion-0.oces.distractor.v1"
+                ]
+              },
+              "subfamily": "homoglyph",
+              "failure_mode": "prediction_flip",
+              "validity_tiers": [
+                "SILVER"
+              ],
+              "affected_cases": [
+                "attack:fx-emotion-0.oces.distractor.v1"
+              ],
+              "remediation_detail": {
+                "rule_id": "encoding.homoglyph.model_level",
+                "rule_version": "1.0.0",
+                "rule_sha256": "46f9b409646fd8f7dae2d244c6ffa04ef80311021168b567774f499b71808227",
+                "observed": "1 eligible comparison(s) changed top label while the clean prediction was at or above the 0.60 confidence threshold.",
+                "significance": "The decision is not stable under a perturbation that leaves the text readable to a person.",
+                "diagnosis_confidence": "supported",
+                "fix": "This needs perturbation-aware evaluation, training-data augmentation with this family, or robustness fine-tuning. Adding an endpoint-level exception handler would not change it, and a confusable-folding filter would change the input rather than the model's sensitivity to it.",
+                "verification": {
+                  "target_id": "emotion_v1",
+                  "command": "python -m runner.run --target http://127.0.0.1:8001 --target-id emotion_v2 --suite core --case-set analysis/case_sets/ci_core_v1.json --out results/verify",
+                  "case_set_file": "analysis/case_sets/ci_core_v1.json",
+                  "includes_baselines": true,
+                  "expected": "The listed attack ids keep the clean top label. Because this is a model-level gap, a passing run means the model changed, not that an endpoint control was added."
+                },
+                "unavailable_evidence": [
+                  "No ground-truth annotation for the attacked text, so this is a consistency failure and is not reported as a new misclassification."
+                ]
+              }
+            }
+          ],
+          "validity_tier_census": {
+            "GOLD": 0,
+            "SILVER": 1
+          },
+          "diagnostic_observations": [],
+          "review_cases": [],
+          "limitations": [
+            "Synthetic fixture. Authored numbers, not measurements.",
+            "An HTTP 500 is an observed server-error response. It does not establish an internal model crash, process death or an information leak."
+          ],
+          "_synthetic": {
+            "is_synthetic": true,
+            "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+            "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+          }
+        },
+        "emotion_v2": {
+          "target_id": "emotion_v2",
+          "version": "v2",
+          "task_id": "emotion_7",
+          "suite_id": "oces",
+          "identity": {
+            "declared": {
+              "model_id": "j-hartmann/emotion-english-distilroberta-base",
+              "model_revision": "0e1cd914e3d46199ed785853e12b57304e04178b",
+              "tokenizer_id": "j-hartmann/emotion-english-distilroberta-base",
+              "tokenizer_revision": "0e1cd914e3d46199ed785853e12b57304e04178b",
+              "label_space": [
+                "anger",
+                "disgust",
+                "fear",
+                "joy",
+                "neutral",
+                "sadness",
+                "surprise"
+              ]
+            },
+            "provenance": "declared_by_run_meta"
+          },
+          "coverage": {
+            "planned": 6,
+            "skipped": 0,
+            "limit_excluded": 0,
+            "selected": 6,
+            "completed": 6,
+            "missing": 0,
+            "coverage_rate": 1.0
+          },
+          "category_stats": {
+            "oces.paraphrase": {
+              "planned": 2,
+              "completed": 2,
+              "failures": 0
+            },
+            "oces.distractor": {
+              "planned": 2,
+              "completed": 2,
+              "failures": 0
+            }
+          },
+          "operational": {
+            "unhandled_5xx": 0,
+            "timeouts": 0,
+            "connection_failures": 0,
+            "service_unavailable": 0,
+            "slow_responses": 0,
+            "info_leaks": 0,
+            "invalid_input_accepted": 0
+          },
+          "drift": {
+            "eligible_comparisons": 4,
+            "qualifying_flips": 0,
+            "flip_rate": {
+              "numerator": 0,
+              "denominator": 4,
+              "rate": 0.0
+            },
+            "baseline_denominator": {
+              "eligible": 2,
+              "total": 2,
+              "threshold": 0.6,
+              "statement": "2 of 2 baselines eligible for flip scoring"
+            },
+            "note": "Measures prediction consistency against this target's own clean prediction. It is not an accuracy measurement; clean-label correctness is reported separately."
+          },
+          "clean_label_agreement": {
+            "numerator": 2,
+            "denominator": 2,
+            "rate": 1.0
+          },
+          "findings": [],
+          "validity_tier_census": {
+            "GOLD": 0,
+            "SILVER": 0
+          },
+          "diagnostic_observations": [],
+          "review_cases": [],
+          "limitations": [
+            "Synthetic fixture. Authored numbers, not measurements.",
+            "An HTTP 500 is an observed server-error response. It does not establish an internal model crash, process death or an information leak."
+          ],
+          "_synthetic": {
+            "is_synthetic": true,
+            "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+            "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+          }
+        }
+      },
+      "comparison": {
+        "fingerprints": {
+          "planned_match": true,
+          "manifest_match": true,
+          "whole_suite_comparable": true
+        },
+        "common_eligible_case_ids": [
+          "fx-emotion-0.oces.distractor.v1",
+          "fx-emotion-0.oces.paraphrase.v1",
+          "fx-emotion-1.oces.distractor.v1",
+          "fx-emotion-1.oces.paraphrase.v1"
+        ],
+        "common_denominator": 4,
+        "flips_on_common": {
+          "emotion_v1": 1,
+          "emotion_v2": 0
+        },
+        "flip_rate_on_common": {
+          "emotion_v1": {
+            "numerator": 1,
+            "denominator": 4,
+            "rate": 0.25
+          },
+          "emotion_v2": {
+            "numerator": 0,
+            "denominator": 4,
+            "rate": 0.0
+          }
+        },
+        "operational": {
+          "emotion_v1": {
+            "unhandled_5xx": 0,
+            "timeouts": 0,
+            "connection_failures": 0,
+            "service_unavailable": 0,
+            "slow_responses": 0,
+            "info_leaks": 0,
+            "invalid_input_accepted": 0
+          },
+          "emotion_v2": {
+            "unhandled_5xx": 0,
+            "timeouts": 0,
+            "connection_failures": 0,
+            "service_unavailable": 0,
+            "slow_responses": 0,
+            "info_leaks": 0,
+            "invalid_input_accepted": 0
+          }
+        },
+        "findings_resolved": [
+          "emotion_v1-prediction-flip-homoglyph"
+        ],
+        "findings_remaining": [],
+        "findings_unavailable": [],
+        "findings_newly_appearing": [],
+        "note": "Deltas are computed over the intersection of eligible case ids in both targets. Each target's individual eligible denominator is kept in its own summary and is not interchangeable with this one."
+      },
+      "coverage": null,
+      "oces": {
+        "families": [
+          "oces.paraphrase",
+          "oces.distractor"
+        ],
+        "planned_attack_ids": [
+          "fx-emotion-0.oces.distractor.v1",
+          "fx-emotion-0.oces.paraphrase.v1",
+          "fx-emotion-1.oces.distractor.v1",
+          "fx-emotion-1.oces.paraphrase.v1"
+        ],
+        "by_target": {
+          "emotion_v1": {
+            "per_case": {
+              "fx-emotion-0.oces.distractor.v1": {
+                "status": "violates_expectation",
+                "reason": "top label changed under a label-invariant transformation"
+              },
+              "fx-emotion-0.oces.paraphrase.v1": {
+                "status": "meets_expectation",
+                "reason": ""
+              },
+              "fx-emotion-1.oces.distractor.v1": {
+                "status": "meets_expectation",
+                "reason": ""
+              },
+              "fx-emotion-1.oces.paraphrase.v1": {
+                "status": "meets_expectation",
+                "reason": ""
+              }
+            },
+            "violation_rate": {
+              "numerator": 1,
+              "denominator": 4,
+              "rate": 0.25
+            },
+            "per_family": {
+              "oces.paraphrase": {
+                "numerator": 0,
+                "denominator": 2,
+                "rate": 0.0
+              },
+              "oces.distractor": {
+                "numerator": 1,
+                "denominator": 2,
+                "rate": 0.5
+              }
+            }
+          },
+          "emotion_v2": {
+            "per_case": {
+              "fx-emotion-0.oces.distractor.v1": {
+                "status": "meets_expectation",
+                "reason": ""
+              },
+              "fx-emotion-0.oces.paraphrase.v1": {
+                "status": "meets_expectation",
+                "reason": ""
+              },
+              "fx-emotion-1.oces.distractor.v1": {
+                "status": "meets_expectation",
+                "reason": ""
+              },
+              "fx-emotion-1.oces.paraphrase.v1": {
+                "status": "meets_expectation",
+                "reason": ""
+              }
+            },
+            "violation_rate": {
+              "numerator": 0,
+              "denominator": 4,
+              "rate": 0.0
+            },
+            "per_family": {
+              "oces.paraphrase": {
+                "numerator": 0,
+                "denominator": 2,
+                "rate": 0.0
+              },
+              "oces.distractor": {
+                "numerator": 0,
+                "denominator": 2,
+                "rate": 0.0
+              }
+            }
+          }
+        },
+        "exposure_statement": "Additional evaluation authored after the evaluated defenses were frozen; the authors were aware of the defenses. This is NOT a blind holdout and is not design-independent.",
+        "freeze": {
+          "defense_file": "endpoint/v2.py",
+          "defense_sha256": "cf364b70c80c25081a5cb5a0ff83c844fe9199d7cbc65a517b59177ccf434a9e",
+          "note": "Real freeze identity; the case content here is synthetic."
+        },
+        "note": "Flips are consistency failures. Calling one a new misclassification needs evidence that the clean baseline was classified correctly to begin with.",
+        "_synthetic": {
+          "is_synthetic": true,
+          "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+          "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+        }
+      }
+    },
+    {
+      "evaluation_id": "sentiment.oces",
+      "kind": "single",
+      "task_id": "sentiment_2",
+      "suite_id": "oces",
+      "targets": [
+        "sentiment_v1"
+      ],
+      "baseline_file": "baseline/oces/sentiment_seeds.json",
+      "baseline_file_sha256": "2f7687dbfbccd8a3b69863cd38034ba04dc313dc67160b38e3edda7730d005fe",
+      "summaries": {
+        "sentiment_v1": {
+          "target_id": "sentiment_v1",
+          "version": "v1",
+          "task_id": "sentiment_2",
+          "suite_id": "oces",
+          "identity": {
+            "declared": {
+              "model_id": "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+              "model_revision": "714eb0fa89d2f80546fda750413ed43d93601a13",
+              "tokenizer_id": "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+              "tokenizer_revision": "714eb0fa89d2f80546fda750413ed43d93601a13",
+              "label_space": [
+                "NEGATIVE",
+                "POSITIVE"
+              ]
+            },
+            "provenance": "declared_by_run_meta"
+          },
+          "coverage": {
+            "planned": 6,
+            "skipped": 0,
+            "limit_excluded": 0,
+            "selected": 6,
+            "completed": 6,
+            "missing": 0,
+            "coverage_rate": 1.0
+          },
+          "category_stats": {
+            "oces.paraphrase": {
+              "planned": 2,
+              "completed": 2,
+              "failures": 0
+            },
+            "oces.distractor": {
+              "planned": 2,
+              "completed": 2,
+              "failures": 0
+            }
+          },
+          "operational": {
+            "unhandled_5xx": 0,
+            "timeouts": 0,
+            "connection_failures": 0,
+            "service_unavailable": 0,
+            "slow_responses": 0,
+            "info_leaks": 0,
+            "invalid_input_accepted": 0
+          },
+          "drift": {
+            "eligible_comparisons": 4,
+            "qualifying_flips": 0,
+            "flip_rate": {
+              "numerator": 0,
+              "denominator": 4,
+              "rate": 0.0
+            },
+            "baseline_denominator": {
+              "eligible": 2,
+              "total": 2,
+              "threshold": 0.6,
+              "statement": "2 of 2 baselines eligible for flip scoring"
+            },
+            "note": "Measures prediction consistency against this target's own clean prediction. It is not an accuracy measurement; clean-label correctness is reported separately."
+          },
+          "clean_label_agreement": {
+            "numerator": 2,
+            "denominator": 2,
+            "rate": 1.0
+          },
+          "findings": [],
+          "validity_tier_census": {
+            "GOLD": 0,
+            "SILVER": 0
+          },
+          "diagnostic_observations": [],
+          "review_cases": [],
+          "limitations": [
+            "Synthetic fixture. Authored numbers, not measurements.",
+            "An HTTP 500 is an observed server-error response. It does not establish an internal model crash, process death or an information leak."
+          ],
+          "_synthetic": {
+            "is_synthetic": true,
+            "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+            "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+          }
+        }
+      },
+      "comparison": null,
+      "coverage": null,
+      "oces": {
+        "families": [
+          "oces.paraphrase",
+          "oces.distractor"
+        ],
+        "planned_attack_ids": [
+          "fx-sentiment-0.oces.distractor.v1",
+          "fx-sentiment-0.oces.paraphrase.v1",
+          "fx-sentiment-1.oces.distractor.v1",
+          "fx-sentiment-1.oces.paraphrase.v1"
+        ],
+        "by_target": {
+          "sentiment_v1": {
+            "per_case": {
+              "fx-sentiment-0.oces.distractor.v1": {
+                "status": "meets_expectation",
+                "reason": ""
+              },
+              "fx-sentiment-0.oces.paraphrase.v1": {
+                "status": "meets_expectation",
+                "reason": ""
+              },
+              "fx-sentiment-1.oces.distractor.v1": {
+                "status": "meets_expectation",
+                "reason": ""
+              },
+              "fx-sentiment-1.oces.paraphrase.v1": {
+                "status": "meets_expectation",
+                "reason": ""
+              }
+            },
+            "violation_rate": {
+              "numerator": 0,
+              "denominator": 4,
+              "rate": 0.0
+            },
+            "per_family": {
+              "oces.paraphrase": {
+                "numerator": 0,
+                "denominator": 2,
+                "rate": 0.0
+              },
+              "oces.distractor": {
+                "numerator": 0,
+                "denominator": 2,
+                "rate": 0.0
+              }
+            }
+          }
+        },
+        "exposure_statement": "Additional evaluation authored after the evaluated defenses were frozen; the authors were aware of the defenses. This is NOT a blind holdout and is not design-independent.",
+        "freeze": {
+          "defense_file": "endpoint/v2.py",
+          "defense_sha256": "cf364b70c80c25081a5cb5a0ff83c844fe9199d7cbc65a517b59177ccf434a9e",
+          "note": "Real freeze identity; the case content here is synthetic."
+        },
+        "note": "Flips are consistency failures. Calling one a new misclassification needs evidence that the clean baseline was classified correctly to begin with.",
+        "_synthetic": {
+          "is_synthetic": true,
+          "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+          "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "Synthetic fixture. Every number here is authored, not measured.",
+    "An observed HTTP 500 is a server-error response. It is not evidence of an internal model crash, process death or an information leak.",
+    "Coverage classes describe intended input-control coverage, not demonstrated effectiveness and not causal attribution.",
+    "The additional evaluation was authored after the defenses were frozen by authors who knew the defenses. It is not a blind holdout.",
+    "A prediction flip is a consistency failure, not automatically a new wrong answer."
+  ],
+  "_synthetic": {
+    "is_synthetic": true,
+    "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+    "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+  }
+}

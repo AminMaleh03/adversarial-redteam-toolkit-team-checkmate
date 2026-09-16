@@ -1,0 +1,70 @@
+{
+  "coverage_map_version": "fixture-1",
+  "classes": {
+    "in_scope": {
+      "controls_targeted": [
+        "length",
+        "strict_type_schema",
+        "normalization"
+      ],
+      "attack_ids": [
+        "malformed.oversized_100kb"
+      ]
+    },
+    "not_targeted": {
+      "controls_targeted": [],
+      "attack_ids": [
+        "fx-emotion-0.encoding.homoglyph",
+        "fx-emotion-0.perturbation.keyboard_typo",
+        "fx-emotion-1.encoding.homoglyph",
+        "fx-emotion-1.perturbation.keyboard_typo",
+        "fx-emotion-2.encoding.homoglyph",
+        "fx-emotion-2.perturbation.keyboard_typo"
+      ]
+    },
+    "out_of_scope": {
+      "controls_targeted": [],
+      "attack_ids": []
+    },
+    "mixed": {
+      "controls_targeted": [],
+      "attack_ids": []
+    }
+  },
+  "buckets": {
+    "eligible_pass": [
+      "attack:fx-emotion-0.perturbation.keyboard_typo",
+      "attack:fx-emotion-1.encoding.homoglyph",
+      "attack:fx-emotion-1.perturbation.keyboard_typo",
+      "attack:fx-emotion-2.encoding.homoglyph",
+      "attack:fx-emotion-2.perturbation.keyboard_typo"
+    ],
+    "eligible_fail": [
+      "attack:fx-emotion-0.encoding.homoglyph",
+      "attack:malformed.oversized_100kb"
+    ],
+    "review": [],
+    "diagnostic": [],
+    "unevaluable": []
+  },
+  "counts": {
+    "eligible_pass": 5,
+    "eligible_fail": 2,
+    "review": 0,
+    "diagnostic": 0,
+    "unevaluable": 0
+  },
+  "not_selected": 0,
+  "not_executed": 0,
+  "selected_attacks": 7,
+  "notes": [
+    "Classes describe INTENDED input-control coverage. They are not a claim that a control caused any observed result, and not a measure of effectiveness.",
+    "C3 error handling is cross-cutting: its observable responses are evaluated, but no isolated causal proof is claimed.",
+    "Within-control counts may overlap and must not be summed as if disjoint."
+  ],
+  "_synthetic": {
+    "is_synthetic": true,
+    "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+    "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+  }
+}

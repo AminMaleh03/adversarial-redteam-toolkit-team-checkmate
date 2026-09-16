@@ -220,7 +220,7 @@ def test_legitimate_partial_run_keeps_inconclusive_evidence(artifacts):
             "".join(json.dumps(dataclasses.asdict(r)) + "\n" for r in rows), encoding="utf8")
         digest = hashlib.sha256(artifacts["manifest_path"].read_bytes()).hexdigest()
         artifacts[f"meta_{version}_path"].write_text(json.dumps(metadata(rows, version, digest)), encoding="utf8")
-    result = analyze.run_analysis(**artifacts)
+    result = analyze.legacy_v2_view(analyze.run_analysis(**artifacts))
     assert result["comparison"]["findings_resolved"] == []
     assert result["comparison"]["findings_unavailable"][0]["unavailable_ids"] == ["a1"]
 
@@ -281,15 +281,19 @@ def test_valid_files_produce_deterministic_serializable_report_input(artifacts):
     first = analyze.run_analysis(**artifacts)
     second = analyze.run_analysis(**artifacts)
     assert first == second
-    assert first["schema_version"] == 2
+    assert first["schema_version"] == 3
+    assert first["contracts_version"] == "3.0.0"
     json.dumps(first, default=dataclasses.asdict, allow_nan=False)
-    for version in ("v1", "v2"):
-        assert first[f"summary_{version}"]["version"] == version
+    block = first["evaluations"][0]
+    assert block["targets"] == ["emotion_v1", "emotion_v2"]
+    for target, version in (("emotion_v1", "v1"), ("emotion_v2", "v2")):
+        assert block["summaries"][target]["version"] == version
+        assert block["summaries"][target]["target_id"] == target
 
 
 def test_different_planned_fingerprints_withhold_all_comparison_claims(artifacts):
     update_json(artifacts["meta_v2_path"], lambda m: m["fingerprints"].update(planned_suite_sha256="c" * 64))
-    comparison = analyze.run_analysis(**artifacts)["comparison"]
+    comparison = analyze.legacy_v2_view(analyze.run_analysis(**artifacts))["comparison"]
     assert "comparison_withheld_reason" in comparison
     for key in ("finding_comparisons", "new_finding_evidence", "inconclusive_new_findings", "category_failure_rates"):
         assert key not in comparison
@@ -300,8 +304,9 @@ def test_flat_cli_emits_report_schema(artifacts):
                               str(artifacts["manifest_path"].parent)],
                              check=True, capture_output=True, text=True)
     output = json.loads(process.stdout)
-    assert set(output) == {"schema_version", "summary_v1", "summary_v2", "comparison"}
-    assert output["schema_version"] == 2
+    assert set(output) == {"schema_version", "contracts_version", "run_identity",
+                           "evaluations", "limitations"}
+    assert output["schema_version"] == 3
 
 
 def test_nested_runner_layout_checks_both_manifests(artifacts, tmp_path):
@@ -327,7 +332,7 @@ def test_valid_limit_and_skip_metadata_is_supported(artifacts):
                             limit_excluded=["attack:a2"])
     meta["coverage"].update(selected=1, missing=0, skipped=1, limit_excluded=1)
     artifacts["meta_v2_path"].write_text(json.dumps(meta), encoding="utf8")
-    result = analyze.run_analysis(**artifacts)
+    result = analyze.legacy_v2_view(analyze.run_analysis(**artifacts))
     assert result["comparison"]["coverage"]["unavailable"] == ["attack:a1", "attack:a2"]
 
 
@@ -335,7 +340,7 @@ def test_empty_recorded_run_is_labelled_with_its_expected_version(artifacts):
     artifacts["results_v2_path"].write_text("", encoding="utf8")
     digest = hashlib.sha256(artifacts["manifest_path"].read_bytes()).hexdigest()
     artifacts["meta_v2_path"].write_text(json.dumps(metadata([], "v2", digest)), encoding="utf8")
-    result = analyze.run_analysis(**artifacts)
+    result = analyze.legacy_v2_view(analyze.run_analysis(**artifacts))
     assert result["summary_v2"]["version"] == "v2"
     assert result["summary_v2"]["drift"]["flip_rate"] == "N/A"
 
@@ -372,3 +377,104 @@ def test_non_success_prediction_cannot_enter_baseline_census():
     result = drift.baseline_confidence_census([clean(status_code=500)])
     assert result.eligible == 0
     assert result.no_prediction_ids == ["b1"]
+
+
+# ------------------------------------------------------------------------------------------
+# Declared-identity runs through the PAIRED entry point.
+#
+# Every artifact above is the legacy shape: rows with no target_id, run_meta with no model
+# block. That blind spot let a real break ship -- the runner now stamps target_id on every
+# row, resolve_identity rightly refuses to guess a label space for such rows, and the paired
+# path supplied none, so `run_all.py --mode demo` (and the web Demo button behind it) died in
+# analysis while the whole suite stayed green. These drive the shape the runner actually
+# writes. Added by Ahsan with the user's authorization for the fix; owner remains Khalid.
+# ------------------------------------------------------------------------------------------
+
+DECLARED_LABELS = ["anger", "disgust", "fear", "joy", "neutral", "sadness", "surprise"]
+
+
+def scores_for(label, confidence):
+    """A complete score vector, which declared-identity rows are required to carry."""
+    rest = round((1.0 - confidence) / (len(DECLARED_LABELS) - 1), 6)
+    return {name: (confidence if name == label else rest) for name in DECLARED_LABELS}
+
+
+def declared_stamp(version, label="joy", confidence=0.9):
+    return dict(target_id=f"emotion_{version}", suite_id="core",
+                all_scores=scores_for(label, confidence))
+
+
+def declared_meta(rows, version, digest="a" * 64, labels=DECLARED_LABELS, **changes):
+    meta = metadata(rows, version, digest)
+    meta["target_id"] = f"emotion_{version}"
+    meta["task_id"] = "emotion_7"
+    meta["suite_id"] = "core"
+    meta["model"] = dict(model_id="j-hartmann/emotion-english-distilroberta-base",
+                         revision="0" * 40, labels=list(labels), max_sequence_length=512)
+    meta.update(changes)
+    return meta
+
+
+@pytest.fixture
+def declared_artifacts(tmp_path):
+    """The paired layout exactly as the current runner writes it."""
+    entries = manifest()
+    paths = {"manifest_path": tmp_path / "manifest.json"}
+    paths["manifest_path"].write_text(json.dumps(entries), encoding="utf8")
+    digest = hashlib.sha256(paths["manifest_path"].read_bytes()).hexdigest()
+    for version in ("v1", "v2"):
+        stamp = declared_stamp(version)
+        rows = [clean(version, **stamp), row(version, **stamp), row(version, "a2", **stamp)]
+        paths[f"results_{version}_path"] = tmp_path / f"results_{version}.jsonl"
+        paths[f"results_{version}_path"].write_text(
+            "".join(json.dumps(dataclasses.asdict(r)) + "\n" for r in rows), encoding="utf8")
+        paths[f"meta_{version}_path"] = tmp_path / f"run_meta_{version}.json"
+        paths[f"meta_{version}_path"].write_text(
+            json.dumps(declared_meta(rows, version, digest)), encoding="utf8")
+    return paths
+
+
+def test_paired_run_with_declared_identity_is_analysable(declared_artifacts):
+    document = analyze.run_analysis(**declared_artifacts)
+    evaluation, = document["evaluations"]
+    assert evaluation["targets"] == ["emotion_v1", "emotion_v2"]
+    for target in evaluation["targets"]:
+        identity = evaluation["summaries"][target]["identity"]
+        # The label space came from each run's own model block, not from a fallback.
+        assert identity["model"]["labels"] == DECLARED_LABELS
+        assert identity["provenance"] == "declared"
+        assert identity["declared"]["target_id"] == target
+    assert document["run_identity"]["provenance"] == "declared"
+
+
+def test_declared_identity_survives_the_legacy_v2_projection(declared_artifacts):
+    view = analyze.legacy_v2_view(analyze.run_analysis(**declared_artifacts))
+    assert view["summary_v1"]["target_id"] == "emotion_v1"
+    assert view["summary_v2"]["target_id"] == "emotion_v2"
+    assert view["comparison"]
+
+
+def test_declared_run_missing_its_label_space_still_refuses_to_guess(declared_artifacts):
+    update_json(declared_artifacts["meta_v1_path"], lambda m: m.pop("model"))
+    with pytest.raises(ValueError, match="no label space was supplied"):
+        analyze.run_analysis(**declared_artifacts)
+
+
+def test_paired_runs_with_different_label_spaces_are_not_compared(declared_artifacts):
+    update_json(declared_artifacts["meta_v2_path"],
+                lambda m: m["model"].update(labels=["NEGATIVE", "POSITIVE"]))
+    with pytest.raises(ValueError, match="different label spaces"):
+        analyze.run_analysis(**declared_artifacts)
+
+
+@pytest.mark.parametrize("labels", [[], "joy", ["joy", "joy"], ["joy", 3], ["joy", ""]])
+def test_unusable_recorded_label_space_is_rejected(declared_artifacts, labels):
+    update_json(declared_artifacts["meta_v1_path"],
+                lambda m: m["model"].update(labels=labels))
+    with pytest.raises(ValueError, match="model.labels|label space"):
+        analyze.run_analysis(**declared_artifacts)
+
+
+def test_legacy_artifacts_without_a_model_block_are_unaffected(artifacts):
+    document = analyze.run_analysis(**artifacts)
+    assert document["run_identity"]["provenance"] == "inferred_legacy"

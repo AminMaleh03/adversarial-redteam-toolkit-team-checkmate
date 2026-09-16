@@ -1,0 +1,50 @@
+{
+  "fx-sentiment-0.oces.distractor.v1": {
+    "attack_id": "fx-sentiment-0.oces.distractor.v1",
+    "family": "oces.distractor",
+    "subfamily": "v1",
+    "relation": "invariant",
+    "oracle": "label_should_match_baseline",
+    "source": "Stage 3 synthetic fixture",
+    "validity_tier": "SILVER",
+    "semantic_risk": "low",
+    "requires_baseline": true,
+    "suite_id": "oces"
+  },
+  "fx-sentiment-0.oces.paraphrase.v1": {
+    "attack_id": "fx-sentiment-0.oces.paraphrase.v1",
+    "family": "oces.paraphrase",
+    "subfamily": "v1",
+    "relation": "invariant",
+    "oracle": "label_should_match_baseline",
+    "source": "Stage 3 synthetic fixture",
+    "validity_tier": "SILVER",
+    "semantic_risk": "low",
+    "requires_baseline": true,
+    "suite_id": "oces"
+  },
+  "fx-sentiment-1.oces.distractor.v1": {
+    "attack_id": "fx-sentiment-1.oces.distractor.v1",
+    "family": "oces.distractor",
+    "subfamily": "v1",
+    "relation": "invariant",
+    "oracle": "label_should_match_baseline",
+    "source": "Stage 3 synthetic fixture",
+    "validity_tier": "SILVER",
+    "semantic_risk": "low",
+    "requires_baseline": true,
+    "suite_id": "oces"
+  },
+  "fx-sentiment-1.oces.paraphrase.v1": {
+    "attack_id": "fx-sentiment-1.oces.paraphrase.v1",
+    "family": "oces.paraphrase",
+    "subfamily": "v1",
+    "relation": "invariant",
+    "oracle": "label_should_match_baseline",
+    "source": "Stage 3 synthetic fixture",
+    "validity_tier": "SILVER",
+    "semantic_risk": "low",
+    "requires_baseline": true,
+    "suite_id": "oces"
+  }
+}

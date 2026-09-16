@@ -1,0 +1,108 @@
+{
+  "artifact": "oces_freeze_provenance",
+  "phase": "Stage 3 Task 4 Phase 5 (freeze provenance)",
+  "note": "Authored AFTER OCES case-content freeze commit A and references it. Per Task 4, a commit cannot embed its own hash, so the freeze SHA lives here, not in the frozen content. No frozen OCES seed/case/tier/expectation file is altered here.",
+  "freeze_commit": "5e01825f7e399ae2019671f0f964b6b83be52a71",
+  "freeze_commit_utc": "2026-09-15T11:34:47Z",
+  "branch": "stage3/lamei",
+  "foundation_commit": "257e15f3432aa29a3942d52b2cf3befb12ba3354",
+  "defense_identity": {
+    "foundation_commit": "257e15f3432aa29a3942d52b2cf3befb12ba3354",
+    "endpoint_v2_git_blob": "b71787e3bf39e4062f883c9e34fae78d5b7c6263",
+    "endpoint_v2_lf_sha256": "b71193bef639410c828ec78e9aacc172e5da6a1c3b9fd8e5f7041ee6afc78baf",
+    "endpoint_v2_crlf_sha256": "cf364b70c80c25081a5cb5a0ff83c844fe9199d7cbc65a517b59177ccf434a9e",
+    "verified": "endpoint/v2.py git blob matches foundation 257e15f and lamei HEAD; unchanged by Task 4"
+  },
+  "tokenizers": {
+    "emotion": {
+      "id": "j-hartmann/emotion-english-distilroberta-base",
+      "revision": "0e1cd914e3d46199ed785853e12b57304e04178b"
+    },
+    "sentiment": {
+      "id": "distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+      "revision": "714eb0fa89d2f80546fda750413ed43d93601a13"
+    },
+    "token_limit_checked": 512,
+    "check": "add_special_tokens=True, truncation=False; both tokenizers per clean request AND per variant"
+  },
+  "generator_version": "1.2.0",
+  "coverage_map_version": "1.0.0",
+  "frozen_artifacts_sha256": {
+    "baseline/oces/emotion_seeds.json": "d5cc6011848ad5800fdfbb2b006a2cc77e7f8de0bd0d6cef3e5d012565951af3",
+    "baseline/oces/sentiment_seeds.json": "a16e5c999c68fc20e685e793b7cfd3e6de38cf49cfc70ebf1e42a833390fd2c5",
+    "attacks/data/oces/emotion_cases.json": "f2e8e394f8cb90cf9dab6de225bb8033868f72ee273f7ea61516a5ff1af65863",
+    "attacks/data/oces/sentiment_cases.json": "053737c338ae0102807e7099963817de33c6d89c972d4e87d93226d504799e04",
+    "attacks/data/oces/provenance.json": "003bdaaaa87aea39f952fbcc0778f419e9be5562eca8b725ac0967c72ea08b85",
+    "baseline/oces/oces_content.py": "522f7f89c878ce7170a0dae9f913ae744e9e466ac904fde2d5e75264b7273ad2",
+    "baseline/oces/build_oces.py": "2f53e72bfaa52a55ce3db4f20c1a6d14ced34d6c6b2551c10dda236b7eeb8357"
+  },
+  "counts": {
+    "emotion_seeds": 21,
+    "sentiment_seeds": 20,
+    "clean_requests": 41,
+    "variants": 82,
+    "total_additional_requests": 123,
+    "family_counts": {
+      "oces.distractor": 41,
+      "oces.paraphrase": 41
+    }
+  },
+  "tier_distribution": {
+    "REVIEW": 32,
+    "SILVER": 50
+  },
+  "semantic_risk_distribution": {
+    "high": 10,
+    "low": 50,
+    "medium": 22
+  },
+  "coverage_distribution": {
+    "not_targeted": 82
+  },
+  "human_review": {
+    "reviewer": "Lamei (Task 4 owner)",
+    "method": "human semantic review by Lamei, assisted by ChatGPT",
+    "author": "AI draft (Claude Code); Task 4 owner: Lamei",
+    "status": "accepted; 0 deleted, 0 rewrites, no GOLD promotion",
+    "decisions": {
+      "SILVER": "APPROVE",
+      "REVIEW": "KEEP_REVIEW"
+    }
+  },
+  "exposure_statement": "additional evaluation authored after the evaluated defenses were frozen; the authors were aware of the defenses; not a blind holdout and not design-independent",
+  "model_inference_before_freeze": false,
+  "no_result_driven_tuning": "No OCES seed, variant, case ID, tier or expectation was selected, removed, rewritten or retuned based on any model result. No V1/V2 prediction, confidence or success was queried.",
+  "integration_repair": {
+    "note": "Appended by an integration-only repair on stage3/integration, AFTER Freeze Commit B above. Does not alter, invalidate or backdate Freeze A/B; every field above this block is exactly as Lamei authored and committed it. This block documents a follow-on generator fix found and applied during PR #8 integration review.",
+    "reason": "cross-platform LF byte reproducibility: baseline/oces/build_oces.py::_write_json opened its output files without newline=\"\n\", so on Windows it wrote CRLF; the SHA-256 values recorded above (and in this file's own generator_version 1.2.0) were only reproducible on the authoring platform.",
+    "previous_generator_version": "1.2.0",
+    "new_generator_version": "1.2.1",
+    "fix": "baseline/oces/build_oces.py::_write_json now opens with newline=\"\n\"; no other writer, seed selection, variant construction, oracle or tier logic changed.",
+    "changed_files": {
+      "attacks/data/oces/provenance.json": {
+        "previous_sha256": "003bdaaaa87aea39f952fbcc0778f419e9be5562eca8b725ac0967c72ea08b85",
+        "new_sha256": "6131332e7988f0e56a9c53556bc09c702e785a64b02625caaec6ed2ec50e0c4d",
+        "why": "embeds generator_version, the only textual change"
+      },
+      "baseline/oces/build_oces.py": {
+        "previous_sha256": "2f53e72bfaa52a55ce3db4f20c1a6d14ced34d6c6b2551c10dda236b7eeb8357",
+        "new_sha256": "437664a5617005e6c58d6fa8e527707fa06b15cf222fcfc823f1498b45b0ab1e",
+        "why": "the generator source itself: newline fix, version bump, docstring"
+      }
+    },
+    "unchanged_files_confirmed_byte_identical": [
+      "baseline/oces/emotion_seeds.json",
+      "baseline/oces/sentiment_seeds.json",
+      "attacks/data/oces/emotion_cases.json",
+      "attacks/data/oces/sentiment_cases.json",
+      "baseline/oces/oces_content.py"
+    ],
+    "oces_semantic_content_unchanged": true,
+    "semantic_verification": "Re-ran the fixed generator for real: 82 total variants (42 emotion / 40 sentiment, 41 paraphrase / 41 distractor); relation=invariant and oracle=label_should_match_baseline on all 82; tiers unchanged (SILVER 50 / REVIEW 32, zero GOLD); semantic_risk unchanged (low 50 / medium 22 / high 10); coverage_class not_targeted on all 82; the 82 attack_ids, and each case's attacked_text/relation/oracle/family/validity_tier, hash identically to the pre-repair set. No negation family, directional oracle or 0.15 score-drop rule was introduced.",
+    "core_suite_unaffected": "planned_suite_sha256 7fcccf16989784ca046317158a97fca6fcb52299eae99deda62ab0c63914a430 unchanged; this repair touches only attacks/data/oces/** and baseline/oces/**.",
+    "current_authoritative_hash_record": "attacks/data/oces/freeze_content_hashes.json (generator_version 1.2.1) -- read that file, not the frozen_artifacts_sha256 above, for the current on-disk identity.",
+    "repair_commit": "Per this file's own note above, a commit cannot embed its own hash. The commit that adds this block is stage3/integration's next commit after 2864f54; see its message and HANDOFF.md for the exact SHA.",
+    "repaired_by": "Ahsan (integration owner) with Claude Sonnet 5, per the standing integration-repair rule in AGENTS.md/HANDOFF.md",
+    "repaired_utc": "2026-09-15"
+  }
+}

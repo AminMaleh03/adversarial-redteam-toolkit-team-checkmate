@@ -1,0 +1,15 @@
+{
+  "run_id": "neg-altered-hash",
+  "evaluation_run_id": "fixturerun0001",
+  "target_id": "emotion_v1",
+  "fingerprints": {
+    "results_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "_expected_rejection": "recorded hash does not match the referenced bytes",
+  "_synthetic": {
+    "is_synthetic": true,
+    "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+    "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+  }
+}

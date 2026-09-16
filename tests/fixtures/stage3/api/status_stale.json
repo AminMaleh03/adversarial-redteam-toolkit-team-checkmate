@@ -1,0 +1,26 @@
+{
+  "run_id": "fixturerun0000",
+  "run_name": "fixture-previous",
+  "state": "complete",
+  "evaluation_id": "sentiment.core",
+  "target_ids": [
+    "sentiment_v1"
+  ],
+  "stage": "done",
+  "percent": 100,
+  "message": "Run complete.",
+  "results": {
+    "analysis_json": "/results/fixturerun0000/analysis.json"
+  },
+  "report_url": "/results/fixturerun0000/report.html",
+  "_stale_against": {
+    "current_run_id": "fixturerun0001",
+    "current_evaluation_id": "emotion.core",
+    "expected_client_behaviour": "Discard. run_id differs from the active run, so this response must not replace the current results or download links."
+  },
+  "_synthetic": {
+    "is_synthetic": true,
+    "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+    "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+  }
+}

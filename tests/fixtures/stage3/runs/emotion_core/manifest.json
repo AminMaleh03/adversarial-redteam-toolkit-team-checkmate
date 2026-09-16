@@ -1,0 +1,86 @@
+{
+  "fx-emotion-0.encoding.homoglyph": {
+    "attack_id": "fx-emotion-0.encoding.homoglyph",
+    "family": "encoding",
+    "subfamily": "homoglyph",
+    "relation": "invariant",
+    "oracle": "label_should_match_baseline",
+    "source": "Stage 3 synthetic fixture",
+    "validity_tier": "SILVER",
+    "semantic_risk": "low",
+    "requires_baseline": true,
+    "suite_id": "core"
+  },
+  "fx-emotion-0.perturbation.keyboard_typo": {
+    "attack_id": "fx-emotion-0.perturbation.keyboard_typo",
+    "family": "perturbation",
+    "subfamily": "keyboard_typo",
+    "relation": "invariant",
+    "oracle": "label_should_match_baseline",
+    "source": "Stage 3 synthetic fixture",
+    "validity_tier": "SILVER",
+    "semantic_risk": "low",
+    "requires_baseline": true,
+    "suite_id": "core"
+  },
+  "fx-emotion-1.encoding.homoglyph": {
+    "attack_id": "fx-emotion-1.encoding.homoglyph",
+    "family": "encoding",
+    "subfamily": "homoglyph",
+    "relation": "invariant",
+    "oracle": "label_should_match_baseline",
+    "source": "Stage 3 synthetic fixture",
+    "validity_tier": "SILVER",
+    "semantic_risk": "low",
+    "requires_baseline": true,
+    "suite_id": "core"
+  },
+  "fx-emotion-1.perturbation.keyboard_typo": {
+    "attack_id": "fx-emotion-1.perturbation.keyboard_typo",
+    "family": "perturbation",
+    "subfamily": "keyboard_typo",
+    "relation": "invariant",
+    "oracle": "label_should_match_baseline",
+    "source": "Stage 3 synthetic fixture",
+    "validity_tier": "SILVER",
+    "semantic_risk": "low",
+    "requires_baseline": true,
+    "suite_id": "core"
+  },
+  "fx-emotion-2.encoding.homoglyph": {
+    "attack_id": "fx-emotion-2.encoding.homoglyph",
+    "family": "encoding",
+    "subfamily": "homoglyph",
+    "relation": "invariant",
+    "oracle": "label_should_match_baseline",
+    "source": "Stage 3 synthetic fixture",
+    "validity_tier": "SILVER",
+    "semantic_risk": "low",
+    "requires_baseline": true,
+    "suite_id": "core"
+  },
+  "fx-emotion-2.perturbation.keyboard_typo": {
+    "attack_id": "fx-emotion-2.perturbation.keyboard_typo",
+    "family": "perturbation",
+    "subfamily": "keyboard_typo",
+    "relation": "invariant",
+    "oracle": "label_should_match_baseline",
+    "source": "Stage 3 synthetic fixture",
+    "validity_tier": "SILVER",
+    "semantic_risk": "low",
+    "requires_baseline": true,
+    "suite_id": "core"
+  },
+  "malformed.oversized_100kb": {
+    "attack_id": "malformed.oversized_100kb",
+    "family": "malformed",
+    "subfamily": "oversized_100kb",
+    "relation": "schema",
+    "oracle": "request_should_be_rejected_cleanly",
+    "source": "Stage 3 synthetic fixture",
+    "validity_tier": "GOLD",
+    "semantic_risk": "none",
+    "requires_baseline": false,
+    "suite_id": "core"
+  }
+}

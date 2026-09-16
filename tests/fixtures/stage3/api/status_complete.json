@@ -1,0 +1,22 @@
+{
+  "run_id": "fixturerun0001",
+  "run_name": "fixture-demo",
+  "state": "complete",
+  "evaluation_id": "emotion.core",
+  "target_ids": [
+    "emotion_v1",
+    "emotion_v2"
+  ],
+  "stage": "done",
+  "percent": 100,
+  "message": "Run complete.",
+  "results": {
+    "analysis_json": "/results/fixturerun0001/analysis.json"
+  },
+  "report_url": "/results/fixturerun0001/report.html",
+  "_synthetic": {
+    "is_synthetic": true,
+    "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+    "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+  }
+}

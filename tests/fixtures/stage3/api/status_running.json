@@ -1,0 +1,20 @@
+{
+  "run_id": "fixturerun0001",
+  "run_name": "fixture-demo",
+  "state": "running",
+  "evaluation_id": "emotion.core",
+  "target_ids": [
+    "emotion_v1",
+    "emotion_v2"
+  ],
+  "stage": "running_v1",
+  "percent": 30,
+  "message": "Sending the core suite to the unhardened emotion endpoint.",
+  "results": null,
+  "report_url": null,
+  "_synthetic": {
+    "is_synthetic": true,
+    "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+    "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+  }
+}

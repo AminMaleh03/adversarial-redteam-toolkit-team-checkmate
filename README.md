@@ -1,3 +1,14 @@
+---
+title: RED LAB — Adversarial Testing Redefined
+emoji: ♟️
+colorFrom: gray
+colorTo: blue
+sdk: docker
+app_port: 7860
+fullWidth: true
+header: mini
+---
+
 # RED LAB — Adversarial Testing Redefined
 
 **Team Checkmate's automated adversarial red-teaming toolkit for deployed AI inference endpoints.**

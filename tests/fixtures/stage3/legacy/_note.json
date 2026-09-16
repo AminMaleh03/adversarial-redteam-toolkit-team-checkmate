@@ -1,0 +1,10 @@
+{
+  "genuine_v2_analysis.json": "GENUINE. Produced by the real analysis code from real preserved bytes.",
+  "synthetic_legacy_rows.jsonl": "SYNTHETIC. Legacy rows with no target_id/suite_id, for adapter tests.",
+  "synthetic_legacy_layout.json": "SYNTHETIC. A recognised legacy v2 envelope shape.",
+  "legacy_target_mapping": {
+    "v1": "emotion_v1",
+    "v2": "emotion_v2"
+  },
+  "warning": "This mapping applies ONLY to recognised legacy emotion artifacts. A new run with a malformed identity must fail, never fall back to emotion."
+}

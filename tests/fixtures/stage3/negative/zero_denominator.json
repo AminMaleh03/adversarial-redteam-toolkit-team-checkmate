@@ -1,0 +1,19 @@
+{
+  "target_id": "emotion_v2",
+  "drift": {
+    "eligible_comparisons": 0,
+    "qualifying_flips": 0,
+    "flip_rate": {
+      "numerator": 0,
+      "denominator": 0,
+      "rate": null
+    }
+  },
+  "_expected_rendering": "N/A",
+  "_must_not_render": "0%",
+  "_synthetic": {
+    "is_synthetic": true,
+    "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+    "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+  }
+}

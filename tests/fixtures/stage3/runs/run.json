@@ -1,0 +1,91 @@
+{
+  "run_id": "fixturerun0001",
+  "run_name": "stage3-fixture-run",
+  "created_at_utc": "2026-09-15T00:00:00+00:00",
+  "app_commit": "9386d75a535ed26007379c3e2af5b930d6698015",
+  "dirty": false,
+  "mode": "full",
+  "registry": {
+    "registry_version": "3.0.0",
+    "source_path": "endpoint/targets.json",
+    "source_sha256": "3212f30cde643ba6e53e8ef514ecce870f212b1a88bfa208876136cc9b8a0136",
+    "note": "Real hash of the real registry file at foundation time, copied into the run so a later registry edit cannot silently change what a past run claimed."
+  },
+  "evaluations": [
+    {
+      "evaluation_id": "emotion.core",
+      "kind": "paired",
+      "task_id": "emotion_7",
+      "suite_id": "core",
+      "declared_families": [
+        "malformed",
+        "boundary",
+        "perturbation",
+        "encoding",
+        "whitespace",
+        "truncation"
+      ],
+      "case_set_id": "fx_core_v1",
+      "baseline_file": "baseline/baseline.json",
+      "target_dirs": {
+        "emotion_v1": "runs/emotion_core/emotion_v1",
+        "emotion_v2": "runs/emotion_core/emotion_v2"
+      }
+    },
+    {
+      "evaluation_id": "sentiment.core",
+      "kind": "single",
+      "task_id": "sentiment_2",
+      "suite_id": "core",
+      "declared_families": [
+        "malformed",
+        "boundary",
+        "perturbation",
+        "encoding",
+        "whitespace",
+        "truncation"
+      ],
+      "case_set_id": null,
+      "baseline_file": "baseline/sentiment_baseline.json",
+      "target_dirs": {
+        "sentiment_v1": "runs/sentiment_core/sentiment_v1"
+      }
+    },
+    {
+      "evaluation_id": "emotion.oces",
+      "kind": "paired",
+      "task_id": "emotion_7",
+      "suite_id": "oces",
+      "declared_families": [
+        "oces.paraphrase",
+        "oces.distractor"
+      ],
+      "case_set_id": null,
+      "baseline_file": "baseline/oces/emotion_seeds.json",
+      "target_dirs": {
+        "emotion_v1": "runs/emotion_oces/emotion_v1",
+        "emotion_v2": "runs/emotion_oces/emotion_v2"
+      }
+    },
+    {
+      "evaluation_id": "sentiment.oces",
+      "kind": "single",
+      "task_id": "sentiment_2",
+      "suite_id": "oces",
+      "declared_families": [
+        "oces.paraphrase",
+        "oces.distractor"
+      ],
+      "case_set_id": null,
+      "baseline_file": "baseline/oces/sentiment_seeds.json",
+      "target_dirs": {
+        "sentiment_v1": "runs/sentiment_oces/sentiment_v1"
+      }
+    }
+  ],
+  "_synthetic": {
+    "is_synthetic": true,
+    "purpose": "Stage 3 contract example. Demonstrates required shape and arithmetic.",
+    "not_evidence_of": "No model was run to produce this. These numbers are authored, not measured. They are not findings about any model, not a model pin, and not proof that any feature works."
+  }
+}

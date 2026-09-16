@@ -1,7 +1,7 @@
 {
   "report_identity": {
     "name": "Red Lab Master Technical Report",
-    "product_version_label": "Red Lab v6.3",
+    "product_version_label": "Red Lab v6.4",
     "contracts_version": "3.0.0",
     "generator_module": "report.master_report",
     "generator_version": "1.0.0",
@@ -199,8 +199,8 @@
   "external_citations": [
     {
       "id": "ci_github_actions_run",
-      "description": "GitHub Actions 'Stage 3 release gate' run on stage3/ahsan, reported as the V6.2 final successful run. This session has no gh/GitHub API access, so the run's own uploaded artifact bytes could not be downloaded or hashed.",
-      "run_number": "35069693601",
+      "description": "GitHub Actions 'Stage 3 release gate' run on stage3/ahsan (PR #11), confirmed via the public GitHub REST API to have completed with conclusion success and its deploy job skipped. This session has no GitHub API token to download the run's own uploaded artifact bytes, so it is cited by run number and verified outcome only, never hashed as if its artifact were present.",
+      "run_number": "35075844725",
       "classification": "external_citation_unverifiable",
       "evaluation_id": "ci.emotion",
       "section": "H"

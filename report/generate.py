@@ -41,7 +41,7 @@ LOGO_PATH = HERE.parent / "Team Checkmate Logo.png"
 CREATOR_NAME = "Team Checkmate"
 PRODUCT_NAME = "RED LAB"
 PRODUCT_TAGLINE = "Adversarial Testing Redefined"
-PRODUCT_VERSION_LABEL = "Red Lab v6.3"
+PRODUCT_VERSION_LABEL = "Red Lab v6.4"
 
 V3_REQUIRED_SUMMARY_FIELDS = (
     "target_id", "version", "task_id", "suite_id", "identity", "coverage",

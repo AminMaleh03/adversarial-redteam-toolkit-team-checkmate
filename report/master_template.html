@@ -67,7 +67,7 @@
     <button id="toc-toggle" class="toc-toggle" type="button" aria-expanded="false" aria-controls="report-toc">
       <span class="toc-toggle-bars" aria-hidden="true"></span> Contents
     </button>
-    <div class="downloads"><a class="home-link" href="/">Back to Red Lab</a><a href="master_evidence_manifest.json" target="_blank" rel="noopener">Evidence manifest</a><a href="/verified-full/report.html">Historical V5 report</a></div>
+    <div class="downloads"><a class="home-link" href="/">Back to Red Lab</a><a href="master_evidence_manifest.json" target="_blank" rel="noopener">Evidence manifest</a><a href="/verified-full/report.html">Historical V5 report</a>{% if include_pdf %}<a class="button" href="report.pdf" download>Download PDF <span aria-hidden="true">&darr;</span></a>{% endif %}</div>
   </div>
 </header>
 
@@ -222,13 +222,13 @@
       </div>
       <h3>emotion.oces (paired: emotion_v1, emotion_v2)</h3>
       <div class="two-up">
-        <div class="panel"><p class="eyebrow">EMOTION_V1</p><p>{{ emotion_oces.v1.completed }}/{{ emotion_oces.v1.planned }} completed &middot; {{ emotion_oces.v1.eligible }} eligible &middot; {{ emotion_oces.v1.flips }} flips &middot; {{ emotion_oces.v1.findings }} findings</p></div>
-        <div class="panel"><p class="eyebrow">EMOTION_V2</p><p>{{ emotion_oces.v2.completed }}/{{ emotion_oces.v2.planned }} completed &middot; {{ emotion_oces.v2.eligible }} eligible &middot; {{ emotion_oces.v2.flips }} flips &middot; {{ emotion_oces.v2.findings }} findings</p></div>
+        <div class="panel"><p class="eyebrow">EMOTION_V1</p><p>{{ emotion_oces.v1.completed }}/{{ emotion_oces.v1.planned }} completed &middot; {{ emotion_oces.v1.eligible }} eligible &middot; {{ emotion_oces.v1.flips }} flips &middot; {{ emotion_oces.v1.findings }} findings</p><p class="caption">{{ emotion_oces.v1.oces_scored_note }}</p></div>
+        <div class="panel"><p class="eyebrow">EMOTION_V2</p><p>{{ emotion_oces.v2.completed }}/{{ emotion_oces.v2.planned }} completed &middot; {{ emotion_oces.v2.eligible }} eligible &middot; {{ emotion_oces.v2.flips }} flips &middot; {{ emotion_oces.v2.findings }} findings</p><p class="caption">{{ emotion_oces.v2.oces_scored_note }}</p></div>
       </div>
       <p class="caption">{{ emotion_oces.note }}</p>
       <h3>sentiment.oces (single target: sentiment_v1)</h3>
       <div class="notice v3-single-note">{{ sentiment_oces.single_target_note }}</div>
-      <div class="panel"><p>{{ sentiment_oces.completed }}/{{ sentiment_oces.planned }} completed &middot; {{ sentiment_oces.eligible }} eligible &middot; {{ sentiment_oces.flips }} flips &middot; {{ sentiment_oces.findings }} findings</p></div>
+      <div class="panel"><p>{{ sentiment_oces.completed }}/{{ sentiment_oces.planned }} completed &middot; {{ sentiment_oces.eligible }} eligible &middot; {{ sentiment_oces.flips }} flips &middot; {{ sentiment_oces.findings }} findings</p><p class="caption">{{ sentiment_oces.oces_scored_note }}</p></div>
       {% for entry in sentiment_oces.sample_findings %}{{ finding_card(entry, 'finding-sentiment-oces-' ~ loop.index) }}{% endfor %}
     </section>
 
@@ -276,7 +276,7 @@
       <h3>Evidence file hashes</h3>
       <p class="caption">Every quantitative claim above is derived from these files, re-hashed and checked against <code>report/master_evidence/manifest.json</code> at generation time. A missing or modified file fails generation closed (no report is produced).</p>
       <table class="category-table"><thead><tr><th scope="col">Evidence</th><th scope="col">Path</th><th scope="col">SHA-256</th><th scope="col">Evaluation</th></tr></thead><tbody>
-      {% for src in provenance.sources %}<tr><td>{{ src.description }}</td><td><code>{{ src.path }}</code></td><td><code>{{ src.sha256[:16] }}&hellip;</code></td><td>{{ src.evaluation_id or '&mdash;' }}</td></tr>{% endfor %}
+      {% for src in provenance.sources %}<tr><td>{{ src.description }}</td><td><code>{{ src.path }}</code></td><td><code>{{ src.sha256[:16] }}&hellip;</code></td><td>{{ src.evaluation_id or '—' }}</td></tr>{% endfor %}
       </tbody></table>
       <h3>External citations (not independently hashed)</h3>
       {% for ext in provenance.external_citations %}<p>{{ ext.description }} Run <code>{{ ext.run_number }}</code>.</p>{% endfor %}
@@ -356,8 +356,8 @@ function rlGoBack(event) {
     toc.inert = isMobile();
   });
   window.rlOnInternalNav = function (hash) {
-    var clicked = toc.querySelector('[data-toc-link][href="' + hash + '"]');
-    setActive(clicked);
+    clickedLink = toc.querySelector('[data-toc-link][href="' + hash + '"]');
+    setActive(clickedLink);
     if (isMobile() && toc.classList.contains("is-open")) { closeDrawer(); }
   };
   if (tocCollapse) {

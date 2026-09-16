@@ -583,7 +583,7 @@ def test_demo_hero_uses_functional_identity_not_marketing_copy(demo_data):
     assert "in one minute" not in result
     assert "V1" in result and "Unhardened Endpoint" in result
     assert "V2" in result and "Hardened Endpoint" in result
-    assert "Red Lab v6.3" in result and "Team Checkmate" in result
+    assert "Red Lab v6.4" in result and "Team Checkmate" in result
 
 
 def test_demo_crash_note_is_a_small_caption_not_a_warning_box(demo_data):
@@ -648,7 +648,7 @@ def test_reports_credit_team_checkmate_and_show_red_lab_version(demo_data):
     for mode in ("demo", "full"):
         result = html(demo_data, mode=mode)
         assert "Team Checkmate" in result
-        assert "Red Lab v6.3" in result
+        assert "Red Lab v6.4" in result
 
 
 # ----------------------------------------------------------------------------------------
@@ -722,7 +722,7 @@ def test_reports_masthead_brand_shows_version_label(demo_data):
         header = result[result.index("<header"):result.index("</header>")]
         assert "Team Checkmate" in header
         assert 'class="brand-creator"' in header
-        assert "Red Lab v6.3" in header
+        assert "Red Lab v6.4" in header
 
 
 def test_reports_masthead_brand_uses_shared_class_names_with_web_app(demo_data):
@@ -1030,7 +1030,7 @@ def test_full_report_analysis_schema_not_a_hero_badge(data):
     assert "Analysis schema" not in hero  # moved out of the hero entirely
     provenance = result[result.index('id="provenance"'):result.index("</section>", result.index('id="provenance"'))]
     assert "Analysis schema v2" in provenance
-    assert "Red Lab v6.3" in provenance  # product version, a distinct concept, still present
+    assert "Red Lab v6.4" in provenance  # product version, a distinct concept, still present
 
 
 def test_full_report_remediation_architecture_preserved(data):

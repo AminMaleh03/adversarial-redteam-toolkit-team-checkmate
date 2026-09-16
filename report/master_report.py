@@ -21,6 +21,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoes
 
 from report.generate import (
     CREATOR_NAME, PRODUCT_NAME, PRODUCT_TAGLINE, PRODUCT_VERSION_LABEL, _logo_data_uri,
+    render_pdf,
 )
 
 HERE = Path(__file__).resolve().parent
@@ -120,12 +121,37 @@ def build_context(verified: dict) -> dict:
     so_ev = sentiment_oces["evaluations"][0]
     so_summary = so_ev["summaries"]["sentiment_v1"]
 
+    def oces_scored_note(oces_summary: dict) -> str:
+        """Describe the OCES scored-expectation rate honestly -- 0/0 is not a rate.
+
+        analysis.oces gives each target a violation_rate {numerator, denominator, rate}
+        counting only meets_expectation/violates_expectation outcomes; excluded and
+        unevaluable cases are deliberately not scored (see attacks/metadata.py's
+        pre-registered oracle rules). A zero denominator means no scored outcome exists
+        to report -- never displayed as 0% failure or 100% success.
+        """
+        vr = oces_summary["violation_rate"]
+        statuses = oces_summary["statuses"]
+        if vr["denominator"] == 0:
+            return (
+                f"0 of 0 cases produced a scored expectation outcome -- no violation rate "
+                f"is available to report ({statuses['excluded']} excluded, "
+                f"{statuses['unevaluable']} unevaluable, {statuses['not_executed']} not "
+                f"executed, per the pre-registered oracle rules)."
+            )
+        return (
+            f"{vr['numerator']} of {vr['denominator']} scored cases violated the "
+            f"pre-registered expectation ({_pct(vr['numerator'], vr['denominator'])}); "
+            f"{statuses['excluded']} excluded, {statuses['unevaluable']} unevaluable."
+        )
+
     def target_row(ev, target_id):
         s = ev["summaries"][target_id]
+        oces_summary = ev["oces"]["summaries"][target_id]
         return {
             "planned": s["coverage"]["planned"], "completed": s["coverage"]["completed"],
             "eligible": s["drift"]["eligible_comparisons"], "flips": s["drift"]["qualifying_flips"],
-            "findings": len(s["findings"]),
+            "findings": len(s["findings"]), "oces_scored_note": oces_scored_note(oces_summary),
         }
 
     evaluations = targets_registry["evaluations"]
@@ -299,6 +325,7 @@ def build_context(verified: dict) -> dict:
             "eligible": so_summary["drift"]["eligible_comparisons"], "flips": so_summary["drift"]["qualifying_flips"],
             "findings": len(so_summary["findings"]),
             "sample_findings": so_summary["findings"],
+            "oces_scored_note": oces_scored_note(so_ev["oces"]["summaries"]["sentiment_v1"]),
         },
         "remediation": {
             "intro": "Each finding below follows the same structure: what was observed, why it matters, the recommended action, and the exact command to verify the fix -- reused directly from this run's own recorded remediation_detail evidence where the schema provides it (sentiment.core, sentiment.oces), or the historical finding's remediation text otherwise (emotion.core).",
@@ -330,13 +357,16 @@ def build_context(verified: dict) -> dict:
             "checks": gate_checks, "checks_passed": checks_passed, "checks_total": len(gate_checks),
             "exit_code_meaning": "Exit 0 = pass (deployment may proceed); exit 1 = policy failure (a check did not meet the frozen policy); exit 2 = execution error (the run itself could not be completed, e.g. an unreadable policy or an endpoint that never started). Both failure types block the workflow's deploy job.",
             "github_run_note": (
-                "The authoritative CI execution for this milestone is GitHub Actions run "
-                "35069693601 on stage3/ahsan (reported success). This session has no GitHub "
-                "API access to download that run's own artifact bytes, so it is cited by run "
-                "number only and not independently hashed. The gate evidence rendered above "
-                "(outcome, exit code, all 13 checks) is a fresh, real local reproduction of the "
-                "identical command at the same application commit, not a copy of that run's "
-                "artifact -- see artifacts/ci_gate_evidence_v1/PROVENANCE.md."
+                "The authoritative CI execution for this line of commits is GitHub Actions "
+                "run 35075844725 ('Stage 3 release gate', PR #11, stage3/ahsan), confirmed "
+                "via the public GitHub REST API to have completed with conclusion success and "
+                "its deploy job skipped. This session has no GitHub API token to download "
+                "that run's own uploaded artifact bytes, so it is cited by run number and "
+                "verified outcome only, never hashed as if its artifact were present. The "
+                "gate evidence rendered above (outcome, exit code, all 13 checks) is instead a "
+                "fresh, real local reproduction of the identical command at this report's own "
+                "application commit -- not a copy of that run's artifact -- "
+                "see artifacts/ci_gate_evidence_v1/PROVENANCE.md."
             ),
             "scope_note": "This is a working reference implementation the gate exercises against one approved emotion release candidate; it does not universally certify arbitrary models. A developer adapting the toolkit to a new target must register that target, author its own case selection, and freeze its own policy.",
         },
@@ -384,19 +414,35 @@ def build_context(verified: dict) -> dict:
     return context
 
 
-def render(context: dict) -> str:
+def render(context: dict, *, include_pdf: bool = True) -> str:
     env = Environment(loader=FileSystemLoader(HERE), autoescape=select_autoescape(("html",)),
                        undefined=StrictUndefined, trim_blocks=True, lstrip_blocks=True)
     return env.get_template("master_template.html").render(
-        css=(HERE / "style.css").read_text(encoding="utf-8"), **context,
+        css=(HERE / "style.css").read_text(encoding="utf-8"), include_pdf=include_pdf, **context,
     )
 
 
-def generate(output_dir: Path = OUTPUT_DIR) -> Path:
+def generate(output_dir: Path = OUTPUT_DIR, *, html_only: bool = False) -> Path:
+    """Render the master report. Writes report.pdf too unless ``html_only`` is set.
+
+    PDF generation is not byte-reproducible. Verified directly (see
+    ``tests/test_master_report.py::test_pdf_generation_reproducibility_limit_is_real``):
+    rendering byte-identical HTML twice, including across separate processes with
+    ``PYTHONHASHSEED`` fixed, produces two ``report.pdf`` files that differ in length and
+    hash. The divergence is not PDF metadata (this build's output carries no
+    ``/CreationDate``/``/ModDate`` at all) -- it appears inside a compressed
+    ``FlateDecode`` content stream itself, consistent with non-deterministic internal
+    serialization (most likely font-subsetting order) somewhere in the WeasyPrint/pydyf
+    rendering pipeline, not in this project's own code. The rendered HTML and the PDF's
+    actual page content/layout ARE reproducible from the same evidence; only the PDF
+    *file bytes* are not, and this generator makes no byte-identical-regeneration claim
+    for report.pdf. The recorded ``rendered_pdf_sha256`` identifies the specific
+    committed file, not an expected regeneration result.
+    """
     manifest = load_manifest()
     verified = verify_manifest(manifest)
     context = build_context(verified)
-    html = render(context)
+    html = render(context, include_pdf=not html_only)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     index_path = output_dir / "index.html"
@@ -406,21 +452,46 @@ def generate(output_dir: Path = OUTPUT_DIR) -> Path:
         **manifest,
         "sources": [verified[s["id"]] for s in manifest["sources"]],
         "rendered_index_sha256": hashlib.sha256(html.encode("utf-8")).hexdigest(),
+        "rendered_pdf_sha256": None,
+        "pdf_reproducibility_limit": (
+            "Not applicable: html_only generation, no PDF produced." if html_only else
+            "Verified non-reproducible: rendering this same HTML twice (including across "
+            "separate processes with PYTHONHASHSEED fixed) produces report.pdf files that "
+            "differ in length and SHA-256. This build's PDFs carry no /CreationDate or "
+            "/ModDate at all, so the divergence is not a timestamp; it appears inside a "
+            "compressed content stream, consistent with non-deterministic internal "
+            "serialization (e.g. font-subsetting order) in WeasyPrint/pydyf. The rendered "
+            "HTML and the PDF's actual page content are reproducible from the same "
+            "evidence; the PDF file bytes are not. The recorded hash below identifies "
+            "this specific committed file, not a value a fresh regeneration reproduces."
+        ),
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
     }
+    if not html_only:
+        pdf_bytes = render_pdf(html)
+        pdf_path = output_dir / "report.pdf"
+        pdf_path.write_bytes(pdf_bytes)
+        snapshot["rendered_pdf_sha256"] = hashlib.sha256(pdf_bytes).hexdigest()
+
     (output_dir / "master_evidence_manifest.json").write_text(
         json.dumps(snapshot, indent=2) + "\n", encoding="utf-8",
     )
     return index_path
 
 
-def main() -> int:
+def main(argv=None) -> int:
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--html-only", action="store_true", help="skip PDF rendering (no WeasyPrint import)")
+    args = parser.parse_args(argv)
     try:
-        path = generate()
+        path = generate(html_only=args.html_only)
     except EvidenceIntegrityError as exc:
         print(f"Master report generation failed: {exc}")
         return 1
     print(f"HTML: {path}")
+    if not args.html_only:
+        print(f"PDF:  {path.parent / 'report.pdf'}")
     return 0
 
 

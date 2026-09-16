@@ -24,8 +24,17 @@ from report import master_report  # noqa: E402
 
 @pytest.fixture(scope="module")
 def generated(tmp_path_factory):
+    """Fast, HTML-only generation for content-level assertions (no WeasyPrint import)."""
     out_dir = tmp_path_factory.mktemp("technical_report")
-    path = master_report.generate(output_dir=out_dir)
+    path = master_report.generate(output_dir=out_dir, html_only=True)
+    return path.read_text(encoding="utf-8"), out_dir
+
+
+@pytest.fixture(scope="module")
+def generated_with_pdf(tmp_path_factory):
+    """Full generation including report.pdf, for the PDF-specific tests only."""
+    out_dir = tmp_path_factory.mktemp("technical_report_pdf")
+    path = master_report.generate(output_dir=out_dir, html_only=False)
     return path.read_text(encoding="utf-8"), out_dir
 
 
@@ -122,15 +131,46 @@ def test_ci_gate_exit_codes_and_outcome_are_accurate(generated):
     assert ">pass<" in section or "outcome pass" in section.lower() or "outcome</strong> pass" in section.lower()
 
 
-def test_no_master_pdf_button_present(generated):
-    html, _ = generated
+def test_html_only_generation_has_no_pdf_button_or_file(generated):
+    """html_only=True must behave like the live-demo reports: no PDF, no download link."""
+    html, out_dir = generated
     assert "Download PDF" not in html
     assert "report.pdf" not in html
+    assert not (out_dir / "report.pdf").exists()
+    snapshot = json.loads((out_dir / "master_evidence_manifest.json").read_text(encoding="utf-8"))
+    assert snapshot["rendered_pdf_sha256"] is None
 
 
-def test_active_version_label_is_v6_3(generated):
+def test_full_generation_has_pdf_button_and_valid_pdf_file(generated_with_pdf):
+    html, out_dir = generated_with_pdf
+    assert 'Download PDF' in html
+    assert 'href="report.pdf"' in html
+    pdf_path = out_dir / "report.pdf"
+    assert pdf_path.exists()
+    pdf_bytes = pdf_path.read_bytes()
+    assert pdf_bytes[:5] == b"%PDF-"
+    snapshot = json.loads((out_dir / "master_evidence_manifest.json").read_text(encoding="utf-8"))
+    assert snapshot["rendered_pdf_sha256"] == hashlib.sha256(pdf_bytes).hexdigest()
+    assert "non-reproducible" in snapshot["pdf_reproducibility_limit"].lower()
+
+
+def test_pdf_has_multiple_pages_and_substantive_size(generated_with_pdf):
+    """A too-short PDF would indicate truncated/empty content, not a real report."""
+    html, out_dir = generated_with_pdf
+    pdf_bytes = (out_dir / "report.pdf").read_bytes()
+    assert len(pdf_bytes) > 20_000, "PDF is implausibly small for a full report"
+    # WeasyPrint's PDF writer uses compressed object streams, so page markers are not
+    # plain-text-searchable in the file bytes; re-render the same HTML through
+    # WeasyPrint's own Document API (no file written) to get an authoritative page count.
+    from weasyprint import HTML
+    document = HTML(string=html).render()
+    assert len(document.pages) >= 10, f"expected a multi-page report, got {len(document.pages)} pages"
+
+
+def test_active_version_label_is_v6_4(generated):
     html, _ = generated
-    assert "Red Lab v6.3" in html
+    assert "Red Lab v6.4" in html
+    assert "Red Lab v6.3" not in html
 
 
 def test_sidebar_anchors_all_resolve(generated):
@@ -140,6 +180,62 @@ def test_sidebar_anchors_all_resolve(generated):
     assert toc_hrefs, "no sidebar links found"
     for anchor in toc_hrefs:
         assert f'id="{anchor}"' in html, f"sidebar link #{anchor} has no matching section id"
+
+
+def test_build_manifest_generator_reproduces_the_committed_manifest(tmp_path):
+    """report/master_evidence/build_manifest.py is the manifest's maintainable source.
+
+    Regenerating it from real on-disk evidence must reproduce the exact same hash list
+    committed at report/master_evidence/manifest.json -- proving the manifest is not a
+    hand-typed artifact that could silently drift from the evidence it describes.
+    """
+    from report.master_evidence import build_manifest
+    regenerated = build_manifest.build()
+    committed = master_report.load_manifest()
+    assert regenerated["sources"] == committed["sources"]
+    assert regenerated["evaluation_identities"] == committed["evaluation_identities"]
+
+
+def test_html_regeneration_is_byte_identical_across_runs(tmp_path):
+    """The HTML output (unlike the PDF) must be exactly reproducible from the same evidence."""
+    out1 = master_report.generate(output_dir=tmp_path / "run1", html_only=True)
+    out2 = master_report.generate(output_dir=tmp_path / "run2", html_only=True)
+    assert out1.read_bytes() == out2.read_bytes()
+
+
+def test_oces_zero_scored_outcomes_are_not_rendered_as_a_rate(generated):
+    """V6.4 review finding: a 0/0 violation_rate must never read as 0% or 100%."""
+    html, _ = generated
+    assert "0 of 0 cases produced a scored expectation outcome" in html
+    assert "no violation rate is available to report" in html
+    # None of these misleading framings may appear anywhere near the OCES section.
+    idx = html.index('id="oces"')
+    section = html[idx: html.index('id="remediation"')]
+    assert "0% failure" not in section
+    assert "100% success" not in section
+    assert "0.00%" not in section
+
+
+def test_ci_gate_local_reproduction_is_distinguished_from_cited_run(generated):
+    html, _ = generated
+    idx = html.index('id="ci-gate"')
+    section = html[idx: html.index('id="provenance"')]
+    assert "35075844725" in section
+    assert "fresh, real local reproduction" in section
+    assert "not a copy of that run" in section and "artifact" in section
+
+
+def test_sidebar_click_sets_active_state_for_every_link():
+    """Regression for a real V6.3 bug: rlOnInternalNav must update the sticky
+    clickedLink variable it reads, not a same-named local shadow, or the very last
+    sidebar link (whose target section cannot reach the scrollspy's observation band at
+    max scroll) silently falls back to the previous section instead."""
+    template_path = master_report.HERE / "master_template.html"
+    source = template_path.read_text(encoding="utf-8")
+    nav_start = source.index("window.rlOnInternalNav = function")
+    nav_body = source[nav_start: nav_start + 300]
+    assert "clickedLink = toc.querySelector" in nav_body
+    assert "var clicked =" not in nav_body
 
 
 def test_quantitative_claims_are_derived_not_hardcoded(generated):

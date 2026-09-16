@@ -792,3 +792,187 @@ via the public, unauthenticated GitHub REST API — no `gh`/token available in t
 its "Deploy tested release to Hugging Face Space" job was `skipped`. PR #11 confirmed open,
 draft, unmerged via the same API. Hugging Face `space` remote was never touched at any
 point in this session.
+
+# RED LAB v6.4 — master report review, PDF, and a reproducible bundle
+
+2026-09-16T14:10:00+04:00, Claude Sonnet 5, Asia/Dubai. Same worktree
+`C:\Users\ahsan\OneDrive\Desktop\stage3-ahsan`, branch `stage3/ahsan`. Observed pre-work
+HEAD `91c4d7fdd23ad6e14cdd5dead6f65464059a1895`, matching the user-stated required starting
+HEAD exactly. The main integration checkout's uncommitted `HANDOFF.md` was not touched.
+User authorized this scope in the V6.4 milestone brief (2026-09-16). Checked the later
+docs-only workflow run (`35076099520`, on the v6.3 handoff-closeout commit) once via the
+GitHub REST API: `completed`/`success` — no failure to root-cause.
+
+## Real browser review (this session installed a local Chromium/Playwright browser)
+
+No browser binary existed in this environment before this session (matches the
+pre-existing "27 skipped, Playwright not available" note in earlier handoffs).
+`python -m playwright install chromium` downloaded both the headless-shell and full
+Chromium builds locally (nothing committed; browser binaries are not repository
+artifacts). Used it to load the live `/technical-report/` page and the rendered
+`report.pdf` and drive/inspect both directly, not just read the template source.
+
+**Real defect found and fixed: sidebar navigation silently failed on the last section.**
+Clicking any sidebar link except the final one (`#historical`) worked; clicking
+`#historical` moved the page but left `#limitations` marked active. Root cause, found by
+instrumenting the live page: `master_template.html`'s `window.rlOnInternalNav` assigned
+the clicked link to a **local** `var clicked` instead of the outer `clickedLink` closure
+variable the scrollspy's `updateActive()` actually reads, so "clicked" state was never
+truly sticky — it only *looked* correct for other sections because the intersection-based
+autodetection happened to agree with the click there too. Fixed by assigning to
+`clickedLink` directly (one line); added a regression test
+(`tests/test_master_report.py::test_sidebar_click_sets_active_state_for_every_link`) that
+greps the template source for the exact bug pattern, plus re-verified all 11 sidebar links
+live with the real browser after the fix.
+
+**Real defect found and fixed: a double-escaped HTML entity rendered as literal text.**
+The provenance evidence table's fallback for a source with no evaluation id was
+`{{ src.evaluation_id or '&mdash;' }}` — Jinja's autoescaping HTML-escapes the fallback
+*string value* itself, so the page showed the literal text `&mdash;` instead of an em
+dash. Fixed by using the real Unicode character instead of an HTML entity string.
+
+**Content gap found and fixed: OCES's 0/0 scored rate was omitted, not misrepresented.**
+All three OCES target summaries (`emotion_v1`, `emotion_v2`, `sentiment_v1`) have
+`violation_rate: {numerator: 0, denominator: 0, rate: null}` — no case in the current seed
+set produced a `meets_expectation`/`violates_expectation` outcome (the rest are
+pre-registered `excluded`/`unevaluable`). The V6.3 report never rendered this metric at
+all, so there was no *wrong* percentage shown, but the brief specifically asked for the
+denominator and an explanation to be visible. Added `oces_scored_note` to each OCES target
+context (`report/master_report.py`), rendered under each target's counts, reading e.g.
+*"0 of 0 cases produced a scored expectation outcome — no violation rate is available to
+report (20 excluded, 22 unevaluable, 0 not executed, per the pre-registered oracle
+rules)."* Regression test added; asserts `"0% failure"`/`"100% success"`/`"0.00%"` never
+appear near the OCES section.
+
+**Citation refreshed, not just re-worded.** The CI-gate section cited GitHub Actions run
+`35069693601` (the v6.2-era run). This session directly confirmed via the GitHub REST API
+that run `35075844725` (the actual gate run for this V6.3→V6.4 line of commits) completed
+`success` with its deploy job `skipped` — a more current and more directly-verified
+citation for "latest successful gate evidence." Updated the citation in both
+`report/master_report.py` and the manifest's `external_citations` entry; still marked
+`external_citation_unverifiable` (no artifact bytes downloaded) and still clearly
+distinguished from the local `ci.emotion` reproduction bundle.
+
+**Pre-existing rendering quirk observed, not fixed:** in both the new PDF and the frozen,
+byte-unchanged `artifacts/verified_full_report/report.pdf`, Chromium's PDF viewer shows
+the masthead logo failing to decode (WeasyPrint logs `Failed to load image` for the
+embedded PNG, which carries C2PA/JUMBF content-credentials metadata) and its alt text
+overlapping the adjacent brand text. Confirmed side-by-side against the historical PDF
+before treating this as a defect — it is identical in both, pre-dates this milestone, and
+is out of scope (would require changing `Team Checkmate Logo.png`, a shared brand asset,
+not a report-generation change). Documented here rather than silently ignored.
+
+All other review checklist items passed as-is: all ten A–J-plus-historical sections have
+substantive content (63–1405 words each, `oces`/`remediation` heaviest); the five
+evaluation identities, emotion-paired/sentiment-single framing, and historical-vs-current
+attribution were already correct from V6.3; every `<a href>` on the page resolves (checked
+programmatically); findings' "How to verify the fix" commands reference real result paths
+recorded in the committed evidence bundles.
+
+## PDF generation
+
+`report/master_report.py` now renders `report.pdf` from the exact same HTML string as
+`index.html` (not a second, possibly-diverging render), via `report.generate.render_pdf`
+(same WeasyPrint call the historical report already used — no new rendering path).
+`master_template.html` gained a masthead "Download PDF → " link, shown only when
+`include_pdf` is true (`html_only` generation, used by the fast test fixture, omits both
+the file and the link, matching the live-demo reports' own PDF suppression). 19 pages at
+A4 (confirmed via WeasyPrint's own `Document.pages`), reusing `report/style.css`'s
+existing `@media print` rules almost entirely as-is (the sidebar/`.report-toc` is already
+print-hidden, `.report-section` already breaks one-per-page, `.panel`/`.v3-finding`/
+`.v3-mini-card` already avoid splitting) because the master template deliberately reuses
+that same class vocabulary — no new print CSS was needed. Visually reviewed page-by-page
+in a real PDF viewer (Chromium via Playwright): clean pagination, page-number footer,
+readable tables (SHA-256/model-identity columns wrap via the existing generic
+`overflow-wrap: anywhere` table-cell rule), finding cards with expanded evidence-case
+lists, and the historical section clearly labeled "ARCHIVED EVIDENCE" on its own final
+page. Live-demo/CLI reports (`template_v3.html`, `demo_template.html`) are untouched and
+still have no PDF button — the new masthead link exists only in `master_template.html`.
+
+## Freezing the bundle and its reproducibility limit
+
+Promoted the evidence-manifest builder from an ephemeral scratch script (used ad hoc in
+V6.3) into a committed, maintainable generator: `report/master_evidence/build_manifest.py`
+regenerates `report/master_evidence/manifest.json` (still 18 real sources, all hashes
+unchanged except the refreshed CI-run citation) from on-disk evidence every time it runs —
+confirmed by a regression test that it reproduces the exact committed manifest.
+
+`report/master_report.generate()` writes a **separate** final bundle manifest,
+`artifacts/technical_report/master_evidence_manifest.json` (not self-referential: it
+records `rendered_index_sha256`/`rendered_pdf_sha256` for the two files it just wrote, and
+does not hash itself). Verified:
+
+- The 18-source evidence manifest still passes `verify_manifest` in full (fail-closed
+  behavior re-tested with a fresh missing-file and modified-bytes case, both real).
+- `index.html` regenerated from identical evidence is **byte-identical** across separate
+  runs (new test, `test_html_regeneration_is_byte_identical_across_runs`).
+- `report.pdf` is **not** byte-reproducible. Verified directly, not assumed: rendering the
+  identical HTML twice — including across separate Python processes with
+  `PYTHONHASHSEED` fixed to `0` — produced two PDFs differing in length and every byte
+  from offset 54472 onward, inside a compressed `FlateDecode` content stream. This
+  build's PDFs carry no `/CreationDate`/`/ModDate` at all (checked directly), ruling out
+  the usual timestamp-metadata explanation; the divergence is consistent with
+  non-deterministic internal serialization (most likely font-subsetting order) inside
+  WeasyPrint/pydyf, not this project's own code. `master_evidence_manifest.json` records
+  this limit in a `pdf_reproducibility_limit` field rather than implying the hash is
+  reproducible.
+- `/technical-report/` serves both `index.html` and `report.pdf` from the committed
+  `artifacts/technical_report/` directory (`web/app.py`'s existing `StaticFiles` mount,
+  unchanged) — confirmed live: `GET /technical-report/report.pdf` returns
+  `200 application/pdf` with real `%PDF-` bytes.
+
+Final committed hashes:
+
+- `artifacts/technical_report/index.html`:
+  `e988d1fc986d01c359897c2ec2a0e585b9dbdcd718b58318eca6121de8fba2ff`
+- `artifacts/technical_report/report.pdf`:
+  `bf2a904c2cfecbcf9cc0d5e856240f7c946f02a87912dea9e791c8d89e052350` (this exact file's
+  hash; a fresh regeneration will legitimately differ — see above)
+
+Frozen/historical artifacts confirmed untouched by this session:
+`artifacts/verified_full_report/`, `artifacts/benchmark_v6/`, `artifacts/ci_gate_evidence_v1/`,
+`artifacts/emotion_oces_v1/`, `artifacts/sentiment_core_v1/`, `artifacts/sentiment_oces_v1/`,
+`analysis/policies/`, OCES data under `attacks/data/oces/` and `baseline/oces/`.
+
+## Branding
+
+`report/generate.py`'s `PRODUCT_VERSION_LABEL` bumped `"Red Lab v6.3"` → `"Red Lab v6.4"`;
+`report/master_report.py` and `report/master_evidence/build_manifest.py` both read/set
+this same value rather than a second hardcoded copy. Archived `/verified-full/` confirmed
+still reading `"Red Lab v5.0"` (unchanged).
+
+## Focused validation (this session's own results)
+
+- `tests/test_master_report.py`: **21 passed** (14 carried over from V6.3 plus 7 new:
+  html-only has no PDF/link, full generation has a valid multi-page PDF whose hash matches
+  the manifest snapshot, the build_manifest generator reproduces the committed manifest,
+  HTML regeneration is byte-identical, the OCES 0/0 wording, the CI-citation distinction,
+  and the sidebar-bug regression).
+- `tests/test_web.py` + `tests/test_report.py` + `tests/test_master_report.py` combined:
+  **237 passed** (2 rewritten for the new PDF-button behavior, 1 new live-demo-has-no-PDF
+  regression check, remaining version-string literals bumped to v6.4).
+- `tests/test_lab.py tests/test_run_all.py tests/test_gate.py tests/test_analysis_identity.py`:
+  **158 passed**, unaffected, run as a broader sanity check per the brief.
+- `git diff --check`: clean (only pre-existing LF/CRLF autocrlf notices).
+- Local browser review: real Chromium (installed this session) driving the live
+  `/technical-report/` page (all 11 sidebar links, collapse/expand, console error count
+  zero) and the real `report.pdf` (19 pages, page-by-page visual pass, one pre-existing
+  non-regression quirk documented above).
+- Did not run: the full pytest suite, full model evaluations, OCES evaluations, Docker,
+  or CI-policy regeneration (all out of scope per the brief).
+
+Code was validated, then the explicit file list below is staged and committed as
+`feat(v6.4): finalize master technical report HTML and PDF`. Immediate next action is
+fetch/verify/push (below).
+
+## Deferred to v6.5+ (per the brief — do not start)
+
+Broader visual/UI redesign of the master report; the pre-existing logo-decode PDF-viewer
+quirk (would require touching the shared `Team Checkmate Logo.png` asset, out of this
+milestone's scope); mobile/responsive polish; Docker rebuild; deployment; final Red Lab
+v7.0 branding.
+
+Next: fetch origin and confirm `origin/stage3/ahsan` is still `91c4d7f` (unchanged since
+the v6.3 docs-closeout push) before pushing this commit, push normally (no force), observe
+the one automatically triggered gate run, confirm its deploy job is skipped, and leave
+PR #11 draft and unmerged. Do not touch Hugging Face.

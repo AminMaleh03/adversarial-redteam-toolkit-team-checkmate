@@ -1,7 +1,7 @@
 {
   "report_identity": {
     "name": "Red Lab Master Technical Report",
-    "product_version_label": "Red Lab v6.3",
+    "product_version_label": "Red Lab v6.4",
     "contracts_version": "3.0.0",
     "generator_module": "report.master_report",
     "generator_version": "1.0.0",
@@ -217,8 +217,8 @@
   "external_citations": [
     {
       "id": "ci_github_actions_run",
-      "description": "GitHub Actions 'Stage 3 release gate' run on stage3/ahsan, reported as the V6.2 final successful run. This session has no gh/GitHub API access, so the run's own uploaded artifact bytes could not be downloaded or hashed.",
-      "run_number": "35069693601",
+      "description": "GitHub Actions 'Stage 3 release gate' run on stage3/ahsan (PR #11), confirmed via the public GitHub REST API to have completed with conclusion success and its deploy job skipped. This session has no GitHub API token to download the run's own uploaded artifact bytes, so it is cited by run number and verified outcome only, never hashed as if its artifact were present.",
+      "run_number": "35075844725",
       "classification": "external_citation_unverifiable",
       "evaluation_id": "ci.emotion",
       "section": "H"
@@ -238,6 +238,8 @@
       "reason": "attacks/data/oces/oces_review_sheet.csv proposed_tier column contains zero GOLD rows (0 GOLD / 50 SILVER / 32 REVIEW of 82)."
     }
   ],
-  "rendered_index_sha256": "bd09c14621ec71164d58fda022f385acd7e044c52a442c282e1f175bf27cabbc",
-  "generated_at_utc": "2026-09-16T08:42:44.843590+00:00"
+  "rendered_index_sha256": "434b56cb50854761a9101056b9d5fc9fcbe7702116b2649bd46eb99fa7893b89",
+  "rendered_pdf_sha256": "bf2a904c2cfecbcf9cc0d5e856240f7c946f02a87912dea9e791c8d89e052350",
+  "pdf_reproducibility_limit": "Verified non-reproducible: rendering this same HTML twice (including across separate processes with PYTHONHASHSEED fixed) produces report.pdf files that differ in length and SHA-256. This build's PDFs carry no /CreationDate or /ModDate at all, so the divergence is not a timestamp; it appears inside a compressed content stream, consistent with non-deterministic internal serialization (e.g. font-subsetting order) in WeasyPrint/pydyf. The rendered HTML and the PDF's actual page content are reproducible from the same evidence; the PDF file bytes are not. The recorded hash below identifies this specific committed file, not a value a fresh regeneration reproduces.",
+  "generated_at_utc": "2026-09-16T09:42:03.816640+00:00"
 }

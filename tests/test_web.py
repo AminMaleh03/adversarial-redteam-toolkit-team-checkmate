@@ -64,14 +64,14 @@ def test_index_returns_branded_welcome_page(client):
 
 def test_home_shows_red_lab_version_label(client):
     body = client.get("/").text
-    assert "Red Lab v6.3" in body
+    assert "Red Lab v6.4" in body
 
 
 def test_active_pages_use_centralized_version_source_not_a_hardcoded_string(client):
     # v6.1: home, lab and generated report pages must all read the same PRODUCT_VERSION_LABEL
     # constant rather than each carrying its own copy of the string.
     from report.generate import PRODUCT_VERSION_LABEL
-    assert PRODUCT_VERSION_LABEL == "Red Lab v6.3"
+    assert PRODUCT_VERSION_LABEL == "Red Lab v6.4"
     home_body = client.get("/").text
     lab_body = client.get("/lab").text
     assert PRODUCT_VERSION_LABEL in home_body
@@ -712,16 +712,37 @@ def test_technical_report_route_serves_master_report(client):
         pytest.skip("technical_report artifact not present in this checkout")
     resp = client.get("/technical-report/")
     assert resp.status_code == 200
-    assert "Red Lab v6.3" in resp.text
+    assert "Red Lab v6.4" in resp.text
     assert "MASTER TECHNICAL REPORT" in resp.text
 
 
-def test_technical_report_route_has_no_pdf_button(client):
-    if not run_all.TECHNICAL_REPORT_DIR.exists():
-        pytest.skip("technical_report artifact not present in this checkout")
+def test_technical_report_route_serves_downloadable_pdf(client):
+    """V6.4: the master report (only) now has a Download PDF link, served from disk."""
+    pdf_path = run_all.TECHNICAL_REPORT_DIR / "report.pdf"
+    if not pdf_path.exists():
+        pytest.skip("technical_report PDF not present in this checkout")
     body = client.get("/technical-report/").text
-    assert "Download PDF" not in body
-    assert "report.pdf" not in body
+    assert 'href="report.pdf"' in body
+    assert "Download PDF" in body
+    resp = client.get("/technical-report/report.pdf")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/pdf"
+    assert resp.content[:5] == b"%PDF-"
+
+
+def test_live_demo_reports_still_have_no_pdf_button(client):
+    """The V6.4 master-report PDF button must never leak into live/demo report rendering.
+
+    demo_template.html/template_v3.html's own PDF-suppression logic is exercised directly
+    in tests/test_report.py; this is a narrow regression check that the master template's
+    new PDF link lives only in its own file, never shared with the demo templates.
+    """
+    master_template = (Path(__file__).resolve().parents[1] / "report" / "master_template.html").read_text(encoding="utf-8")
+    demo_template = (Path(__file__).resolve().parents[1] / "report" / "demo_template.html").read_text(encoding="utf-8")
+    v3_template = (Path(__file__).resolve().parents[1] / "report" / "template_v3.html").read_text(encoding="utf-8")
+    assert "report.pdf" in master_template
+    assert "report.pdf" not in demo_template
+    assert "{% if include_pdf and mode == 'full' %}" in v3_template
 
 
 def test_technical_report_verified_full_bytes_unmodified(client):

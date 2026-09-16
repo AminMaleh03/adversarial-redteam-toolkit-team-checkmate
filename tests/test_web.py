@@ -697,7 +697,7 @@ def test_new_run_allowed_after_previous_job_completes(monkeypatch, client, tmp_p
 def test_home_page_has_landing_background_canvas_and_particles_script(client):
     body = client.get("/").text
     assert 'id="rl-bg-canvas"' in body
-    assert '<script src="/static/particles.js">' in body
+    assert re.search(r'<script src="/static/particles\.js\?v=[0-9a-f]+">', body)
     # The canvas lives inside #view-home only -- never inside the execution view.
     home_section = body[body.index('id="view-home"'):body.index('id="view-execution"')]
     assert 'id="rl-bg-canvas"' in home_section
@@ -828,3 +828,50 @@ def test_technical_report_verified_full_bytes_unmodified(client):
         assert hashlib.sha256(resp.content).hexdigest() == recorded[name], name
     verified_body = client.get("/verified-full/report.html").text
     assert "Red Lab v5.0" in verified_body
+
+
+# ------------------------------------------------------------------------------------------
+# Static asset cache busting.
+#
+# The v7 deploy shipped correct dark CSS that visitors did not see: the templates linked
+# "/static/app.css" with no version and the platform sends no Cache-Control, so browsers
+# reused the previous release's stylesheet and rendered v7 markup in the superseded V5.5
+# light palette. The generated reports were unaffected because their CSS is inline, which
+# made it look like a partial deployment rather than a cache.
+# ------------------------------------------------------------------------------------------
+
+
+def test_static_assets_are_referenced_with_a_content_version(client):
+    for path in ("/", "/lab"):
+        body = client.get(path).text
+        for match in re.findall(r'(?:href|src)="(/static/[^"]+)"', body):
+            assert "?v=" in match, f"{path} links {match} with no cache-busting version"
+
+
+def test_asset_version_is_the_hash_of_the_file_actually_served(client):
+    url = web_app.asset_url("app.css")
+    name, _, query = url.partition("?")
+    served = client.get(name).content
+    expected = hashlib.sha256(served).hexdigest()[:12]
+    assert query == f"v={expected}"
+
+
+def test_asset_version_changes_when_the_file_changes():
+    before = web_app.asset_url("app.css")
+    original = (Path(web_app.HERE) / "static" / "app.css").read_bytes()
+    target = Path(web_app.HERE) / "static" / "app.css"
+    try:
+        target.write_bytes(original + b"\n/* cache-bust probe */\n")
+        web_app.ASSET_FINGERPRINTS = web_app._asset_fingerprints()
+        assert web_app.asset_url("app.css") != before
+    finally:
+        target.write_bytes(original)
+        web_app.ASSET_FINGERPRINTS = web_app._asset_fingerprints()
+    assert web_app.asset_url("app.css") == before
+
+
+def test_versioned_asset_still_serves_the_real_file(client):
+    url = web_app.asset_url("app.css")
+    r = client.get(url)
+    assert r.status_code == 200
+    assert b"--rl-base" in r.content

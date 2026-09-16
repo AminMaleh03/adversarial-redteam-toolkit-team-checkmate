@@ -934,7 +934,9 @@ def test_lab_page_loads_shared_app_css_and_no_lab_only_stylesheet(client):
     # masthead, circular back button, cards, landing tokens) comes from the one shared
     # web/static/app.css, so Home and Lab can never visually drift apart again.
     body = client.get("/lab").text
-    assert '<link rel="stylesheet" href="/static/app.css">' in body
+    # The href carries a content-hash query (?v=...) so a new release can never be answered
+    # from the previous release's cached stylesheet; match the path, not the exact string.
+    assert re.search(r'<link rel="stylesheet" href="/static/app\.css\?v=[0-9a-f]+">', body)
     assert body.count("<link rel=\"stylesheet\"") == 1
 
 

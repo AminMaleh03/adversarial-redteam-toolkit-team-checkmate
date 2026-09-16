@@ -6,7 +6,7 @@
   <meta name="description" content="Red Lab by Team Checkmate: run a real live adversarial attack test against a hardened and unhardened AI endpoint.">
   <title>{{ product_name }} &mdash; {{ product_tagline }}</title>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
 </head>
 <body class="page-home">
   <header class="masthead">
@@ -121,8 +121,8 @@
     <p>{{ creator_name }} &mdash; {{ product_name }}, {{ product_tagline }}</p>
   </footer>
 
-  <script src="/static/chrome.js"></script>
-  <script src="/static/app.js"></script>
-  <script src="/static/particles.js"></script>
+  <script src="{{ asset('chrome.js') }}"></script>
+  <script src="{{ asset('app.js') }}"></script>
+  <script src="{{ asset('particles.js') }}"></script>
 </body>
 </html>

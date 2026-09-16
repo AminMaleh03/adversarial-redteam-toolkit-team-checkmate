@@ -6,7 +6,7 @@
   <meta name="description" content="Red Lab Live Red-Team Lab: test your own sentence against a hardened and unhardened AI endpoint.">
   <title>{{ product_name }} &mdash; Live Red-Team Lab</title>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="{{ asset('app.css') }}">
 </head>
 <body class="has-back page-lab">
   <header class="masthead">
@@ -140,7 +140,7 @@
     <p>{{ creator_name }} &mdash; {{ product_name }}, Live Red-Team Lab</p>
   </footer>
 
-  <script src="/static/chrome.js"></script>
-  <script src="/static/lab.js"></script>
+  <script src="{{ asset('chrome.js') }}"></script>
+  <script src="{{ asset('lab.js') }}"></script>
 </body>
 </html>

@@ -29,6 +29,7 @@ from contract import (
 )
 
 from analysis import compare, drift, severity, validation
+from analysis.coverage import matched_delta
 from analysis.validation import validate_manifest, validate_rows, validate_run
 from analysis.compare import FindingGroupRef
 from analysis.drift import (
@@ -868,7 +869,48 @@ def build_comparison_summary(
             ],
         }
     )
+    summary.update(_matched_flip_rate_block(v1_analysis, v2_analysis, meta_v1, meta_v2))
     return summary
+
+
+def _matched_flip_rate_block(
+    v1_analysis: "VersionAnalysis", v2_analysis: "VersionAnalysis", meta_v1: dict, meta_v2: dict
+) -> dict:
+    """The paired flip rate over the intersection of both targets' eligible case ids.
+
+    Each side's own ``drift.eligible``/``flip_rate`` is reported separately and is not
+    interchangeable with the other's -- they can be drawn from different eligible sets.
+    ``analysis.coverage.matched_delta`` computes the one genuinely comparable figure: the
+    rate on exactly the case ids both targets could evaluate. It already existed, tested,
+    and was never wired into this function -- ``report/template_v3.html`` has always read
+    ``comparison.common_denominator``/``comparison.flip_rate_on_common`` and always fallen
+    back to "Not recorded", for every paired report this pipeline has ever produced.
+    """
+    v1_ids = {r.attack_id for r in v1_analysis.drift.records if r.status == "eligible"}
+    v2_ids = {r.attack_id for r in v2_analysis.drift.records if r.status == "eligible"}
+    common_ids = v1_ids & v2_ids
+    denominator = len(common_ids)
+
+    def rate_on_common(version_analysis: "VersionAnalysis") -> dict:
+        numerator = sum(
+            1 for r in version_analysis.drift.records
+            if r.attack_id in common_ids and r.qualifying_flip
+        )
+        return {
+            "numerator": numerator,
+            "denominator": denominator,
+            "rate": (numerator / denominator) if denominator else None,
+        }
+
+    v1_target_id = meta_v1.get("target_id") or "v1"
+    v2_target_id = meta_v2.get("target_id") or "v2"
+    matched = matched_delta(rate_on_common(v1_analysis), rate_on_common(v2_analysis), denominator)
+    return {
+        "common_denominator": denominator,
+        "flip_rate_on_common": {v1_target_id: matched["a"], v2_target_id: matched["b"]},
+        "matched_flip_rate_delta": matched["delta"],
+        "note": matched["note"],
+    }
 
 
 # --------------------------------------------------------------------------------------

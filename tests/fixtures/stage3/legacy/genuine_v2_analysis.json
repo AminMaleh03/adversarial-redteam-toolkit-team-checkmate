@@ -1863,7 +1863,22 @@
         ]
       }
     ],
-    "new_finding_evidence": []
+    "new_finding_evidence": [],
+    "common_denominator": 76,
+    "flip_rate_on_common": {
+      "v1": {
+        "numerator": 21,
+        "denominator": 76,
+        "rate": 0.27631578947368424
+      },
+      "v2": {
+        "numerator": 13,
+        "denominator": 76,
+        "rate": 0.17105263157894737
+      }
+    },
+    "matched_flip_rate_delta": -0.105263,
+    "note": "Computed over case ids eligible in both targets. Per-target denominators are reported separately and are not interchangeable."
   },
   "_provenance": {
     "is_synthetic": false,
